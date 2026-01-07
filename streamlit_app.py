@@ -13,6 +13,32 @@ from PIL import Image
 import db
 import config
 
+# --- Worker Manager (Singleton) ---
+@st.cache_resource
+class WorkerManager:
+    def __init__(self):
+        self.process = None
+
+    def ensure_worker_running(self):
+        # Check if process exists and is running
+        if self.process is None or self.process.poll() is not None:
+            print("WorkerManager: Starting worker process...")
+            # Use separate process group/detached logic if needed, but basic Popen is fine for supervision
+            self.process = subprocess.Popen(
+                [sys.executable, "/workspace/worker.py"],
+                cwd="/workspace",
+                # Log stdout/stderr to file for debugging
+                stdout=open("/workspace/output/worker.log", "a"),
+                stderr=subprocess.STDOUT
+            )
+        else:
+            # Worker is healthy
+            pass
+
+# Initialize Manager and ensure worker is running
+worker_mgr = WorkerManager()
+worker_mgr.ensure_worker_running()
+
 # Setup page
 st.set_page_config(page_title="Real-ESRGAN Web App", page_icon="🚀", layout="wide")
 st.image("Real-ESRGAN/assets/realesrgan_logo.png", width=320)
