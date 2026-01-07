@@ -71,7 +71,6 @@ def render_create_tab():
             "Model", opts, index=def_idx,
             format_func=lambda x: f"{x} - {model_map.get(x, '')}"
         )
-        # Extract raw name
         raw_model_name = model_name.split(" - ")[0]
         
         upscale = st.selectbox("Upscale factor", [2, 3, 4], index=1)
@@ -92,15 +91,34 @@ def render_create_tab():
             keep_audio = st.checkbox("Keep audio", config.DEFAULT_KEEP_AUDIO)
             crf = st.slider("CRF (Quality)", 10, 30, config.DEFAULT_CRF)
 
+    uploaded_file = None
     if input_type == "Video":
-        uploaded_file = st.file_uploader("Upload Video", type=["mp4", "mov", "mkv", "webm"])
+        uploaded_file = st.file_uploader(
+            "Upload Video", 
+            type=["mp4", "mov", "mkv", "webm"],
+            help=f"Limit: {config.MAX_VIDEO_SIZE_MB} MB"
+        )
+        st.caption(f"Limit: {config.MAX_VIDEO_SIZE_MB} MB per file")
     else:
-        uploaded_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg", "webp"])
+        uploaded_file = st.file_uploader(
+            "Upload Image", 
+            type=["png", "jpg", "jpeg", "webp"],
+            help=f"Limit: {config.MAX_IMAGE_SIZE_MB} MB"
+        )
+        st.caption(f"Limit: {config.MAX_IMAGE_SIZE_MB} MB per file")
 
     if st.button("🚀 Submit Task", type="primary"):
         if not uploaded_file:
             st.error("Please upload a file.")
         else:
+            # Check size logic
+            file_size_mb = uploaded_file.size / (1024 * 1024)
+            limit_mb = config.MAX_VIDEO_SIZE_MB if input_type == "Video" else config.MAX_IMAGE_SIZE_MB
+            
+            if file_size_mb > limit_mb:
+                st.error(f"File too large! {file_size_mb:.2f} MB > {limit_mb} MB")
+                return
+
             task_id = uuid.uuid4().hex
             output_root = Path("/workspace/output")
             run_dir = output_root / f"run_{task_id}"
@@ -111,13 +129,12 @@ def render_create_tab():
             with open(input_path, "wb") as f:
                 f.write(uploaded_file.read())
             
-            size_mb = input_path.stat().st_size / (1024*1024)
             duration, fps = 0.0, 0.0
             if input_type == "Video":
                 duration, fps = ffprobe_info(input_path)
             
             video_info = {
-                "size_mb": round(size_mb, 2),
+                "size_mb": round(file_size_mb, 2),
                 "duration": duration,
                 "fps": fps,
                 "filename": filename

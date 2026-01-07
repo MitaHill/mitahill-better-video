@@ -1,11 +1,19 @@
 import streamlit as st
 import db
 from .manager import WorkerManager
-from .layout import render_create_tab, render_status_tab
+import config
 
 def app():
     # Init DB
     db.init_db()
+    
+    # Configure Upload Limit (Global Max)
+    # Streamlit requires this to be set before any upload interaction
+    max_mb = max(config.MAX_VIDEO_SIZE_MB, config.MAX_IMAGE_SIZE_MB)
+    try:
+        st.set_option("server.maxUploadSize", max_mb)
+    except:
+        pass
     
     # Ensure worker
     mgr = WorkerManager()
