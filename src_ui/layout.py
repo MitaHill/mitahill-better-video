@@ -44,6 +44,17 @@ def ffprobe_info(file_path):
         return 0.0, 30.0
 
 def render_create_tab():
+    # CSS to hide the default Streamlit file size limit text
+    st.markdown("""
+        <style>
+        /* Hide the default limit text */
+        section[data-testid="stFileUploader"] small {
+            display: none !important;
+        }
+        /* Make our custom caption more prominent if needed */
+        </style>
+    """, unsafe_allow_html=True)
+
     st.header("Create New Upscale Task")
     col1, col2 = st.columns(2)
     
