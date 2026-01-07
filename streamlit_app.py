@@ -82,7 +82,8 @@ with tab_create:
                 "realesrnet-x4plus", 
                 "realesrgan-x4plus-anime", 
                 "realesr-animevideov3", 
-                "realesr-general-x4v3"
+                "realesr-general-x4v3",
+                "realesr-general-wdn-x4v3"
             ],
             index=0
         )
