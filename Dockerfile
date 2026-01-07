@@ -44,6 +44,10 @@ RUN mkdir -p /workspace/weights && \
 # 4. Copy Source Code (Changes often, should be last for cache efficiency)
 COPY . .
 
+# 5. Install Real-ESRGAN as a local library
+# This ensures 'from realesrgan import ...' works anywhere in the container
+RUN pip install -e Real-ESRGAN/
+
 EXPOSE 8501
 
 CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
