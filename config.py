@@ -36,6 +36,9 @@ DEFAULT_FP16 = get_env_bool("DEFAULT_FP16", True)
 DEFAULT_CRF = get_env_int("DEFAULT_CRF", 18)
 DEFAULT_KEEP_AUDIO = get_env_bool("DEFAULT_KEEP_AUDIO", True)
 
+# Long Video Handling
+SEGMENT_TIME_SECONDS = get_env_int("SEGMENT_TIME_SECONDS", 300) # 5 minutes
+
 FALLBACK_VRAM_GB = get_env_float("FALLBACK_VRAM_GB", 4.0)
 
 def get_gpu_memory_gb():

@@ -9,6 +9,7 @@ from pathlib import Path
 import sqlite3
 from PIL import Image
 import numpy as np
+import gc
 
 # Setup paths
 repo_root = "/workspace/Real-ESRGAN"
@@ -37,6 +38,14 @@ def get_video_codec(file_path):
     cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)]
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     return result.stdout.strip().lower()
+
+def get_video_duration(file_path):
+    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        return float(result.stdout.strip())
+    except:
+        return 0.0
 
 def ensure_weights(model_name, weights_dir):
     weights_dir = Path(weights_dir)
@@ -114,6 +123,87 @@ def build_model(model_name, scale, tile, tile_pad, fp16, weights_dir, denoise_st
     )
     return upsampler
 
+def process_segment(input_path, output_path, params, weights_dir, task_id, progress_offset, progress_scale):
+    """Process a single video segment."""
+    run_dir = input_path.parent
+    in_frames = run_dir / f"frames_in_{input_path.stem}"
+    out_frames = run_dir / f"frames_out_{input_path.stem}"
+    
+    # Clean previous if any
+    shutil.rmtree(in_frames, ignore_errors=True)
+    shutil.rmtree(out_frames, ignore_errors=True)
+    in_frames.mkdir()
+    out_frames.mkdir()
+
+    try:
+        # 1. Extract
+        extract_cmd = ["ffmpeg", "-y"]
+        if torch.cuda.is_available():
+            extract_cmd.extend(["-hwaccel", "cuda"])
+        extract_cmd.extend(["-i", str(input_path), "-vsync", "0", "-q:v", "2", str(in_frames / "f_%06d.jpg")])
+        run_ffmpeg(extract_cmd)
+
+        frames = sorted(list(in_frames.glob("*.jpg")))
+        total_frames = len(frames)
+        if total_frames == 0:
+            print(f"Warning: Segment {input_path.name} has no frames.")
+            return
+
+        # 2. Upscale
+        upsampler = build_model(
+            params['model_name'], params['upscale'], params['tile'], params['tile_pad'],
+            params['fp16'], weights_dir, params.get('denoise_strength')
+        )
+
+        for i, fpath in enumerate(frames, 1):
+            img = Image.open(fpath).convert("RGB")
+            img_np = np.array(img)[:, :, ::-1]
+            output, _ = upsampler.enhance(img_np, outscale=params['upscale'])
+            out_img = Image.fromarray(output[:, :, ::-1])
+            out_img.save(out_frames / fpath.name)
+            
+            # Save previews if this is the very first segment of the task
+            if "preview_done" not in params and i==1 and "segment_000" in input_path.name:
+                 img.save(run_dir.parent / f"run_{task_id}" / "preview_original.jpg")
+                 out_img.save(run_dir.parent / f"run_{task_id}" / "preview_upscaled.jpg")
+                 params['preview_done'] = True
+
+            # Update DB Progress
+            # Scale local progress (0-100) to global task progress
+            if i % 10 == 0 or i == total_frames:
+                local_pct = i / total_frames
+                global_pct = progress_offset + (local_pct * progress_scale)
+                db.update_task_status(task_id, "PROCESSING", int(global_pct), f"Segment {input_path.stem}: {i}/{total_frames}")
+        
+        # Free memory
+        del upsampler
+        torch.cuda.empty_cache()
+        gc.collect()
+
+        # 3. Encode Segment
+        audio_path = run_dir / f"audio_{input_path.stem}.m4a"
+        has_audio = False
+        if params.get('keep_audio'):
+            try:
+                run_ffmpeg(["ffmpeg", "-y", "-i", str(input_path), "-vn", "-acodec", "copy", str(audio_path)])
+                has_audio = audio_path.exists() and audio_path.stat().st_size > 0
+            except: pass
+
+        encode = ["ffmpeg", "-y", "-framerate", str(params.get('fps', 30)), "-start_number", "1",
+                  "-i", str(out_frames / "f_%06d.jpg")]
+        if has_audio:
+            encode.extend(["-i", str(audio_path), "-map", "0:v:0", "-map", "1:a:0?", "-c:a", "copy"])
+        
+        encode.extend(["-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "medium", "-crf", str(params.get('crf', 18)), str(output_path)])
+        run_ffmpeg(encode)
+
+    finally:
+        # ALWAYS clean up frames to save space
+        shutil.rmtree(in_frames, ignore_errors=True)
+        shutil.rmtree(out_frames, ignore_errors=True)
+        if 'audio_path' in locals() and audio_path.exists():
+            os.remove(audio_path)
+
 def process_single_task(task):
     task_id = task['task_id']
     print(f"Processing task: {task_id}")
@@ -139,70 +229,74 @@ def process_single_task(task):
             if codec in ['vp9', 'av1']:
                 raise ValueError(f"Unsupported codec: {codec}. VP9 and AV1 are not supported.")
 
-        # Logic from previous worker...
         if input_type == 'Video':
-            in_frames = run_dir / "frames_in"
-            out_frames = run_dir / "frames_out"
-            in_frames.mkdir(exist_ok=True)
-            out_frames.mkdir(exist_ok=True)
-
-            db.update_task_status(task_id, "PROCESSING", 5, "Extracting frames...")
-            extract_cmd = ["ffmpeg", "-y"]
-            if torch.cuda.is_available():
-                extract_cmd.extend(["-hwaccel", "cuda"])
-            extract_cmd.extend(["-i", str(input_path), "-vsync", "0", "-q:v", "2", str(in_frames / "f_%06d.jpg")])
-            run_ffmpeg(extract_cmd)
-
-            frames = sorted(list(in_frames.glob("*.jpg")))
-            total = len(frames)
-            if total == 0: raise RuntimeError("No frames extracted")
-
-            db.update_task_status(task_id, "PROCESSING", 10, "Loading model...")
-            upsampler = build_model(
-                params['model_name'], params['upscale'], params['tile'], params['tile_pad'],
-                params['fp16'], weights_dir, params.get('denoise_strength')
-            )
-
-            preview_done = False
-            for i, fpath in enumerate(frames, 1):
-                img = Image.open(fpath).convert("RGB")
-                img_np = np.array(img)[:, :, ::-1]
-                output, _ = upsampler.enhance(img_np, outscale=params['upscale'])
-                out_img = Image.fromarray(output[:, :, ::-1])
-                out_img.save(out_frames / fpath.name)
-
-                if not preview_done:
-                    img.save(run_dir / "preview_original.jpg")
-                    out_img.save(run_dir / "preview_upscaled.jpg")
-                    preview_done = True
-
-                if i % 5 == 0 or i == total:
-                    pct = 10 + int((i / total) * 80)
-                    db.update_task_status(task_id, "PROCESSING", pct, f"Upscaling {i}/{total}")
-
-            db.update_task_status(task_id, "PROCESSING", 90, "Encoding...")
-            audio_path = run_dir / "audio.m4a"
-            has_audio = False
-            if params.get('keep_audio'):
-                try:
-                    run_ffmpeg(["ffmpeg", "-y", "-i", str(input_path), "-vn", "-acodec", "copy", str(audio_path)])
-                    has_audio = audio_path.exists() and audio_path.stat().st_size > 0
-                except: pass
-
-            video_out_name = f"sr_{Path(filename).stem}.mp4"
-            video_out = output_root / video_out_name
+            duration = get_video_duration(input_path)
             
-            encode = ["ffmpeg", "-y", "-framerate", str(params.get('fps', 30)), "-start_number", "1",
-                      "-i", str(out_frames / "f_%06d.jpg")]
-            if has_audio:
-                encode.extend(["-i", str(audio_path), "-map", "0:v:0", "-map", "1:a:0?", "-c:a", "copy"])
-            
-            encode.extend(["-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "medium", "-crf", str(params.get('crf', 18)), str(video_out)])
-            run_ffmpeg(encode)
-            
-            db.update_task_status(task_id, "COMPLETED", 100, f"Output: {video_out_name}")
+            # --- SEGMENTATION LOGIC ---
+            if duration > config.SEGMENT_TIME_SECONDS:
+                print(f"Long video detected ({duration}s). Using segmentation mode.")
+                segments_dir = run_dir / "segments"
+                segments_dir.mkdir(exist_ok=True)
+                
+                # Split video
+                db.update_task_status(task_id, "PROCESSING", 1, "Splitting video into chunks...")
+                
+                # Check if already split (resume)
+                existing_segs = sorted(list(segments_dir.glob("seg_*.mp4")))
+                if not existing_segs:
+                    run_ffmpeg([
+                        "ffmpeg", "-i", str(input_path), 
+                        "-c", "copy", "-map", "0",
+                        "-segment_time", str(config.SEGMENT_TIME_SECONDS), 
+                        "-f", "segment", "-reset_timestamps", "1",
+                        str(segments_dir / "seg_%03d.mp4")
+                    ])
+                    existing_segs = sorted(list(segments_dir.glob("seg_*.mp4")))
+                
+                total_segs = len(existing_segs)
+                concat_list_path = run_dir / "concat_list.txt"
+                with open(concat_list_path, "w") as f:
+                    for idx, seg_path in enumerate(existing_segs):
+                        sr_seg_name = f"{seg_path.stem}_sr.mp4"
+                        sr_seg_path = segments_dir / sr_seg_name
+                        
+                        # Process if SR segment doesn't exist
+                        if not sr_seg_path.exists():
+                            # Calculate progress range for this segment
+                            # e.g., 2 segments. Seg 1: 5%-50%. Seg 2: 50%-95%.
+                            p_start = 5 + int((idx / total_segs) * 90)
+                            p_end = 5 + int(((idx + 1) / total_segs) * 90)
+                            p_scale = p_end - p_start
+                            
+                            process_segment(seg_path, sr_seg_path, params, weights_dir, task_id, p_start, p_scale)
+                            
+                            # Delete source segment to save space? Optional. 
+                            # Better keep source segment in case of retry, but frames are gone.
+                        
+                        f.write(f"file '{sr_seg_path.name}'\n")
+                
+                # Concat
+                db.update_task_status(task_id, "PROCESSING", 98, "Merging segments...")
+                video_out_name = f"sr_{Path(filename).stem}.mp4"
+                video_out = output_root / video_out_name
+                
+                run_ffmpeg([
+                    "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+                    "-i", str(concat_list_path), "-c", "copy", str(video_out)
+                ])
+                
+                # Cleanup segments
+                shutil.rmtree(segments_dir, ignore_errors=True)
+                
+                db.update_task_status(task_id, "COMPLETED", 100, f"Output: {video_out_name}")
+                
+            else:
+                # --- ORIGINAL SINGLE PASS ---
+                process_segment(input_path, output_root / f"sr_{Path(filename).stem}.mp4", params, weights_dir, task_id, 0, 100)
+                db.update_task_status(task_id, "COMPLETED", 100, f"Output: sr_{Path(filename).stem}.mp4")
 
         elif input_type == 'Image':
+            # Reuse image logic (simplified for brevity, assume similar)
             upsampler = build_model(
                 params['model_name'], params['upscale'], params['tile'], params['tile_pad'],
                 params['fp16'], weights_dir, params.get('denoise_strength')
@@ -212,16 +306,13 @@ def process_single_task(task):
             out_img = Image.fromarray(output[:,:,::-1])
             out_name = f"sr_{Path(filename).stem}.png"
             out_img.save(output_root / out_name)
-            
             img.save(run_dir / "preview_original.jpg")
             out_img.save(run_dir / "preview_upscaled.jpg")
-            
             db.update_task_status(task_id, "COMPLETED", 100, f"Output: {out_name}")
 
     except Exception as e:
         print(f"Task {task_id} failed: {e}")
         db.update_task_status(task_id, "FAILED", 0, str(e))
-        # If codec error, verify cleanup
         if "Unsupported codec" in str(e):
             db.delete_task(task_id)
 
@@ -236,8 +327,6 @@ def recover_tasks():
         try:
             params = json.loads(task['task_params'])
             filename = params.get('filename')
-            
-            # Check source file
             run_dir = output_root / f"run_{task_id}"
             input_path = run_dir / filename
             
@@ -247,7 +336,6 @@ def recover_tasks():
             else:
                 print(f"Cleaning task {task_id}: Source missing, deleting.")
                 db.delete_task(task_id)
-                # Cleanup run dir if it exists but empty/partial
                 if run_dir.exists():
                     shutil.rmtree(run_dir, ignore_errors=True)
         except Exception as e:
@@ -255,18 +343,14 @@ def recover_tasks():
             db.delete_task(task_id)
 
 def worker_loop():
-    # 0. Recover
     recover_tasks()
-    
     print("Worker daemon started. Waiting for tasks...")
     while True:
-        # 1. Cleanup
         try:
             db.cleanup_old_tasks(config.TASK_TTL_HOURS)
         except Exception as e:
             print(f"Cleanup error: {e}")
 
-        # 2. Fetch Pending
         conn = sqlite3.connect(db.DB_PATH)
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
@@ -276,6 +360,10 @@ def worker_loop():
 
         if row:
             process_single_task(dict(row))
+            # Force GC after task
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
         else:
             time.sleep(2)
 
