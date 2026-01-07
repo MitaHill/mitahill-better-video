@@ -2,6 +2,9 @@ import os
 import subprocess
 import sys
 import logging
+import platform
+import hashlib
+import yaml
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -14,15 +17,80 @@ logging.basicConfig(
 )
 logger = logging.getLogger("CONFIG")
 
+# --- System Information Collection (DEBUG) ---
+def log_system_info():
+    logger.debug("-" * 60)
+    logger.debug("SYSTEM INFORMATION GATHERING")
+    logger.debug(f"OS: {platform.system()} {platform.release()} ({platform.version()})")
+    logger.debug(f"Architecture: {platform.machine()}")
+    logger.debug(f"Hostname: {platform.node()}")
+    logger.debug(f"Python Version: {sys.version}")
+    
+    # CPU Info
+    try:
+        if platform.system() == "Linux":
+            cpu_info = subprocess.check_output("cat /proc/cpuinfo | grep 'model name' | uniq", shell=True).decode().strip()
+            logger.debug(f"CPU: {cpu_info}")
+        logger.debug(f"CPU Cores: {os.cpu_count()}")
+    except: pass
+
+    # Memory Info
+    try:
+        if platform.system() == "Linux":
+            mem_info = subprocess.check_output("free -h", shell=True).decode()
+            logger.debug(f"Memory Status:\n{mem_info}")
+    except: pass
+
+    # GPU Info (Detailed)
+    try:
+        gpu_info = subprocess.check_output(["nvidia-smi", "--query-gpu=name,driver_version,pcie.link.gen.max,vbios_version", "--format=csv,noheader"]).decode().strip()
+        logger.debug(f"GPU Details: {gpu_info}")
+    except:
+        logger.debug("GPU Details: nvidia-smi failed to retrieve extended info.")
+    logger.debug("-" * 60)
+
+# --- Model SHA256 Verification ---
+def verify_models():
+    sha_file = Path("data/models_sha256.yaml")
+    weights_dir = Path("/workspace/weights")
+    
+    if not sha_file.exists():
+        logger.critical(f"[FAILED] SHA256 verification file missing: {sha_file}")
+        sys.exit(1)
+        
+    try:
+        with open(sha_file, "r") as f:
+            data = yaml.safe_load(f)
+            expected_hashes = data.get("models", {})
+    except Exception as e:
+        logger.critical(f"[FAILED] Failed to read SHA256 YAML: {e}")
+        sys.exit(1)
+
+    logger.info("Starting mandatory model integrity check...")
+    for model_name, expected_sha in expected_hashes.items():
+        model_path = weights_dir / model_name
+        if not model_path.exists():
+            logger.critical(f"[FAILED] Model file missing: {model_path}")
+            sys.exit(1)
+            
+        logger.debug(f"Verifying {model_name}...")
+        sha256_hash = hashlib.sha256()
+        with open(model_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        
+        actual_sha = sha256_hash.hexdigest()
+        if actual_sha != expected_sha:
+            logger.critical(f"[FAILED] SHA256 mismatch for {model_name}!")
+            logger.critical(f"Expected: {expected_sha}")
+            logger.critical(f"Actual:   {actual_sha}")
+            sys.exit(1)
+    
+    logger.info("[SUCCESS] All model files verified (SHA256 matched).")
+
 # --- Fail-Fast Configuration Loading ---
 env_path = Path(".env")
-if env_path.exists():
-    logger.info(f"Loading configuration from {env_path.absolute()}")
-    if not load_dotenv(dotenv_path=env_path, override=True):
-        logger.critical("[FAILED] .env file found but could not be parsed.")
-        sys.exit(1)
-else:
-    logger.warning(".env file not found. Relying on System Environment Variables.")
+load_dotenv(dotenv_path=env_path, override=True)
 
 def get_env_bool(key, default):
     val = os.getenv(key, str(default)).lower()
@@ -62,39 +130,31 @@ except Exception as e:
     sys.exit(1)
 
 def get_gpu_memory_gb():
-    """HARD REQUIREMENT: Detect GPU or DIE."""
-    logger.debug("Mandatory GPU check starting...")
     try:
         cmd = ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"]
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
         mem_mb = float(result.stdout.strip().split('\n')[0])
         gb = mem_mb / 1024.0
-        logger.info(f"[SUCCESS] NVIDIA GPU Detected: {gb:.2f} GB VRAM")
         return gb
     except Exception as e:
         logger.error("-" * 60)
         logger.critical("[FAILED] NVIDIA GPU NOT DETECTED OR DRIVER ERROR!")
         logger.critical(f"Detailed Error: {e}")
-        logger.critical("SUGGESTIONS:")
-        logger.critical("1. Ensure NVIDIA Container Toolkit is installed on host.")
-        logger.critical("2. Ensure 'runtime: nvidia' is set in docker-compose or use '--gpus all'.")
-        logger.critical("3. Check if NVIDIA drivers are healthy on the host (run nvidia-smi).")
         logger.error("-" * 60)
         sys.exit(1)
 
 def get_smart_tile_size():
     env_tile = get_env_int("DEFAULT_TILE_SIZE", 0)
-    if env_tile > 0:
-        logger.info(f"Manual override: Tile Size = {env_tile}")
-        return env_tile
-
+    if env_tile > 0: return env_tile
     vram = get_gpu_memory_gb()
-    # If we are here, vram is guaranteed not None
     if vram < 4: res = 128
     elif vram < 6: res = 256
     elif vram < 10: res = 400
-    else: res = 512
+    else: return 512
     return res
 
+# --- EXECUTION ON IMPORT ---
+log_system_info()
+verify_models()
 DEFAULT_SMART_TILE_SIZE = get_smart_tile_size()
 logger.info("Application context initialized successfully.")
