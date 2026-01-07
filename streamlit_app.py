@@ -75,16 +75,20 @@ with tab_create:
     col1, col2 = st.columns(2)
     
     with col1:
+        # Model descriptions
+        model_map = {
+            "realesrgan-x4plus": "📸 通用 (画质优先/慢) - 适合真实照片/细节恢复",
+            "realesrnet-x4plus": "🧹 通用 (去噪优先/慢) - 适合有噪点的照片",
+            "realesrgan-x4plus-anime": "🎨 动漫 (画质优先/慢) - 适合插画/壁纸",
+            "realesr-animevideov3": "🎬 动漫视频 (速度优先/快) - 适合长视频处理",
+            "realesr-general-x4v3": "⚡ 通用 (速度优先/快) - 可调节降噪",
+            "realesr-general-wdn-x4v3": "🌫️ 通用 (强力降噪/快) - 速度优先"
+        }
+        
         model_name = st.selectbox(
             "Model",
-            [
-                "realesrgan-x4plus", 
-                "realesrnet-x4plus", 
-                "realesrgan-x4plus-anime", 
-                "realesr-animevideov3", 
-                "realesr-general-x4v3",
-                "realesr-general-wdn-x4v3"
-            ],
+            options=list(model_map.keys()),
+            format_func=lambda x: model_map.get(x, x),
             index=0
         )
         upscale = st.selectbox("Upscale factor", [2, 3, 4], index=1)
