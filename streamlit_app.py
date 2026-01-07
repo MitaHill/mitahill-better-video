@@ -77,7 +77,13 @@ with tab_create:
     with col1:
         model_name = st.selectbox(
             "Model",
-            ["realesrgan-x4plus", "realesrnet-x4plus", "realesr-general-x4v3"],
+            [
+                "realesrgan-x4plus", 
+                "realesrnet-x4plus", 
+                "realesrgan-x4plus-anime", 
+                "realesr-animevideov3", 
+                "realesr-general-x4v3"
+            ],
             index=0
         )
         upscale = st.selectbox("Upscale factor", [2, 3, 4], index=1)
