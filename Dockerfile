@@ -35,7 +35,7 @@ RUN pip install --upgrade pip "numpy<2" && \
 RUN mkdir -p /workspace/weights && \
     wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth && \
     wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/RealESRNet_x4plus.pth && \
-    wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.3.0/realesr-animevideov3.pth && \
+    wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth && \
     wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus_anime_6B.pth && \
     wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth && \
     wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth
