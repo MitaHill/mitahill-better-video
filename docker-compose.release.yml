@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  app:
+    image: kindmitaishere/realesrgan-web:20260107-1153
+    container_name: realesrgan_app
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8501:8501"
+    volumes:
+      # Mount the output directory to persist data
+      - ./output:/workspace/output
+      # Mount the .env file for configuration
+      - ./.env:/workspace/.env
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
