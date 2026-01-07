@@ -3,12 +3,23 @@ import shutil
 import subprocess
 from pathlib import Path
 
-# Try to load dotenv
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+# --- Robust .env Loader (No dependencies required) ---
+def load_env_file(dotenv_path=".env"):
+    path = Path(dotenv_path)
+    if path.exists():
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    k, v = line.split("=", 1)
+                    # Remove quotes if present
+                    v = v.strip().strip('"').strip("'")
+                    os.environ[k.strip()] = v
+
+# Load configuration from .env at module level
+load_env_file()
 
 def get_env_bool(key, default):
     val = os.getenv(key, str(default)).lower()

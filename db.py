@@ -67,14 +67,25 @@ def update_task_status(task_id, status, progress=None, message=None):
     conn.close()
 
 def delete_task(task_id):
-    """Delete task from DB and remove associated files."""
+    """Delete task from DB and remove associated files (run dir and result file)."""
+    # 1. Get task info before deleting to find result file
+    task = get_task(task_id)
+    result_filename = None
+    if task and task.get('task_params'):
+        try:
+            params = json.loads(task['task_params'])
+            result_filename = f"sr_{params.get('filename')}"
+        except:
+            pass
+
+    # 2. Delete from DB
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("DELETE FROM task_queue WHERE task_id = ?", (task_id,))
     conn.commit()
     conn.close()
     
-    # Remove files
+    # 3. Remove run directory
     output_root = Path("/workspace/output")
     run_dir = output_root / f"run_{task_id}"
     import shutil
@@ -84,17 +95,55 @@ def delete_task(task_id):
         except Exception as e:
             print(f"Failed to delete run dir {run_dir}: {e}")
             
-    # Also clean up potential result files in output root if named systematically
-    # (Current worker saves sr_xxx to output root, we might need to track output path in DB to clean perfectly)
-    # For now, we only clean the run_dir which holds the bulk.
+    # 4. Remove final result file if exists
+    if result_filename:
+        # Check for original extension and .mp4 (since we often convert to mp4)
+        stem = Path(result_filename).stem
+        for p in output_root.glob(f"{stem}*"):
+            if p.is_file():
+                try:
+                    p.unlink()
+                except:
+                    pass
+
+def get_next_task_atomic():
+    """Pick next pending task and mark it as PROCESSING atomically."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    try:
+        # Atomic selection and update using a transaction
+        c.execute("BEGIN IMMEDIATE")
+        c.execute("SELECT * FROM task_queue WHERE status = 'PENDING' ORDER BY created_at ASC LIMIT 1")
+        row = c.fetchone()
+        if row:
+            task_id = row['task_id']
+            c.execute("UPDATE task_queue SET status = 'PROCESSING', message = 'Initializing...' WHERE task_id = ?", (task_id,))
+            conn.commit()
+            return dict(row)
+        else:
+            conn.rollback()
+            return None
+    except Exception as e:
+        conn.rollback()
+        print(f"DB Error picking next task: {e}")
+        return None
+    finally:
+        conn.close()
 
 def cleanup_old_tasks(hours_ttl):
-    """Remove tasks older than hours_ttl."""
+    """Remove finished tasks older than hours_ttl, or stuck tasks older than 48h."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    cutoff = datetime.datetime.now() - datetime.timedelta(hours=hours_ttl)
-    c.execute("SELECT task_id FROM task_queue WHERE created_at < ?", (cutoff,))
+    now = datetime.datetime.now()
+    finished_cutoff = now - datetime.timedelta(hours=hours_ttl)
+    stuck_cutoff = now - datetime.timedelta(hours=48)
+    
+    # Target finished tasks older than TTL OR any task older than 48 hours
+    c.execute("""SELECT task_id FROM task_queue 
+                 WHERE (status IN ('COMPLETED', 'FAILED') AND created_at < ?)
+                 OR (created_at < ?)""", (finished_cutoff, stuck_cutoff))
     rows = c.fetchall()
     conn.close()
     
@@ -104,7 +153,7 @@ def cleanup_old_tasks(hours_ttl):
         count += 1
     
     if count > 0:
-        print(f"Cleaned up {count} old tasks.")
+        print(f"Cleaned up {count} tasks from history.")
 
 def get_unfinished_tasks():
     """Get all tasks that are stuck in PROCESSING or PENDING (e.g. after restart)."""

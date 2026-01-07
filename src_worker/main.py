@@ -45,15 +45,11 @@ def worker_loop():
         except Exception as e:
             print(f"Cleanup error: {e}")
 
-        conn = sqlite3.connect(db.DB_PATH)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute("SELECT * FROM task_queue WHERE status = 'PENDING' ORDER BY created_at ASC LIMIT 1")
-        row = c.fetchone()
-        conn.close()
+        # Atomic pick and mark
+        task = db.get_next_task_atomic()
 
-        if row:
-            process_single_task(dict(row))
+        if task:
+            process_single_task(task)
             gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
