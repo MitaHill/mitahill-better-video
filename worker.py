@@ -67,6 +67,14 @@ def ensure_weights(model_name, weights_dir):
     local_path = weights_dir / fname
     
     if not local_path.exists():
+        # Check pre-downloaded weights
+        pre_downloaded = Path("/workspace/weights") / fname
+        if pre_downloaded.exists():
+            print(f"Found pre-downloaded model: {pre_downloaded}")
+            # Symlink or Copy? Copy is safer for permissions/modification
+            shutil.copy(pre_downloaded, local_path)
+            return local_path
+
         url = urls.get(model_name)
         if url:
             print(f"Downloading {fname} from {url}...")
