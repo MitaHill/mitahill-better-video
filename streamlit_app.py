@@ -5,6 +5,8 @@ import math
 import shutil
 import tempfile
 import subprocess
+import sqlite3
+import datetime
 from pathlib import Path
 
 import numpy as np
@@ -24,6 +26,40 @@ if os.path.isdir(os.path.join(repo_root, "realesrgan")):
 from realesrgan import RealESRGANer
 from realesrgan.archs.srvgg_arch import SRVGGNetCompact
 from basicsr.archs.rrdbnet_arch import RRDBNet
+
+# --- Database ---
+DB_PATH = Path("/workspace/output/tasks.db")
+
+def init_db():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS tasks
+                 (run_token TEXT PRIMARY KEY, 
+                  timestamp DATETIME,
+                  input_type TEXT, 
+                  filename TEXT, 
+                  model TEXT, 
+                  status TEXT)''')
+    conn.commit()
+    conn.close()
+
+def log_task_start(run_token, input_type, filename, model):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT INTO tasks (run_token, timestamp, input_type, filename, model, status) VALUES (?, ?, ?, ?, ?, ?)",
+              (run_token, datetime.datetime.now(), input_type, filename, model, "RUNNING"))
+    conn.commit()
+    conn.close()
+
+def update_task_status(run_token, status):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("UPDATE tasks SET status = ? WHERE run_token = ?", (status, run_token))
+    conn.commit()
+    conn.close()
+
+init_db()
 
 st.image("Real-ESRGAN/assets/realesrgan_logo.png", width=320)
 # Increase upload limit to 1 GB
@@ -315,6 +351,18 @@ with st.sidebar:
     keep_audio = st.checkbox("Keep original audio", True) if input_type == "Video" else False
     crf = st.slider("CRF (lower = higher quality, larger file)", 14, 28, 18) if input_type == "Video" else 18
 
+    # History
+    with st.expander("History"):
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            # Use pandas if available, else simple table
+            import pandas as pd
+            df = pd.read_sql_query("SELECT timestamp, input_type, filename, status FROM tasks ORDER BY timestamp DESC LIMIT 10", conn)
+            st.dataframe(df)
+            conn.close()
+        except Exception:
+            st.write("No history yet.")
+
 # Uploaders by type
 uploaded_video = None
 uploaded_image = None
@@ -370,6 +418,7 @@ if input_type == "Video" and uploaded_video and start and not st.session_state.w
     st.session_state.cancel = False
     st.session_state.last_config_hash = cfg_hash
     run_token = new_run_token()
+    log_task_start(run_token, "Video", uploaded_video.name, model_name)
 
     try:
         # Persistent output workspace under /workspace/output
@@ -483,6 +532,7 @@ if input_type == "Video" and uploaded_video and start and not st.session_state.w
             
             encode_with_libx264()
 
+            update_task_status(run_token, "COMPLETED")
             st.success("Done!")
             st.video(str(video_out))
             with open(video_out, "rb") as f:
@@ -490,8 +540,10 @@ if input_type == "Video" and uploaded_video and start and not st.session_state.w
 
     except RuntimeError as e:
         if "Cancelled" in str(e):
+            update_task_status(run_token, "CANCELLED")
             st.warning("Run cancelled.")
         else:
+            update_task_status(run_token, "FAILED")
             st.error(str(e))
     finally:
         st.session_state.worker_running = False
@@ -506,6 +558,11 @@ elif input_type == "Image" and uploaded_image and start and not st.session_state
     st.session_state.cancel = False
     st.session_state.last_config_hash = cfg_hash
     run_token = new_run_token()
+    # For multiple files, log the first one or a summary
+    fname_log = uploaded_image[0].name if uploaded_image else "unknown"
+    if len(uploaded_image) > 1:
+        fname_log += f" (+{len(uploaded_image)-1} others)"
+    log_task_start(run_token, "Image", fname_log, model_name)
 
     try:
         # Persistent output workspace under /workspace/output
@@ -561,14 +618,17 @@ elif input_type == "Image" and uploaded_image and start and not st.session_state
             for p in out_paths:
                 zf.write(p, arcname=p.name)
 
+        update_task_status(run_token, "COMPLETED")
         st.success("Done!")
         with open(zip_out, "rb") as f:
             st.download_button("Download all upscaled images (ZIP)", f, file_name=zip_out.name)
 
     except RuntimeError as e:
         if "Cancelled" in str(e):
+            update_task_status(run_token, "CANCELLED")
             st.warning("Run cancelled.")
         else:
+            update_task_status(run_token, "FAILED")
             st.error(str(e))
     finally:
         st.session_state.worker_running = False
