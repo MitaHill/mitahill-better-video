@@ -27,7 +27,7 @@ def get_env_float(key, default):
         return default
 
 # --- Configuration ---
-TASK_TTL_HOURS = get_env_int("TASK_TTL_HOURS", 12)
+TASK_TTL_HOURS = get_env_float("TASK_TTL_HOURS", 12.0)
 
 DEFAULT_UPSCALE_FACTOR = get_env_int("DEFAULT_UPSCALE_FACTOR", 2)
 DEFAULT_MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "realesrgan-x4plus")
