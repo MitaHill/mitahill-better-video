@@ -41,11 +41,12 @@ def get_video_duration(file_path):
     except:
         return 0.0
 
-def build_model(model_name, scale, tile, tile_pad, fp16, weights_dir, denoise_strength):
+def ensure_weights(model_name, weights_dir):
+    """Ensure weights exist, download if needed."""
     weights_dir = Path(weights_dir)
     weights_dir.mkdir(parents=True, exist_ok=True)
     
-    fname_map = {
+    default_files = {
         "realesrgan-x4plus": "RealESRGAN_x4plus.pth",
         "realesrnet-x4plus": "RealESRNet_x4plus.pth",
         "realesr-animevideov3": "realesr-animevideov3.pth",
@@ -53,8 +54,49 @@ def build_model(model_name, scale, tile, tile_pad, fp16, weights_dir, denoise_st
         "realesr-general-x4v3": "realesr-general-x4v3.pth",
         "realesr-general-wdn-x4v3": "realesr-general-wdn-x4v3.pth",
     }
+    urls = {
+        "realesrgan-x4plus": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+        "realesrnet-x4plus": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/RealESRNet_x4plus.pth",
+        "realesr-animevideov3": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.3.0/realesr-animevideov3.pth",
+        "realesrgan-x4plus-anime": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus_anime_6B.pth",
+        "realesr-general-x4v3": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth",
+        "realesr-general-wdn-x4v3": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth",
+    }
     
-    model_path = weights_dir / fname_map.get(model_name, f"{model_name}.pth")
+    fname = default_files.get(model_name, f"{model_name}.pth")
+    local_path = weights_dir / fname
+    
+    if not local_path.exists():
+        url = urls.get(model_name)
+        if url:
+            print(f"Downloading {fname} from {url}...")
+            import urllib.request
+            try:
+                urllib.request.urlretrieve(url, local_path)
+                print(f"Download complete: {local_path}")
+            except Exception as e:
+                print(f"Failed to download {model_name}: {e}")
+                # Don't raise yet, maybe the user has it elsewhere? 
+                # But realistically this will fail later.
+        else:
+            print(f"No URL found for model {model_name}, assuming local file exists.")
+            
+    return local_path
+
+def build_model(model_name, scale, tile, tile_pad, fp16, weights_dir, denoise_strength):
+    weights_dir = Path(weights_dir)
+    # Ensure weights logic called here
+    # For general-x4v3 we might need two files
+    if model_name == "realesr-general-x4v3" and denoise_strength is not None and denoise_strength != 1.0:
+        main_path = ensure_weights("realesr-general-x4v3", weights_dir)
+        wdn_path = ensure_weights("realesr-general-wdn-x4v3", weights_dir)
+        model_path = [str(main_path), str(wdn_path)]
+        dni_weight = [float(denoise_strength), float(1.0 - denoise_strength)]
+    else:
+        # Standard model
+        model_path = ensure_weights(model_name, weights_dir)
+        dni_weight = None
+        model_path = str(model_path)
     
     if model_name in ("realesrgan-x4plus", "realesrnet-x4plus"):
         model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=4)
@@ -66,14 +108,6 @@ def build_model(model_name, scale, tile, tile_pad, fp16, weights_dir, denoise_st
         model = SRVGGNetCompact(num_in_ch=3, num_out_ch=3, num_feat=64, num_conv=32, upscale=4, act_type='prelu')
     else:
         raise ValueError(f"Unknown model {model_name}")
-
-    dni_weight = None
-    if model_name == "realesr-general-x4v3" and denoise_strength is not None and denoise_strength != 1.0:
-        wdn_path = weights_dir / "realesr-general-wdn-x4v3.pth"
-        model_path = [str(model_path), str(wdn_path)]
-        dni_weight = [float(denoise_strength), float(1.0 - denoise_strength)]
-    else:
-        model_path = str(model_path)
 
     upsampler = RealESRGANer(
         scale=4,
