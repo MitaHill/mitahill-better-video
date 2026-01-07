@@ -40,6 +40,9 @@ DEFAULT_KEEP_AUDIO = get_env_bool("DEFAULT_KEEP_AUDIO", True)
 MAX_VIDEO_SIZE_MB = get_env_int("MAX_VIDEO_SIZE_MB", 1024)
 MAX_IMAGE_SIZE_MB = get_env_int("MAX_IMAGE_SIZE_MB", 1024)
 
+# Video Segmentation
+SEGMENT_TIME_SECONDS = get_env_int("SEGMENT_TIME_SECONDS", 300)
+
 # Fallback VRAM in GB (used if nvidia-smi fails)
 FALLBACK_VRAM_GB = get_env_float("FALLBACK_VRAM_GB", 4.0)
 
