@@ -41,11 +41,13 @@ RUN mkdir -p /workspace/weights && \
     wget -q -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth && \
     wget -q -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth
 
-# 4. Copy Source Code (Changes often, should be last for cache efficiency)
+# --- CACHE BUSTER TO ENSURE SOURCE CODE IS ALWAYS RE-COPIED AND RE-VERIFIED ---
+RUN echo "Triggering Re-build at: $(date)"
+
+# 4. Copy Source Code
 COPY . .
 
 # 5. Install Real-ESRGAN as a local library
-# This ensures 'from realesrgan import ...' works anywhere in the container
 RUN pip install -e Real-ESRGAN/
 
 EXPOSE 8501

@@ -5,7 +5,8 @@ from .layout import render_create_tab, render_status_tab
 import config
 
 def app():
-    # Init DB
+    # Init Config & DB
+    config.initialize_context()
     db.init_db()
     
     # Configure Upload Limit (Global Max)

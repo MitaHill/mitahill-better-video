@@ -38,35 +38,39 @@ def recover_tasks():
             db.delete_task(task_id)
 
 def worker_loop():
-    logger.info("--- Worker Process Initiated ---")
-    db.init_db()
-    recover_tasks()
-    
-    logger.info(f"Daemon Loop Started (TTL: {config.TASK_TTL_HOURS}h, Segments: {config.SEGMENT_TIME_SECONDS}s)")
-    
-    while True:
-        try:
-            db.cleanup_old_tasks(config.TASK_TTL_HOURS)
-        except Exception as e:
-            logger.error(f"Background cleanup failed: {e}")
-
-        # Atomic pick and mark
-        task = db.get_next_task_atomic()
-
-        if task:
+    try:
+        logger.info("--- Worker Process Initiated ---")
+        config.initialize_context()
+        db.init_db()
+        recover_tasks()
+        
+        logger.info(f"Daemon Loop Started (TTL: {config.TASK_TTL_HOURS}h, Segments: {config.SEGMENT_TIME_SECONDS}s)")
+        
+        while True:
             try:
-                process_single_task(task)
+                db.cleanup_old_tasks(config.TASK_TTL_HOURS)
             except Exception as e:
-                logger.error(f"Fatal error during task {task['task_id']}: {e}")
-                db.update_task_status(task['task_id'], "FAILED", message=str(e))
-            finally:
-                logger.debug(f"Memory cleanup after task {task['task_id']}")
-                gc.collect()
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-        else:
-            # Idle
-            time.sleep(2)
+                logger.error(f"Background cleanup failed: {e}")
+
+            # Atomic pick and mark
+            task = db.get_next_task_atomic()
+
+            if task:
+                try:
+                    process_single_task(task)
+                except Exception as e:
+                    logger.error(f"Fatal error during task {task['task_id']}: {e}")
+                    db.update_task_status(task['task_id'], "FAILED", message=str(e))
+                finally:
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+            else:
+                time.sleep(2)
+    except Exception as fatal_e:
+        logger.critical(f"WORKER CRASHED: {fatal_e}", exc_info=True)
+        time.sleep(5) # Slow down restart loop
+        raise fatal_e
 
 if __name__ == "__main__":
     worker_loop()

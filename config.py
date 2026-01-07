@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 # --- Standardized Logging ---
 LOG_FORMAT = "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format=LOG_FORMAT,
     handlers=[logging.StreamHandler(sys.stdout)]
 )
@@ -153,8 +153,17 @@ def get_smart_tile_size():
     else: return 512
     return res
 
-# --- EXECUTION ON IMPORT ---
-log_system_info()
-verify_models()
-DEFAULT_SMART_TILE_SIZE = get_smart_tile_size()
-logger.info("Application context initialized successfully.")
+# --- Execution Lifecycle ---
+_initialized = False
+DEFAULT_SMART_TILE_SIZE = 512
+
+def initialize_context():
+    global _initialized, DEFAULT_SMART_TILE_SIZE
+    if _initialized: return
+    
+    log_system_info()
+    verify_models()
+    DEFAULT_SMART_TILE_SIZE = get_smart_tile_size()
+    logger.info(f"Application context initialized. Smart Tile Size: {DEFAULT_SMART_TILE_SIZE}")
+    _initialized = True
+
