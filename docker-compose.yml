@@ -12,11 +12,6 @@ services:
       NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
     runtime: nvidia
     ipc: host
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
     command: >
       bash -lc "
         # DO NOT install PyPI realesrgan here;
