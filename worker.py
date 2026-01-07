@@ -225,7 +225,39 @@ def process_single_task(task):
         if "Unsupported codec" in str(e):
             db.delete_task(task_id)
 
+def recover_tasks():
+    """Check for interrupted tasks on startup and reset or delete them."""
+    print("Checking for interrupted tasks...")
+    tasks = db.get_unfinished_tasks()
+    output_root = Path("/workspace/output")
+    
+    for task in tasks:
+        task_id = task['task_id']
+        try:
+            params = json.loads(task['task_params'])
+            filename = params.get('filename')
+            
+            # Check source file
+            run_dir = output_root / f"run_{task_id}"
+            input_path = run_dir / filename
+            
+            if input_path.exists():
+                print(f"Recovering task {task_id}: Source exists, resetting to PENDING.")
+                db.update_task_status(task_id, "PENDING", 0, "Recovered. Waiting to restart...")
+            else:
+                print(f"Cleaning task {task_id}: Source missing, deleting.")
+                db.delete_task(task_id)
+                # Cleanup run dir if it exists but empty/partial
+                if run_dir.exists():
+                    shutil.rmtree(run_dir, ignore_errors=True)
+        except Exception as e:
+            print(f"Error recovering task {task_id}: {e}")
+            db.delete_task(task_id)
+
 def worker_loop():
+    # 0. Recover
+    recover_tasks()
+    
     print("Worker daemon started. Waiting for tasks...")
     while True:
         # 1. Cleanup

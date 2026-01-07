@@ -105,3 +105,15 @@ def cleanup_old_tasks(hours_ttl):
     
     if count > 0:
         print(f"Cleaned up {count} old tasks.")
+
+def get_unfinished_tasks():
+    """Get all tasks that are stuck in PROCESSING or PENDING (e.g. after restart)."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    # PENDING is normal, but if we just restarted, we might want to verify them too.
+    # PROCESSING means it was interrupted.
+    c.execute("SELECT * FROM task_queue WHERE status NOT IN ('COMPLETED', 'FAILED')")
+    rows = c.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
