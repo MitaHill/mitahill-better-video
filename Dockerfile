@@ -28,7 +28,8 @@ RUN pip install --upgrade pip "numpy<2" && \
         tqdm==4.65.0 \
         ffmpeg-python==0.2.0 \
         pyyaml==6.0 \
-        streamlit
+        streamlit \
+        python-dotenv
 
 # Copy source code
 COPY . .
