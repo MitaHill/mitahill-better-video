@@ -5,6 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
+# 1. Install System Dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 python3.10-dev python3.10-distutils \
     ffmpeg git wget curl ca-certificates build-essential \
@@ -14,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /workspace
 
-# Install dependencies
+# 2. Install Pip Dependencies (Cachable layer)
 RUN pip install --upgrade pip "numpy<2" && \
     pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu116 \
         torch==1.12.1+cu116 torchvision==0.13.1+cu116 torchaudio==0.12.1+cu116 && \
@@ -31,17 +32,17 @@ RUN pip install --upgrade pip "numpy<2" && \
         streamlit \
         python-dotenv
 
-# Copy source code
-COPY . .
-
-# Pre-download weights into the image to make it standalone
+# 3. Pre-download weights (Huge layer, rarely changes)
 RUN mkdir -p /workspace/weights && \
-    wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth && \
-    wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/RealESRNet_x4plus.pth && \
-    wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth && \
-    wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth && \
-    wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth && \
-    wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth
+    wget -q -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth && \
+    wget -q -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/RealESRNet_x4plus.pth && \
+    wget -q -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth && \
+    wget -q -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth && \
+    wget -q -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth && \
+    wget -q -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth
+
+# 4. Copy Source Code (Changes often, should be last for cache efficiency)
+COPY . .
 
 EXPOSE 8501
 

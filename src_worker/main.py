@@ -2,6 +2,7 @@ import time
 import shutil
 import json
 import gc
+import logging
 from pathlib import Path
 import sqlite3
 import torch
@@ -10,9 +11,11 @@ import db
 import config
 from .processor import process_single_task
 
+logger = logging.getLogger("WORKER")
+
 def recover_tasks():
     """Check for interrupted tasks on startup and reset or delete them."""
-    print("Checking for interrupted tasks...")
+    logger.info("Scanning for interrupted tasks during startup...")
     tasks = db.get_unfinished_tasks()
     output_root = Path("/workspace/output")
     
@@ -25,35 +28,44 @@ def recover_tasks():
             input_path = run_dir / filename
             
             if input_path.exists():
-                print(f"Recovering task {task_id}: Source exists, resetting to PENDING.")
-                db.update_task_status(task_id, "PENDING", 0, "Recovered. Waiting to restart...")
+                logger.info(f"Task Recovery: Task {task_id} has source file. Resetting to PENDING.")
+                db.update_task_status(task_id, "PENDING", 0, "Recovered from system restart.")
             else:
-                print(f"Cleaning task {task_id}: Source missing, deleting.")
+                logger.warning(f"Task Recovery: Task {task_id} source missing at {input_path}. Deleting task.")
                 db.delete_task(task_id)
-                if run_dir.exists():
-                    shutil.rmtree(run_dir, ignore_errors=True)
         except Exception as e:
-            print(f"Error recovering task {task_id}: {e}")
+            logger.error(f"Failed to recover task {task_id}: {e}")
             db.delete_task(task_id)
 
 def worker_loop():
+    logger.info("--- Worker Process Initiated ---")
+    db.init_db()
     recover_tasks()
-    print("Worker daemon started. Waiting for tasks...")
+    
+    logger.info(f"Daemon Loop Started (TTL: {config.TASK_TTL_HOURS}h, Segments: {config.SEGMENT_TIME_SECONDS}s)")
+    
     while True:
         try:
             db.cleanup_old_tasks(config.TASK_TTL_HOURS)
         except Exception as e:
-            print(f"Cleanup error: {e}")
+            logger.error(f"Background cleanup failed: {e}")
 
         # Atomic pick and mark
         task = db.get_next_task_atomic()
 
         if task:
-            process_single_task(task)
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            try:
+                process_single_task(task)
+            except Exception as e:
+                logger.error(f"Fatal error during task {task['task_id']}: {e}")
+                db.update_task_status(task['task_id'], "FAILED", message=str(e))
+            finally:
+                logger.debug(f"Memory cleanup after task {task['task_id']}")
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
         else:
+            # Idle
             time.sleep(2)
 
 if __name__ == "__main__":
