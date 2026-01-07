@@ -1,4 +1,3 @@
-# CUDA 12.1 runtime with cuDNN
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -15,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /workspace
 
-# Pinned stack 
+# Install dependencies
 RUN pip install --upgrade pip "numpy<2" && \
     pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu116 \
         torch==1.12.1+cu116 torchvision==0.13.1+cu116 torchaudio==0.12.1+cu116 && \
@@ -28,10 +27,13 @@ RUN pip install --upgrade pip "numpy<2" && \
         Pillow==9.5.0 \
         tqdm==4.65.0 \
         ffmpeg-python==0.2.0 \
-        pyyaml==6.0\
+        pyyaml==6.0 \
         streamlit
 
-# Pre-download models
+# Copy source code
+COPY . .
+
+# Pre-download weights into the image to make it standalone
 RUN mkdir -p /workspace/weights && \
     wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth && \
     wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/RealESRNet_x4plus.pth && \
@@ -41,7 +43,5 @@ RUN mkdir -p /workspace/weights && \
     wget -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth
 
 EXPOSE 8501
-
-CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
 
 CMD ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
