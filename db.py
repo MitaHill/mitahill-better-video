@@ -65,3 +65,43 @@ def update_task_status(task_id, status, progress=None, message=None):
     c.execute(sql, params)
     conn.commit()
     conn.close()
+
+def delete_task(task_id):
+    """Delete task from DB and remove associated files."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM task_queue WHERE task_id = ?", (task_id,))
+    conn.commit()
+    conn.close()
+    
+    # Remove files
+    output_root = Path("/workspace/output")
+    run_dir = output_root / f"run_{task_id}"
+    import shutil
+    if run_dir.exists():
+        try:
+            shutil.rmtree(run_dir)
+        except Exception as e:
+            print(f"Failed to delete run dir {run_dir}: {e}")
+            
+    # Also clean up potential result files in output root if named systematically
+    # (Current worker saves sr_xxx to output root, we might need to track output path in DB to clean perfectly)
+    # For now, we only clean the run_dir which holds the bulk.
+
+def cleanup_old_tasks(hours_ttl):
+    """Remove tasks older than hours_ttl."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    cutoff = datetime.datetime.now() - datetime.timedelta(hours=hours_ttl)
+    c.execute("SELECT task_id FROM task_queue WHERE created_at < ?", (cutoff,))
+    rows = c.fetchall()
+    conn.close()
+    
+    count = 0
+    for row in rows:
+        delete_task(row[0])
+        count += 1
+    
+    if count > 0:
+        print(f"Cleaned up {count} old tasks.")

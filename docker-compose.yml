@@ -14,7 +14,8 @@ services:
     ipc: host
     command: >
       bash -lc "
-        # DO NOT install PyPI realesrgan here;
-        # start Streamlit directly, using the repo on PYTHONPATH
+        # Start worker daemon in background
+        python /workspace/worker.py &
+        # Start Streamlit
         streamlit run /workspace/streamlit_app.py --server.port=8501 --server.address=0.0.0.0
       "
