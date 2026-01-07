@@ -1,94 +1,79 @@
 import shutil
 import os
-import gc
+import logging
 from pathlib import Path
-import numpy as np
-from PIL import Image
-import torch
-
-import db
-import config
-from .utils import run_ffmpeg
+from .utils import run_ffmpeg, get_video_duration, get_video_fps
 from .upscaler import build_model
+import db
 
-def process_segment(input_path, output_path, params, weights_dir, task_id, progress_offset, progress_scale):
-    """Process a single video segment."""
+logger = logging.getLogger("SEGMENTER")
+
+def process_segment(input_path, output_path, params, weights_dir, task_id, progress_base, progress_scale):
+    """Processes a single video segment: extract frames, upscale, and combine."""
+    logger.info(f"Segment Process: {input_path.name}")
     run_dir = input_path.parent
-    in_frames = run_dir / f"frames_in_{input_path.stem}"
-    out_frames = run_dir / f"frames_out_{input_path.stem}"
-    
-    # Clean previous if any
-    shutil.rmtree(in_frames, ignore_errors=True)
-    shutil.rmtree(out_frames, ignore_errors=True)
-    in_frames.mkdir()
-    out_frames.mkdir()
+    frames_in = run_dir / "frames_in"
+    frames_out = run_dir / "frames_out"
+    audio_path = run_dir / "audio.m4a"
 
     try:
-        # 1. Extract
-        extract_cmd = ["ffmpeg", "-y"]
-        if torch.cuda.is_available():
-            extract_cmd.extend(["-hwaccel", "cuda"])
-        extract_cmd.extend(["-i", str(input_path), "-vsync", "0", "-q:v", "2", str(in_frames / "f_%06d.jpg")])
-        run_ffmpeg(extract_cmd)
+        # Cleanup old leftovers
+        for d in [frames_in, frames_out]:
+            if d.exists(): shutil.rmtree(d)
+            d.mkdir(parents=True, exist_ok=True)
 
-        frames = sorted(list(in_frames.glob("*.jpg")))
-        total_frames = len(frames)
-        if total_frames == 0:
-            print(f"Warning: Segment {input_path.name} has no frames.")
-            return
+        # 1. Extract Audio
+        logger.debug(f"[{input_path.name}] Extracting audio...")
+        run_ffmpeg(["ffmpeg", "-y", "-i", str(input_path), "-vn", "-acodec", "copy", str(audio_path)])
 
-        # 2. Upscale
+        # 2. Extract Frames
+        logger.debug(f"[{input_path.name}] Extracting frames...")
+        run_ffmpeg(["ffmpeg", "-y", "-i", str(input_path), "-q:v", "2", "-f", "image2", str(frames_in / "f_%06d.jpg")])
+
+        # 3. Upscale
+        logger.info(f"[{input_path.name}] Loading model: {params['model_name']}")
         upsampler = build_model(
             params['model_name'], params['upscale'], params['tile'], params['tile_pad'],
             params['fp16'], weights_dir, params.get('denoise_strength')
         )
 
-        for i, fpath in enumerate(frames, 1):
-            img = Image.open(fpath).convert("RGB")
-            img_np = np.array(img)[:, :, ::-1]
-            output, _ = upsampler.enhance(img_np, outscale=params['upscale'])
-            out_img = Image.fromarray(output[:, :, ::-1])
-            out_img.save(out_frames / fpath.name)
+        frame_list = sorted(list(frames_in.glob("*.jpg")))
+        total_frames = len(frame_list)
+        logger.info(f"[{input_path.name}] Total frames to upscale: {total_frames}")
+
+        for i, frame_path in enumerate(frame_list):
+            out_frame = frames_out / frame_path.name
+            upsampler.enhance_to_file(frame_path, out_frame, params['upscale'])
             
-            # Save previews if this is the very first segment of the task
-            if "preview_done" not in params and i==1 and "seg_000" in input_path.name:
-                 # Look up to run_{task_id} dir
-                 preview_dir = run_dir.parent
-                 img.save(preview_dir / "preview_original.jpg")
-                 out_img.save(preview_dir / "preview_upscaled.jpg")
-                 params['preview_done'] = True
+            # Progress Update
+            if i % 10 == 0 or i == total_frames - 1:
+                progress = progress_base + int(((i + 1) / total_frames) * progress_scale)
+                db.update_task_status(task_id, "PROCESSING", progress, f"Upscaling {input_path.name}: {i+1}/{total_frames} frames")
+                logger.debug(f"[{input_path.name}] Progress: {i+1}/{total_frames} frames upscaled.")
 
-            # Update DB Progress
-            if i % 10 == 0 or i == total_frames:
-                local_pct = i / total_frames
-                global_pct = progress_offset + (local_pct * progress_scale)
-                db.update_task_status(task_id, "PROCESSING", int(global_pct), f"Segment {input_path.stem}: {i}/{total_frames}")
+        # 4. Recombine
+        fps = get_video_fps(input_path)
+        logger.info(f"[{input_path.name}] Combining frames at {fps} FPS...")
         
-        # Free memory
-        del upsampler
-        torch.cuda.empty_cache()
-        gc.collect()
-
-        # 3. Encode Segment
-        audio_path = run_dir / f"audio_{input_path.stem}.m4a"
-        has_audio = False
-        if params.get('keep_audio'):
-            try:
-                run_ffmpeg(["ffmpeg", "-y", "-i", str(input_path), "-vn", "-acodec", "copy", str(audio_path)])
-                has_audio = audio_path.exists() and audio_path.stat().st_size > 0
-            except: pass
-
-        encode = ["ffmpeg", "-y", "-framerate", str(params.get('fps', 30)), "-start_number", "1",
-                  "-i", str(out_frames / "f_%06d.jpg")]
-        if has_audio:
-            encode.extend(["-i", str(audio_path), "-map", "0:v:0", "-map", "1:a:0?", "-c:a", "copy"])
+        # Use simple combine if no audio, or combine with audio
+        cmd = [
+            "ffmpeg", "-y", "-framerate", str(fps), "-i", str(frames_out / "f_%06d.jpg")
+        ]
         
-        encode.extend(["-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "medium", "-crf", str(params.get('crf', 18)), str(output_path)])
-        run_ffmpeg(encode)
+        if audio_path.exists() and params.get('keep_audio', True):
+            logger.debug(f"[{input_path.name}] Including audio in combination.")
+            cmd += ["-i", str(audio_path), "-map", "0:v:0", "-map", "1:a:0?", "-c:a", "copy"]
+        
+        cmd += [
+            "-c:v", "libx264", "-crf", str(params.get('crf', 18)), 
+            "-pix_fmt", "yuv420p", str(output_path)
+        ]
+        run_ffmpeg(cmd)
+        logger.info(f"[SUCCESS] Segment completed: {output_path.name}")
 
     finally:
-        # ALWAYS clean up frames to save space
-        shutil.rmtree(in_frames, ignore_errors=True)
-        shutil.rmtree(out_frames, ignore_errors=True)
-        if 'audio_path' in locals() and audio_path.exists():
-            os.remove(audio_path)
+        # Cleanup
+        logger.debug(f"[{input_path.name}] Cleaning up temporary frames.")
+        shutil.rmtree(frames_in, ignore_errors=True)
+        shutil.rmtree(frames_out, ignore_errors=True)
+        if audio_path.exists(): audio_path.unlink()
