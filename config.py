@@ -26,32 +26,20 @@ else:
 
 def get_env_bool(key, default):
     val = os.getenv(key, str(default)).lower()
-    res = val in ("true", "1", "yes", "on")
-    logger.debug(f"Config: {key} = {res} (from '{val}')")
-    return res
+    return val in ("true", "1", "yes", "on")
 
 def get_env_int(key, default):
     val = os.getenv(key)
-    if val is None:
-        logger.debug(f"Config: {key} using default {default}")
-        return default
-    try:
-        res = int(val)
-        logger.debug(f"Config: {key} = {res}")
-        return res
+    if val is None: return default
+    try: return int(val)
     except ValueError:
         logger.critical(f"[FAILED] Invalid integer for {key}: '{val}'")
         sys.exit(1)
 
 def get_env_float(key, default):
     val = os.getenv(key)
-    if val is None:
-        logger.debug(f"Config: {key} using default {default}")
-        return default
-    try:
-        res = float(val)
-        logger.debug(f"Config: {key} = {res}")
-        return res
+    if val is None: return default
+    try: return float(val)
     except ValueError:
         logger.critical(f"[FAILED] Invalid float for {key}: '{val}'")
         sys.exit(1)
@@ -69,42 +57,44 @@ try:
     MAX_IMAGE_SIZE_MB = get_env_int("MAX_IMAGE_SIZE_MB", 1024)
     SEGMENT_TIME_SECONDS = get_env_int("SEGMENT_TIME_SECONDS", 300)
     FALLBACK_VRAM_GB = get_env_float("FALLBACK_VRAM_GB", 4.0)
-    logger.info("Configuration loaded successfully.")
 except Exception as e:
-    logger.critical(f"[FAILED] Critical error during config initialization: {e}")
+    logger.critical(f"[FAILED] Configuration error: {e}")
     sys.exit(1)
 
 def get_gpu_memory_gb():
-    """Try to get GPU memory in GB using nvidia-smi."""
-    logger.debug("Attempting GPU VRAM detection...")
+    """HARD REQUIREMENT: Detect GPU or DIE."""
+    logger.debug("Mandatory GPU check starting...")
     try:
         cmd = ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"]
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
         mem_mb = float(result.stdout.strip().split('\n')[0])
         gb = mem_mb / 1024.0
-        logger.info(f"GPU Detected: {gb:.2f} GB VRAM")
+        logger.info(f"[SUCCESS] NVIDIA GPU Detected: {gb:.2f} GB VRAM")
         return gb
     except Exception as e:
-        logger.warning(f"nvidia-smi detection failed: {e}. Using fallback strategy.")
-        return None
+        logger.error("-" * 60)
+        logger.critical("[FAILED] NVIDIA GPU NOT DETECTED OR DRIVER ERROR!")
+        logger.critical(f"Detailed Error: {e}")
+        logger.critical("SUGGESTIONS:")
+        logger.critical("1. Ensure NVIDIA Container Toolkit is installed on host.")
+        logger.critical("2. Ensure 'runtime: nvidia' is set in docker-compose or use '--gpus all'.")
+        logger.critical("3. Check if NVIDIA drivers are healthy on the host (run nvidia-smi).")
+        logger.error("-" * 60)
+        sys.exit(1)
 
 def get_smart_tile_size():
     env_tile = get_env_int("DEFAULT_TILE_SIZE", 0)
     if env_tile > 0:
-        logger.info(f"Using manually forced Tile Size: {env_tile}")
+        logger.info(f"Manual override: Tile Size = {env_tile}")
         return env_tile
 
     vram = get_gpu_memory_gb()
-    if vram is None:
-        logger.warning(f"GPU VRAM unknown. Using fallback VRAM: {FALLBACK_VRAM_GB}GB")
-        vram = FALLBACK_VRAM_GB
-    
+    # If we are here, vram is guaranteed not None
     if vram < 4: res = 128
     elif vram < 6: res = 256
     elif vram < 10: res = 400
     else: res = 512
-    
-    logger.info(f"Smart Tile Size calculated: {res} (based on {vram:.1f}GB VRAM)")
     return res
 
 DEFAULT_SMART_TILE_SIZE = get_smart_tile_size()
+logger.info("Application context initialized successfully.")
