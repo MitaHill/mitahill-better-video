@@ -196,3 +196,5 @@ def initialize_context():
     logger.info(f"Application context initialized. Smart Tile Size: {DEFAULT_SMART_TILE_SIZE}")
     _initialized = True
 
+if __name__ == "__main__":
+    initialize_context()
