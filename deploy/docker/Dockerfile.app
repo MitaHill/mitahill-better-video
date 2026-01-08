@@ -10,8 +10,9 @@ COPY app/frontend/src ./src
 RUN npm install
 RUN npm run build
 
-ARG PIP_INDEX_URL=https://pypi.mirrors.ustc.edu.cn/simple/
-ARG PIP_TRUSTED_HOST=pypi.mirrors.ustc.edu.cn
+ARG PIP_INDEX_URL=https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple
+ARG PIP_TRUSTED_HOST=mirrors.tuna.tsinghua.edu.cn
+ARG PYTORCH_WHL=https://mirrors.aliyun.com/pytorch-wheels/torch_stable.html
 
 FROM realesrgan-base:20260108-0930
 
@@ -35,7 +36,7 @@ COPY . .
 RUN pip install -e vendor/Real-ESRGAN/
 
 # 3. Install web backend dependencies
-RUN pip install --no-cache-dir flask==2.3.3 gunicorn==21.2.0
+RUN pip install --no-cache-dir -i ${PIP_INDEX_URL} flask==2.3.3 gunicorn==21.2.0
 
 # 4. Copy built frontend assets
 COPY --from=frontend-build /frontend/dist /workspace/app/frontend/dist
