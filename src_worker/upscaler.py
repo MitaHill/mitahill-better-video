@@ -1,6 +1,7 @@
-import cv2
 import logging
 from pathlib import Path
+from PIL import Image
+import numpy as np
 from realesrgan import RealESRGANer
 from realesrgan.archs.srvgg_arch import SRVGGNetCompact
 from basicsr.archs.rrdbnet_arch import RRDBNet
@@ -73,17 +74,15 @@ class Upscaler:
 
     def enhance_to_file(self, input_path, output_path, outscale=2):
         """Helper to enhance image file to another file directly."""
-        img = cv2.imread(str(input_path), cv2.IMREAD_UNCHANGED)
-        if img is None:
-            logger.error(f"Failed to read image: {input_path}")
+        try:
+            img = Image.open(input_path).convert("RGB")
+        except Exception as exc:
+            logger.error(f"Failed to read image: {input_path} ({exc})")
             return
-        if img.ndim == 2:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-        elif img.shape[2] == 4:
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
-        output, _ = self.enhance(img, outscale=outscale)
-        output_rgb = cv2.cvtColor(output, cv2.COLOR_BGR2RGB)
-        cv2.imwrite(str(output_path), output_rgb)
+        img_bgr = np.array(img)[:, :, ::-1]
+        output, _ = self.enhance(img_bgr, outscale=outscale)
+        out_rgb = output[:, :, ::-1]
+        Image.fromarray(out_rgb).save(output_path)
 
 def build_model(model_name, scale, tile, tile_pad, fp16, weights_dir, denoise_strength=None):
     return Upscaler(model_name, scale, tile, tile_pad, fp16, weights_dir, denoise_strength)
