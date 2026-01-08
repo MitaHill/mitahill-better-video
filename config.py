@@ -201,10 +201,13 @@ def initialize_context():
         logger.critical("[FAILED] CUDA not available. NVIDIA GPU required.")
         sys.exit(1)
     try:
+        subprocess.run(["nvidia-smi", "-L"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    except Exception as e:
+        logger.critical(f"[FAILED] NVIDIA GPU not detected via nvidia-smi: {e}")
+        sys.exit(1)
+    try:
         gpu_name = torch.cuda.get_device_name(0)
-        if "nvidia" not in gpu_name.lower():
-            logger.critical(f"[FAILED] Non-NVIDIA GPU detected: {gpu_name}")
-            sys.exit(1)
+        logger.info(f"NVIDIA GPU detected: {gpu_name}")
     except Exception as e:
         logger.critical(f"[FAILED] Unable to query NVIDIA GPU: {e}")
         sys.exit(1)
