@@ -48,6 +48,19 @@ def process_single_task(task):
             duration = get_video_duration(input_path)
             logger.info(f"Video Duration: {duration}s (Segment Threshold: {config.SEGMENT_TIME_SECONDS}s)")
             
+            # --- GENERATE PREVIEW ---
+            try:
+                preview_path = run_dir / "preview_original.jpg"
+                if not preview_path.exists():
+                    logger.debug(f"Generating preview for {input_path.name}...")
+                    run_ffmpeg([
+                        "ffmpeg", "-y", "-i", str(input_path), 
+                        "-ss", "00:00:00", "-vframes", "1", 
+                        "-q:v", "2", str(preview_path)
+                    ])
+            except Exception as e:
+                logger.warning(f"Failed to generate preview: {e}")
+
             # --- SEGMENTATION LOGIC ---
             if duration > config.SEGMENT_TIME_SECONDS:
                 logger.info("Decision: Using SEGMENTATION mode.")

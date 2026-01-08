@@ -168,6 +168,12 @@ def render_create_tab():
 def render_status_tab():
     st.header("Check Status")
     
+    # Global Queue Stats
+    active_tasks = db.get_unfinished_tasks()
+    queue_len = len(active_tasks)
+    processing_count = sum(1 for t in active_tasks if t['status'] == 'PROCESSING')
+    st.caption(f"📊 System Status: {processing_count} Processing | {queue_len} Total in Queue")
+    
     # Simple layout: Toggle refresh + Input
     col1, col2 = st.columns([1, 3])
     with col1:
@@ -185,7 +191,9 @@ def render_status_tab():
             
             # Progress Bar
             prog_val = task['progress'] if task['progress'] is not None else 0
-            st.progress(max(0, min(100, prog_val)) / 100.0)
+            safe_prog = max(0, min(100, prog_val))
+            st.write(f"**Progress:** {safe_prog}%")
+            st.progress(safe_prog / 100.0)
             
             # Details Table
             with st.expander("Task Details", expanded=True):
@@ -197,7 +205,7 @@ def render_status_tab():
                         "Input File": v_info.get("filename"),
                         "Model": t_params.get("model_name"),
                         "Duration": f"{v_info.get('duration', 0)}s",
-                        "Resolution": f"{v_info.get('width', '?')}x{v_info.get('height', '?')}" # If available
+                        "Resolution": f"{v_info.get('width', '?')}x{v_info.get('height', '?')}" 
                     }
                     st.table(details)
                 except: 
@@ -208,13 +216,18 @@ def render_status_tab():
             p_orig = run_dir / "preview_original.jpg"
             p_ups = run_dir / "preview_upscaled.jpg"
             
-            if p_orig.exists() and p_ups.exists():
-                st.subheader("Preview")
+            st.subheader("Preview")
+            if p_orig.exists():
                 c1, c2 = st.columns(2)
                 # Timestamp trick to prevent browser caching of replaced images
                 ts = int(time.time()) 
                 with c1: st.image(str(p_orig), caption="Original")
-                with c2: st.image(str(p_ups), caption="Upscaled")
+                if p_ups.exists():
+                    with c2: st.image(str(p_ups), caption="Upscaled")
+                else:
+                    with c2: st.info("Upscaled preview pending...")
+            else:
+                st.info("Previews will appear here once processing starts.")
             
             # Download Button
             if task['status'] == "COMPLETED":
