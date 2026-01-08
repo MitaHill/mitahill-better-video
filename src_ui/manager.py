@@ -13,6 +13,5 @@ class WorkerManager:
             self.process = subprocess.Popen(
                 [sys.executable, "worker.py"],
                 cwd="/workspace",
-                stdout=open("/workspace/output/worker.log", "a"),
-                stderr=subprocess.STDOUT
+                # stdout/stderr defaults to None, which inherits from parent (Streamlit -> Docker logs)
             )

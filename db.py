@@ -26,7 +26,7 @@ def init_db():
                       message TEXT)''')
         conn.commit()
         conn.close()
-        logger.info("Database initialized successfully.")
+        logger.debug("Database initialized successfully.")
     except Exception as e:
         logger.critical(f"[FAILED] Failed to initialize database: {e}")
         import sys

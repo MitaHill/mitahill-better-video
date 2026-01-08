@@ -25,13 +25,14 @@ def get_client_ip():
 def ffprobe_info(file_path):
     try:
         cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", 
-               "-show_entries", "stream=r_frame_rate,duration", "-of", "default=nw=1", str(file_path)]
+               "-show_entries", "stream=r_frame_rate,duration,width,height", "-of", "default=nw=1", str(file_path)]
         res = subprocess.run(cmd, stdout=subprocess.PIPE, text=True)
         data = {}
         for line in res.stdout.splitlines():
             if "=" in line:
                 k, v = line.split("=", 1)
                 data[k] = v.strip()
+        
         fps = 30.0
         if "r_frame_rate" in data:
             if "/" in data["r_frame_rate"]:
@@ -39,9 +40,15 @@ def ffprobe_info(file_path):
                 fps = float(n)/float(d)
             else:
                 fps = float(data["r_frame_rate"])
-        return float(data.get("duration", 0)), fps
+        
+        return {
+            "duration": float(data.get("duration", 0)),
+            "fps": fps,
+            "width": int(data.get("width", 0)),
+            "height": int(data.get("height", 0))
+        }
     except:
-        return 0.0, 30.0
+        return {"duration": 0.0, "fps": 30.0, "width": 0, "height": 0}
 
 def render_create_tab():
     # CSS to hide the default Streamlit file size limit text
@@ -140,14 +147,17 @@ def render_create_tab():
             with open(input_path, "wb") as f:
                 f.write(uploaded_file.read())
             
-            duration, fps = 0.0, 0.0
+            # Get video details
+            info = {"duration": 0.0, "fps": 0.0, "width": 0, "height": 0}
             if input_type == "Video":
-                duration, fps = ffprobe_info(input_path)
+                info = ffprobe_info(input_path)
             
             video_info = {
                 "size_mb": round(file_size_mb, 2),
-                "duration": duration,
-                "fps": fps,
+                "duration": info["duration"],
+                "fps": info["fps"],
+                "width": info["width"],
+                "height": info["height"],
                 "filename": filename
             }
             
@@ -155,7 +165,7 @@ def render_create_tab():
                 "model_name": raw_model_name, "upscale": upscale, "tile": tile,
                 "tile_pad": tile_pad, "fp16": fp16, "denoise_strength": denoise_strength,
                 "input_type": input_type, "keep_audio": keep_audio, "crf": crf,
-                "filename": filename, "fps": fps
+                "filename": filename, "fps": info["fps"]
             }
             
             db.create_task(task_id, get_client_ip(), task_params, video_info)
