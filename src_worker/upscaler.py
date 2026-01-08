@@ -2,6 +2,7 @@ import cv2
 import logging
 from pathlib import Path
 from realesrgan import RealESRGANer
+from realesrgan.archs.srvgg_arch import SRVGGNetCompact
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from gfpgan import GFPGANer
 
@@ -11,6 +12,8 @@ class Upscaler:
     def __init__(self, model_name, scale, tile, tile_pad, fp16, weights_dir, denoise_strength=None):
         logger.info(f"Initializing model {model_name} (scale: {scale}, fp16: {fp16})")
         self.model_name = model_name
+        model_scale = 4
+        dni_weight = None
         
         # Mapping models
         if model_name == 'realesrgan-x4plus':
@@ -23,21 +26,39 @@ class Upscaler:
             model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=6, num_grow_ch=32, scale=4)
             model_path = weights_dir / 'RealESRGAN_x4plus_anime_6B.pth'
         elif model_name == 'realesr-animevideov3':
-            # scale is 4 for this model but can be used for 2/3 as well
-            model = None # Handled by RealESRGANer internally for animevideo
+            model = SRVGGNetCompact(
+                num_in_ch=3, num_out_ch=3, num_feat=64, num_conv=16, upscale=4, act_type='prelu'
+            )
             model_path = weights_dir / 'realesr-animevideov3.pth'
+        elif model_name == 'realesr-general-x4v3':
+            model = SRVGGNetCompact(
+                num_in_ch=3, num_out_ch=3, num_feat=64, num_conv=32, upscale=4, act_type='prelu'
+            )
+            model_path = weights_dir / 'realesr-general-x4v3.pth'
+            if denoise_strength is None:
+                denoise_strength = 0.5
+            if denoise_strength != 1:
+                wdn_model_path = weights_dir / 'realesr-general-wdn-x4v3.pth'
+                if not wdn_model_path.exists():
+                    logger.critical(f"[FAILED] Model weight file not found at {wdn_model_path}")
+                    raise FileNotFoundError(f"Model weight missing: {wdn_model_path}")
+                model_path = [str(model_path), str(wdn_model_path)]
+                dni_weight = [denoise_strength, 1 - denoise_strength]
         else:
             logger.critical(f"Unknown model name: {model_name}")
             raise ValueError(f"Unknown model: {model_name}")
 
-        if not model_path.exists():
-            logger.critical(f"[FAILED] Model weight file not found at {model_path}")
-            raise FileNotFoundError(f"Model weight missing: {model_path}")
+        if isinstance(model_path, Path):
+            if not model_path.exists():
+                logger.critical(f"[FAILED] Model weight file not found at {model_path}")
+                raise FileNotFoundError(f"Model weight missing: {model_path}")
+            model_path = str(model_path)
 
         logger.debug(f"Loading weights from {model_path}...")
         self.upsampler = RealESRGANer(
-            scale=scale,
-            model_path=str(model_path),
+            scale=model_scale,
+            model_path=model_path,
+            dni_weight=dni_weight,
             model=model,
             tile=tile,
             tile_pad=tile_pad,
