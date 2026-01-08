@@ -38,9 +38,26 @@ def init_db():
                       progress INTEGER,
                       message TEXT)''')
         _ensure_columns(conn)
+        c.execute("""CREATE TABLE IF NOT EXISTS task_progress
+                     (task_id TEXT PRIMARY KEY,
+                      total_frames INTEGER,
+                      total_segments INTEGER,
+                      updated_at DATETIME)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS segment_progress
+                     (task_id TEXT,
+                      segment_key TEXT,
+                      segment_index INTEGER,
+                      start_frame INTEGER,
+                      end_frame INTEGER,
+                      total_frames INTEGER,
+                      last_done_frame INTEGER,
+                      updated_at DATETIME,
+                      PRIMARY KEY (task_id, segment_key))""")
         c.execute("CREATE INDEX IF NOT EXISTS idx_task_status ON task_queue(status)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_task_created ON task_queue(created_at)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_task_updated ON task_queue(updated_at)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_task_progress_updated ON task_progress(updated_at)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_segment_progress_task ON segment_progress(task_id)")
         conn.commit()
         conn.close()
         logger.debug("Database initialized successfully.")
@@ -103,6 +120,8 @@ def delete_task(task_id):
     conn = get_connection()
     c = conn.cursor()
     c.execute("DELETE FROM task_queue WHERE task_id = ?", (task_id,))
+    c.execute("DELETE FROM task_progress WHERE task_id = ?", (task_id,))
+    c.execute("DELETE FROM segment_progress WHERE task_id = ?", (task_id,))
     conn.commit()
     conn.close()
     
@@ -181,6 +200,63 @@ def mark_stuck_tasks(timeout_seconds):
         logger.warning(f"Marking {len(rows)} stuck tasks as FAILED...")
         for row in rows:
             update_task_status(row[0], "FAILED", message="Task timed out")
+
+def upsert_task_progress(task_id, total_frames, total_segments):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        """INSERT INTO task_progress (task_id, total_frames, total_segments, updated_at)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(task_id) DO UPDATE SET
+             total_frames = excluded.total_frames,
+             total_segments = excluded.total_segments,
+             updated_at = excluded.updated_at""",
+        (task_id, total_frames, total_segments, datetime.datetime.now()),
+    )
+    conn.commit()
+    conn.close()
+
+def upsert_segment(task_id, segment_key, segment_index, start_frame, end_frame, total_frames):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        """INSERT INTO segment_progress
+           (task_id, segment_key, segment_index, start_frame, end_frame, total_frames, last_done_frame, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(task_id, segment_key) DO UPDATE SET
+             segment_index = excluded.segment_index,
+             start_frame = excluded.start_frame,
+             end_frame = excluded.end_frame,
+             total_frames = excluded.total_frames,
+             updated_at = excluded.updated_at""",
+        (task_id, segment_key, segment_index, start_frame, end_frame, total_frames, 0, datetime.datetime.now()),
+    )
+    conn.commit()
+    conn.close()
+
+def update_segment_progress(task_id, segment_key, last_done_frame):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        """UPDATE segment_progress
+           SET last_done_frame = ?, updated_at = ?
+           WHERE task_id = ? AND segment_key = ?""",
+        (last_done_frame, datetime.datetime.now(), task_id, segment_key),
+    )
+    conn.commit()
+    conn.close()
+
+def get_segment_progress(task_id, segment_key):
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute(
+        "SELECT * FROM segment_progress WHERE task_id = ? AND segment_key = ?",
+        (task_id, segment_key),
+    )
+    row = c.fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 def _ensure_columns(conn):
     c = conn.cursor()

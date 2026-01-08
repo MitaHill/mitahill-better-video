@@ -9,7 +9,7 @@ import torch
 
 import db
 import config
-from .utils import run_ffmpeg, get_video_codec, get_video_duration
+from .utils import run_ffmpeg, get_video_codec, get_video_duration, get_video_total_frames, get_video_fps
 from .upscaler import build_model
 from .segmenter import process_segment
 
@@ -68,6 +68,10 @@ def process_single_task(task):
             generate_previews(input_path, run_dir, upsampler, params['upscale'])
             
             duration = get_video_duration(input_path)
+            total_frames = get_video_total_frames(input_path)
+            if total_frames <= 0:
+                total_frames = max(1, int(round(get_video_duration(input_path) * get_video_fps(input_path))))
+            db.upsert_task_progress(task_id, total_frames, 0)
             # 3. Process Video (reuse upsampler logic)
             if duration > config.SEGMENT_TIME_SECONDS:
                 # Segmented processing
@@ -75,21 +79,32 @@ def process_single_task(task):
                 segments_dir = run_dir / "segments"
                 segments_dir.mkdir(exist_ok=True)
                 
-                # Split
-                run_ffmpeg([
-                    "ffmpeg", "-y", "-i", str(input_path), "-c", "copy", "-map", "0",
-                    "-segment_time", str(config.SEGMENT_TIME_SECONDS), "-f", "segment", 
-                    "-reset_timestamps", "1", str(segments_dir / "seg_%03d.mp4")
-                ])
+                segs = sorted(list(segments_dir.glob("seg_*.mp4")))
+                if not segs:
+                    # Split
+                    run_ffmpeg([
+                        "ffmpeg", "-y", "-i", str(input_path), "-c", "copy", "-map", "0",
+                        "-segment_time", str(config.SEGMENT_TIME_SECONDS), "-f", "segment",
+                        "-reset_timestamps", "1", str(segments_dir / "seg_%03d.mp4")
+                    ])
                 
                 segs = sorted(list(segments_dir.glob("seg_*.mp4")))
                 if not segs:
                     raise RuntimeError("Video split produced no segments.")
+                db.upsert_task_progress(task_id, total_frames, len(segs))
                 concat_list = run_dir / "concat_list.txt"
                 
                 with open(concat_list, "w") as f:
+                    cumulative_frames = 0
                     segment_scale = 80.0 / len(segs)
                     for i, s_path in enumerate(segs):
+                        seg_frames = get_video_total_frames(s_path)
+                        if seg_frames <= 0:
+                            seg_frames = max(1, int(round(get_video_duration(s_path) * get_video_fps(s_path))))
+                        start_frame = cumulative_frames + 1
+                        end_frame = start_frame + seg_frames - 1
+                        segment_key = f"seg_{start_frame}_{end_frame}"
+                        db.upsert_segment(task_id, segment_key, i, start_frame, end_frame, seg_frames)
                         out_s_path = segments_dir / f"{s_path.stem}_sr.mp4"
                         prog = 10 + int((i / len(segs)) * 80)
                         db.update_task_status(task_id, "PROCESSING", prog, f"Processing Part {i+1}/{len(segs)}...")
@@ -100,8 +115,23 @@ def process_single_task(task):
                         from .segmenter import process_video_with_model
                         p_base = 10 + int(i * segment_scale)
                         p_scale = max(1, int(round(segment_scale)))
-                        process_video_with_model(s_path, out_s_path, upsampler, params, task_id, p_base, p_scale)
+                        segment_progress = db.get_segment_progress(task_id, segment_key)
+                        last_done = (segment_progress or {}).get("last_done_frame") or 0
+                        resume_frame = max(1, last_done - 2) if last_done else 1
+                        if not (out_s_path.exists() and last_done >= seg_frames and seg_frames > 0):
+                            process_video_with_model(
+                                s_path,
+                                out_s_path,
+                                upsampler,
+                                params,
+                                task_id,
+                                p_base,
+                                p_scale,
+                                segment_key=segment_key,
+                                resume_from_frame=resume_frame,
+                            )
                         f.write(f"file 'segments/{out_s_path.name}'\n")
+                        cumulative_frames += seg_frames
                 
                 db.update_task_status(task_id, "PROCESSING", 95, "Merging Parts...")
                 out_name = f"sr_{input_path.stem}.mp4"
@@ -115,7 +145,25 @@ def process_single_task(task):
                 db.update_task_status(task_id, "PROCESSING", 20, "Upscaling Video...")
                 out_name = f"sr_{input_path.stem}.mp4"
                 from .segmenter import process_video_with_model
-                process_video_with_model(input_path, output_root / out_name, upsampler, params, task_id, 20, 80)
+                segment_key = f"full_1_{total_frames}"
+                db.upsert_task_progress(task_id, total_frames, 1)
+                db.upsert_segment(task_id, segment_key, 0, 1, total_frames, total_frames)
+                segment_progress = db.get_segment_progress(task_id, segment_key)
+                last_done = (segment_progress or {}).get("last_done_frame") or 0
+                resume_frame = max(1, last_done - 2) if last_done else 1
+                output_path = output_root / out_name
+                if not (output_path.exists() and last_done >= total_frames and total_frames > 0):
+                    process_video_with_model(
+                        input_path,
+                        output_path,
+                        upsampler,
+                        params,
+                        task_id,
+                        20,
+                        80,
+                        segment_key=segment_key,
+                        resume_from_frame=resume_frame,
+                    )
 
         else:
             # 4. Process Image
