@@ -2,94 +2,102 @@
   <div class="app-shell">
     <section class="hero">
       <div class="hero-card">
-        <div class="hero-title">MitaHill Better Video</div>
+        <div class="hero-title">米塔影像增强平台</div>
         <p class="hero-subtitle">
-          Video and image upscaling powered by Real-ESRGAN. Submit a task, monitor
-          progress, and download pristine results once the worker finishes.
+          提交任务、查看进度、下载结果，一站式完成视频与图片增强。
         </p>
-        <div class="hero-meta">
-          <span class="meta-pill">GPU-first pipeline</span>
-          <span class="meta-pill">Segmented video flow</span>
-          <span class="meta-pill">SQLite + WAL</span>
-        </div>
       </div>
       <div class="panel">
-        <h2>Quick Stats</h2>
-        <p class="notice">Backend: {{ health.status }}</p>
-        <p class="notice">Queue DB: {{ health.db }}</p>
-        <p class="notice">Worker: {{ health.worker }}</p>
-        <button class="secondary" @click="fetchHealth">Refresh</button>
+        <h2>服务状态</h2>
+        <p class="notice">后端：{{ health.status }}</p>
+        <p class="notice">数据库：{{ health.db }}</p>
+        <p class="notice">Worker：{{ health.worker }}</p>
+        <button class="secondary" @click="fetchHealth">刷新</button>
       </div>
     </section>
 
     <section class="panel-grid">
       <div class="panel">
-        <h2>Create Task</h2>
+        <h2>创建任务</h2>
 
         <div class="field">
-          <label>Input Type</label>
+          <label>输入类型</label>
           <select v-model="form.inputType">
-            <option value="Video">Video</option>
-            <option value="Image">Image</option>
+            <option value="Video">视频</option>
+            <option value="Image">图片</option>
           </select>
         </div>
 
         <div class="field">
-          <label>Model</label>
+          <label>模型</label>
           <select v-model="form.modelName">
-            <option value="realesrgan-x4plus">General (High Quality)</option>
-            <option value="realesrnet-x4plus">Denoise (Slow)</option>
-            <option value="realesrgan-x4plus-anime">Anime</option>
-            <option value="realesr-animevideov3">Anime Video</option>
-            <option value="realesr-general-x4v3">General (Fast)</option>
+            <option value="realesrgan-x4plus">通用（高清）</option>
+            <option value="realesrnet-x4plus">降噪（慢速）</option>
+            <option value="realesrgan-x4plus-anime">二次元</option>
+            <option value="realesr-animevideov3">二次元视频（快）</option>
+            <option value="realesr-general-x4v3">通用（快速）</option>
           </select>
         </div>
 
         <div class="field">
-          <label>Upscale Factor</label>
-          <select v-model.number="form.upscale">
-            <option :value="2">2x</option>
-            <option :value="3">3x</option>
-            <option :value="4">4x</option>
-          </select>
+          <label>放大倍率：{{ form.upscale }}x</label>
+          <input
+            v-model.number="form.upscale"
+            type="range"
+            min="2"
+            max="4"
+            step="1"
+          />
         </div>
 
         <div class="field">
-          <label>Tile Size</label>
-          <input v-model.number="form.tile" type="number" min="0" max="512" step="64" />
+          <label>切片大小：{{ form.tile }}</label>
+          <input
+            v-model.number="form.tile"
+            type="range"
+            min="0"
+            max="512"
+            step="64"
+          />
         </div>
 
         <div class="field" v-if="form.modelName.includes('general')">
-          <label>Denoise Strength</label>
-          <input v-model.number="form.denoise" type="number" min="0" max="1" step="0.05" />
+          <label>降噪强度：{{ form.denoise.toFixed(2) }}</label>
+          <input
+            v-model.number="form.denoise"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+          />
         </div>
 
         <div class="field">
-          <label>Upload File</label>
+          <label>上传文件</label>
           <input type="file" @change="onFileChange" />
         </div>
 
         <div class="field" v-if="form.inputType === 'Video'">
-          <label>Keep Original Audio</label>
+          <label>保留原音轨</label>
           <select v-model="form.keepAudio">
-            <option :value="true">Yes</option>
-            <option :value="false">No</option>
+            <option :value="true">是</option>
+            <option :value="false">否</option>
           </select>
         </div>
 
         <div class="field" v-if="form.inputType === 'Video'">
-          <label>CRF (Quality)</label>
-          <input v-model.number="form.crf" type="number" min="10" max="30" />
+          <label>CRF 质量：{{ form.crf }}</label>
+          <input v-model.number="form.crf" type="range" min="10" max="30" />
         </div>
 
         <button @click="submitTask" :disabled="loading.submit">
-          {{ loading.submit ? "Submitting..." : "Submit Task" }}
+          {{ loading.submit ? "提交中..." : "提交任务" }}
         </button>
 
         <p v-if="taskId" class="notice" style="margin-top: 12px;">
-          Task ID: <strong>{{ taskId }}</strong>
+          任务 ID：<strong>{{ taskId }}</strong>
           <button class="secondary" style="margin-left: 8px;" @click="copyTaskId">
-            Copy
+            复制
           </button>
         </p>
         <p v-if="submitError" class="notice" style="color: var(--accent-2);">
@@ -98,14 +106,14 @@
       </div>
 
       <div class="panel">
-        <h2>Check Status</h2>
+        <h2>查询状态</h2>
 
         <div class="field">
-          <label>Task ID</label>
-          <input v-model="statusQuery" placeholder="Paste Task ID" />
+          <label>任务 ID</label>
+          <input v-model="statusQuery" placeholder="粘贴任务 ID" />
         </div>
 
-        <button class="secondary" @click="fetchStatus">Check</button>
+        <button class="secondary" @click="fetchStatus">查询</button>
 
         <div v-if="status" style="margin-top: 16px;">
           <div :class="['status-pill', statusClass]">{{ status.status }}</div>
@@ -116,14 +124,14 @@
           <p class="notice">{{ status.message }}</p>
 
           <div class="panel" style="margin-top: 16px; background: rgba(255,255,255,0.05);">
-            <p class="notice">File: {{ status.video_info?.filename || 'Unknown' }}</p>
-            <p class="notice">Resolution: {{ resolution }}</p>
-            <p class="notice">Size: {{ status.video_info?.size_mb || 0 }} MB</p>
-          </div>
+          <p class="notice">文件：{{ status.video_info?.filename || '未知' }}</p>
+          <p class="notice">分辨率：{{ resolution }}</p>
+          <p class="notice">大小：{{ status.video_info?.size_mb || 0 }} MB</p>
+        </div>
 
           <div class="preview-grid" v-if="status.status !== 'PENDING'">
             <div class="preview">
-              <p class="notice">Original Preview</p>
+              <p class="notice">原始预览</p>
               <img
                 v-if="preview.original"
                 :src="preview.original"
@@ -131,10 +139,10 @@
                 @error="preview.originalReady = false"
                 v-show="preview.originalReady"
               />
-              <p v-if="!preview.originalReady" class="notice">Not ready</p>
+              <p v-if="!preview.originalReady" class="notice">未生成</p>
             </div>
             <div class="preview">
-              <p class="notice">Upscaled Preview</p>
+              <p class="notice">放大预览</p>
               <img
                 v-if="preview.upscaled"
                 :src="preview.upscaled"
@@ -142,7 +150,7 @@
                 @error="preview.upscaledReady = false"
                 v-show="preview.upscaledReady"
               />
-              <p v-if="!preview.upscaledReady" class="notice">Not ready</p>
+              <p v-if="!preview.upscaledReady" class="notice">未生成</p>
             </div>
           </div>
 
@@ -151,7 +159,7 @@
             style="margin-top: 16px;"
             @click="downloadResult"
           >
-            Download Result
+            下载结果
           </button>
         </div>
 
@@ -218,7 +226,7 @@ const onFileChange = (event) => {
 const submitTask = async () => {
   submitError.value = "";
   if (!form.file) {
-    submitError.value = "Please select a file before submitting.";
+    submitError.value = "请先选择要上传的文件。";
     return;
   }
   loading.submit = true;
@@ -236,7 +244,7 @@ const submitTask = async () => {
     const res = await fetch("/api/tasks", { method: "POST", body: data });
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.error || "Failed to submit task.");
+      throw new Error(err.error || "提交失败，请稍后重试。");
     }
     const payload = await res.json();
     taskId.value = payload.task_id;
@@ -252,14 +260,14 @@ const submitTask = async () => {
 const fetchStatus = async () => {
   statusError.value = "";
   if (!statusQuery.value) {
-    statusError.value = "Please provide a task ID.";
+    statusError.value = "请先填写任务 ID。";
     return;
   }
   try {
     const res = await fetch(`/api/tasks/${statusQuery.value}`);
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.error || "Task not found.");
+      throw new Error(err.error || "未找到任务，请确认 ID 是否正确。");
     }
     status.value = await res.json();
     preview.original = `/api/tasks/${statusQuery.value}/preview/original`;
@@ -286,7 +294,7 @@ const copyTaskId = async () => {
   try {
     await navigator.clipboard.writeText(taskId.value);
   } catch (error) {
-    submitError.value = "Clipboard not available. Copy manually.";
+    submitError.value = "无法访问剪贴板，请手动复制。";
   }
 };
 

@@ -1,6 +1,5 @@
 import logging
 import signal
-import subprocess
 import sys
 from pathlib import Path
 
@@ -11,22 +10,14 @@ if str(APP_DIR) not in sys.path:
 import config
 import db
 from backend.api import create_app
+from backend.worker_service import WorkerService
 
 logger = logging.getLogger("MAIN")
 
 
-def _start_worker():
-    app_dir = Path(__file__).resolve().parents[1]
-    worker_script = app_dir / "worker.py"
+def _build_worker_service():
     log_path = Path("/workspace/worker.log")
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_file = open(log_path, "a", encoding="utf-8")
-    return subprocess.Popen(
-        [sys.executable, "-u", str(worker_script)],
-        stdout=log_file,
-        stderr=subprocess.STDOUT,
-        cwd=str(app_dir),
-    )
+    return WorkerService(log_path)
 
 
 def main():
@@ -37,19 +28,19 @@ def main():
     config.initialize_context()
     db.init_db()
 
-    worker = _start_worker()
-    logger.info("Worker started with PID %s", worker.pid)
+    worker_service = _build_worker_service()
+    worker_service.start()
+    logger.info("Worker status: %s", worker_service.status())
 
     def shutdown_handler(*_args):
         logger.info("Shutting down services...")
-        if worker.poll() is None:
-            worker.terminate()
+        worker_service.stop()
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, shutdown_handler)
     signal.signal(signal.SIGINT, shutdown_handler)
 
-    app = create_app()
+    app = create_app(worker_service)
     app.run(host="0.0.0.0", port=8501, threaded=True)
 
 

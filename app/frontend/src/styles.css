@@ -127,11 +127,45 @@ textarea {
 
 input,
 select {
-  background: var(--surface-strong);
+  background: #ffffff;
   border: 1px solid var(--border);
-  color: var(--text);
+  color: #1b1b1b;
   padding: 10px 12px;
   border-radius: 12px;
+}
+
+select option {
+  color: #1b1b1b;
+  background: #ffffff;
+}
+
+input[type="range"] {
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #ffd769);
+  padding: 0;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #1b1b1b;
+  border: 2px solid #ffffff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #1b1b1b;
+  border: 2px solid #ffffff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
 }
 
 input[type="file"] {

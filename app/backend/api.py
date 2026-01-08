@@ -10,7 +10,7 @@ from .utils import ffprobe_info, secure_filename
 OUTPUT_ROOT = Path("/workspace/output")
 
 
-def create_app():
+def create_app(worker_service=None):
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = (
         max(config.MAX_VIDEO_SIZE_MB, config.MAX_IMAGE_SIZE_MB) * 1024 * 1024
@@ -25,7 +25,10 @@ def create_app():
             conn.close()
         except Exception:
             db_status = "error"
-        return jsonify({"status": "ok", "db": db_status})
+        worker_status = "unknown"
+        if worker_service is not None:
+            worker_status = worker_service.status()
+        return jsonify({"status": "ok", "db": db_status, "worker": worker_status})
 
     @app.post("/api/tasks")
     def create_task():
