@@ -10,8 +10,8 @@ COPY app/frontend/src ./src
 RUN npm install
 RUN npm run build
 
-ARG PIP_INDEX_URL=https://pypi.mirrors.ustc.edu.cn/simple/
-ARG PIP_TRUSTED_HOST=pypi.mirrors.ustc.edu.cn
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ARG PIP_TRUSTED_HOST=mirrors.aliyun.com
 
 FROM realesrgan-base:20260108-0930
 
