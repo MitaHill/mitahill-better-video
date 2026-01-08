@@ -195,10 +195,11 @@ def resolve_default_tile_size():
 
 # --- Execution Lifecycle ---
 _initialized = False
+_init_info = None
 DEFAULT_SMART_TILE_SIZE = 512
 
 def initialize_context():
-    global _initialized, DEFAULT_SMART_TILE_SIZE
+    global _initialized, DEFAULT_SMART_TILE_SIZE, _init_info
     if _initialized: return
     
     log_system_info()
@@ -226,11 +227,17 @@ def initialize_context():
     DEFAULT_SMART_TILE_SIZE, vram = resolve_default_tile_size()
     if vram is None:
         logger.info("Tile Size: %s (env override)", DEFAULT_SMART_TILE_SIZE)
+        source = "env"
     else:
         logger.info("Tile Size: %s (auto by VRAM %.2f GB)", DEFAULT_SMART_TILE_SIZE, vram)
+        source = "auto"
     logger.info(f"Application context initialized. Smart Tile Size: {DEFAULT_SMART_TILE_SIZE}")
     _initialized = True
-    return {"tile_size": DEFAULT_SMART_TILE_SIZE, "vram_gb": vram}
+    _init_info = {"tile_size": DEFAULT_SMART_TILE_SIZE, "vram_gb": vram, "source": source}
+    return _init_info
+
+def get_init_info():
+    return _init_info or {"tile_size": DEFAULT_SMART_TILE_SIZE, "vram_gb": None, "source": "unknown"}
 
 if __name__ == "__main__":
     initialize_context()

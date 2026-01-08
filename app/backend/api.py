@@ -30,6 +30,10 @@ def create_app(worker_service=None):
             worker_status = worker_service.status()
         return jsonify({"status": "ok", "db": db_status, "worker": worker_status})
 
+    @app.get("/api/config/recommendations")
+    def config_recommendations():
+        return jsonify(config.get_init_info())
+
     @app.post("/api/tasks")
     def create_task():
         if "file" not in request.files:

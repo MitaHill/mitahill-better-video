@@ -156,7 +156,7 @@
 </template>
 
 <script setup>
-import { computed, onUnmounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 
 const form = reactive({
   inputType: "Video",
@@ -273,6 +273,19 @@ const fetchStatus = async () => {
   }
 };
 
+const fetchRecommendations = async () => {
+  try {
+    const res = await fetch("/api/config/recommendations");
+    if (!res.ok) return;
+    const payload = await res.json();
+    if (payload?.tile_size) {
+      form.tile = Number(payload.tile_size);
+    }
+  } catch (error) {
+    // ignore
+  }
+};
+
 const downloadResult = () => {
   window.location.href = `/api/tasks/${statusQuery.value}/result`;
 };
@@ -298,5 +311,6 @@ const stopPolling = () => {
   }
 };
 
+onMounted(fetchRecommendations);
 onUnmounted(stopPolling);
 </script>
