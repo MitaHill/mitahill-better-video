@@ -9,21 +9,35 @@ import config
 logger = logging.getLogger("DB")
 DB_PATH = Path("/workspace/output/tasks.db")
 
+def _apply_pragmas(conn):
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA temp_store=MEMORY;")
+    conn.execute("PRAGMA foreign_keys=ON;")
+    conn.execute("PRAGMA busy_timeout=30000;")
+
+def get_connection():
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
+    _apply_pragmas(conn)
+    return conn
+
 def init_db():
     logger.debug(f"Initializing database at {DB_PATH}")
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=30)
+        conn = get_connection()
         c = conn.cursor()
         c.execute('''CREATE TABLE IF NOT EXISTS task_queue
-                     (task_id TEXT PRIMARY KEY, 
+                     (task_id TEXT PRIMARY KEY,
                       created_at DATETIME,
-                      client_ip TEXT, 
-                      status TEXT, 
+                      client_ip TEXT,
+                      status TEXT,
                       task_params TEXT,
                       video_info TEXT,
                       progress INTEGER,
                       message TEXT)''')
+        c.execute("CREATE INDEX IF NOT EXISTS idx_task_status ON task_queue(status)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_task_created ON task_queue(created_at)")
         conn.commit()
         conn.close()
         logger.debug("Database initialized successfully.")
@@ -34,7 +48,7 @@ def init_db():
 
 def create_task(task_id, client_ip, task_params, video_info):
     logger.info(f"Creating new task: {task_id} from {client_ip}")
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_connection()
     c = conn.cursor()
     c.execute("""INSERT INTO task_queue 
                  (task_id, created_at, client_ip, status, task_params, video_info, progress, message) 
@@ -46,7 +60,7 @@ def create_task(task_id, client_ip, task_params, video_info):
     logger.debug(f"Task {task_id} inserted into queue.")
 
 def get_task(task_id):
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_connection()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM task_queue WHERE task_id = ?", (task_id,))
@@ -56,7 +70,7 @@ def get_task(task_id):
 
 def update_task_status(task_id, status, progress=None, message=None):
     logger.debug(f"Updating Task {task_id}: {status} ({progress}%) - {message}")
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_connection()
     c = conn.cursor()
     updates = ["status = ?"]
     params = [status]
@@ -83,7 +97,7 @@ def delete_task(task_id):
             result_filename = f"sr_{params.get('filename')}"
         except: pass
 
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_connection()
     c = conn.cursor()
     c.execute("DELETE FROM task_queue WHERE task_id = ?", (task_id,))
     conn.commit()
@@ -106,7 +120,7 @@ def delete_task(task_id):
 
 def get_next_task_atomic():
     logger.debug("Checking for next pending task...")
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_connection()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     try:
@@ -134,7 +148,7 @@ def cleanup_old_tasks(hours_ttl):
     finished_cutoff = now - datetime.timedelta(hours=hours_ttl)
     stuck_cutoff = now - datetime.timedelta(hours=48)
     
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_connection()
     c = conn.cursor()
     c.execute("""SELECT task_id FROM task_queue 
                  WHERE (status IN ('COMPLETED', 'FAILED') AND created_at < ?)
@@ -148,7 +162,7 @@ def cleanup_old_tasks(hours_ttl):
             delete_task(row[0])
 
 def get_unfinished_tasks():
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_connection()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM task_queue WHERE status NOT IN ('COMPLETED', 'FAILED')")

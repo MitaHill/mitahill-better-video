@@ -12,22 +12,15 @@
 
 ---
 
-## 🛡️ 进程管理与单例模式 (Streamlit 特有)
+## 🛡️ 进程管理与守护策略 (Flask + Worker)
 
-**故障现象**：容器内出现大量 `<defunct>` (僵尸) 进程，Worker 逻辑虽然正确但被重复启动。
-**原因分析**：Streamlit 每次页面刷新都会重跑主脚本。如果在脚本中直接实例化管理类（如 `mgr = WorkerManager()`），会导致每次刷新都创建一个失去旧进程句柄的新实例。
+**故障现象**：Worker 未启动或被重复启动导致任务停滞。
+**原因分析**：主进程未统一管理子进程生命周期，导致 Worker 丢失或僵尸进程残留。
 
 ### ✅ 解决方案：
-- **必须**使用 `@st.cache_resource` 装饰一个 getter 函数来获取实例。
-- **示例**：
-  ```python
-  @st.cache_resource
-  def get_manager():
-      return WorkerManager()
-  
-  mgr = get_manager() # 跨刷新保持唯一实例
-  mgr.ensure_worker_running()
-  ```
+- **唯一启动点**：只能由 `app/backend/main.py` 启动 Worker。
+- **显式退出**：主进程收到 SIGTERM/SIGINT 时，必须终止 Worker。
+- **禁止 UI 拉起 Worker**：前端仅调用 API，禁止在 UI 侧创建后台进程。
 
 ---
 
@@ -44,7 +37,7 @@
 
 ## 🛠️ 构建与部署 SOP
 
-1. **无缓存构建**：进行逻辑变更后，优先使用 `docker build --no-cache` 以排除层干扰。
+1. **优先使用缓存构建**：除非排查缓存污染问题，否则使用缓存加速构建。
 2. **集成审计测试**：
    - 构建镜像后，必须先运行临时容器执行审计脚本：
      `docker run --rm --gpus all <image_tag> python3 app/config.py`
@@ -68,15 +61,15 @@
   - `docs:` 仅文档变更（如更新 SOP）。
 
 **3. 源码与镜像同步 [CRITICAL]**：
-- **操作顺序**：修改代码 -> 构建新镜像并打标 -> **更新 `deploy/docker-compose.yml` 中的镜像标签** -> 提交 Git。
-- **严禁**：在 `docker-compose.yml` 指向旧镜像或标签不匹配的状态下提交代码。
+- **操作顺序**：修改代码 -> 构建新镜像并打标 -> **更新 `deploy/compose/docker-compose.local.yml` 中的镜像标签** -> 提交 Git。
+- **严禁**：在 `deploy/compose/docker-compose.local.yml` 指向旧镜像或标签不匹配的状态下提交代码。
 - **标签规范**：推荐使用日期时间戳，如 `20260107-1530`。
 
 **4. 紧急回滚流程**：
 - 若部署后出现不可预知错误，应立即执行：
   1. `git reset --hard HEAD@{1}` (或指定哈希) 还原源码。
-  2. 手动将 `docker-compose.yml` 中的镜像标签改为上一个稳定版本的 Tag。
-  3. `docker-compose up -d --force-recreate` 确保旧逻辑物理生效。
+  2. 手动将 `deploy/compose/docker-compose.local.yml` 中的镜像标签改为上一个稳定版本的 Tag。
+  3. `docker-compose -f deploy/compose/docker-compose.local.yml up -d --force-recreate` 确保旧逻辑物理生效。
 
 ---
-*Last Updated: 2026-01-07*
+*Last Updated: 2026-01-08*

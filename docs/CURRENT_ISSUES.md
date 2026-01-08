@@ -1,18 +1,9 @@
-# Real-ESRGAN Web App 当前故障症状记录
+# Current Issues
 
-## 1. 进程级故障
-- **Worker 循环重启**：容器日志持续出现 `Database initialized successfully` 提示，显示 Worker 进程在初始化后立即退出并被 UI 重新启动。
-- **僵尸进程堆积**：容器内出现 `[python] <defunct>` 进程，父进程未能正确回收已崩溃的子进程。
+## 1. Migration Status
+- **Flask + Vue migration in progress**: Streamlit UI has been removed, Vue UI is now served by Flask.
+- **Docker images**: Ensure `deploy/docker/Dockerfile.app` builds the frontend assets during image build.
 
-## 2. 数据库与任务状态故障
-- **任务停滞**：任务状态长期卡在 `Recovered from system restart.`，进度保持为 0%。
-- **状态同步失效**：通过后台 SQL 查询显示任务正在处理（帧数在增加），但该状态无法反映到 Web 前端。
-- **潜在的数据库死锁**：UI 进程与 Worker 进程在并发访问 SQLite 数据库时，疑似出现锁定竞争，导致 UI 无法读取最新进度。
-
-## 3. Web 前端 UI 故障
-- **进度条缺失**：即使在 Task ID 输入框中输入了正确的 ID，网页上也不显示进度条或状态更新。
-- **渲染静默失败**：前端页面虽然可以访问，但状态查询部分没有任何输出或反馈，疑似 Streamlit 组件在处理特定格式的进度消息时发生崩溃。
-- **列表展示空缺**：活跃任务队列无法在前端自动列出。
-
----
-*记录时间：2026-01-07*
+## 2. Pending Validation
+- **API polling**: Validate `GET /api/tasks/<task_id>` response under concurrent usage.
+- **Preview availability**: Preview endpoints return 404 until worker generates previews.

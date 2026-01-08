@@ -47,7 +47,7 @@ def load_env_file(env_path):
 
 # Load environment immediately (repo root)
 ROOT_DIR = Path(__file__).resolve().parents[1]
-load_env_file(str(ROOT_DIR / ".env"))
+load_env_file(str(ROOT_DIR / "config/.env"))
 
 # --- System Information Collection (DEBUG) ---
 def log_system_info():

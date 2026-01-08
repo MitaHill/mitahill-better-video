@@ -10,14 +10,14 @@
 ### 2. 为什么舍弃 python-dotenv 库？
 在 Docker 环境下，由于网络限制导致镜像构建时无法下载第三方库。我们决定在 `config.py` 中编写**原生环境变量解析器**，通过文件流直接读取 `.env` 并注入 `os.environ`。这消除了项目对外部库的依赖，提高了部署成功率。
 
-### 3. UI 与 Worker 的“守护关系”
-为了简化部署，我们将 `app/streamlit_app.py` 设为父进程。利用 Streamlit 的 `st.cache_resource` 实现了 `WorkerManager` 单例，只要有人访问网页，Worker 就会被自动拉起（如果它意外挂掉）。这避免了用户手动在命令行启动多个进程的麻烦。
+### 3. API 与 Worker 的“守护关系”
+为了简化部署，我们将 `app/backend/main.py` 设为父进程，由其统一启动 Worker 子进程并管理退出。前端仅调用 API，不再负责启动 Worker。
 
 ## 🛠️ 重要修复日志
 
-- **[修复] 任务卡死**: 解决了 Worker 进程与 Streamlit 进程互相独立导致的启动失败问题。
+- **[重构] Flask + Vue**: 前端与后端解耦，UI 使用 Vue，API 使用 Flask。
+- **[修复] 任务卡死**: Worker 统一由 `main.py` 启动，避免分离启动导致的任务空转。
 - **[修复] 404 模型下载**: 修正了官方 Real-ESRGAN 模型库中部分模型的下载链接。
-- **[修复] 上传限制显示**: 绕过了 Streamlit 硬编码的 1GB 限制提示，实现了基于 `.env` 的动态校验逻辑。
 - **[优化] 显存计算**: 调整了 Tile Size 阶梯，4GB 显存现在默认使用 128 Tile 以确保绝对安全。
 
 ## ⚠️ 维护者建议

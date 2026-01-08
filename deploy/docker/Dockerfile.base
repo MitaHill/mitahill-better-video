@@ -32,7 +32,8 @@ RUN pip install --upgrade pip setuptools wheel "numpy<2" && \
         tqdm==4.65.0 \
         ffmpeg-python==0.2.0 \
         pyyaml==6.0 \
-        streamlit
+        flask==2.3.3 \
+        gunicorn==21.2.0
 
 # Pre-download weights (huge layer, fixed)
 RUN mkdir -p /workspace/weights && \
