@@ -1,21 +1,5 @@
 <template>
   <div class="app-shell">
-    <section class="hero">
-      <div class="hero-card">
-        <div class="hero-title">米塔影像增强平台</div>
-        <p class="hero-subtitle">
-          提交任务、查看进度、下载结果，一站式完成视频与图片增强。
-        </p>
-      </div>
-      <div class="panel">
-        <h2>服务状态</h2>
-        <p class="notice">后端：{{ health.status }}</p>
-        <p class="notice">数据库：{{ health.db }}</p>
-        <p class="notice">Worker：{{ health.worker }}</p>
-        <button class="secondary" @click="fetchHealth">刷新</button>
-      </div>
-    </section>
-
     <section class="panel-grid">
       <div class="panel">
         <h2>创建任务</h2>
@@ -51,11 +35,11 @@
         </div>
 
         <div class="field">
-          <label>切片大小：{{ tileLabel }}</label>
+          <label>切片大小：{{ form.tile }}</label>
           <input
             v-model.number="form.tile"
             type="range"
-            min="0"
+            min="64"
             max="512"
             step="64"
           />
@@ -172,13 +156,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, onUnmounted, reactive, ref } from "vue";
 
 const form = reactive({
   inputType: "Video",
   modelName: "realesrgan-x4plus",
   upscale: 3,
-  tile: 0,
+  tile: 256,
   denoise: 0.5,
   keepAudio: true,
   crf: 18,
@@ -198,7 +182,6 @@ const preview = reactive({
   upscaledReady: false
 });
 const lastPreviewId = ref("");
-const health = reactive({ status: "unknown", db: "unknown", worker: "unknown" });
 let pollTimer = null;
 
 const resolution = computed(() => {
@@ -206,11 +189,6 @@ const resolution = computed(() => {
   const w = status.value.video_info.width || "?";
   const h = status.value.video_info.height || "?";
   return `${w}x${h}`;
-});
-
-const tileLabel = computed(() => {
-  if (form.tile === 0) return "自动";
-  return `${form.tile}`;
 });
 
 const statusClass = computed(() => {
@@ -308,21 +286,6 @@ const copyTaskId = async () => {
   }
 };
 
-const fetchHealth = async () => {
-  try {
-    const res = await fetch("/api/health");
-    if (!res.ok) throw new Error("Health check failed");
-    const payload = await res.json();
-    health.status = payload.status || "ok";
-    health.db = payload.db || "unknown";
-    health.worker = payload.worker || "unknown";
-  } catch (error) {
-    health.status = "offline";
-    health.db = "unknown";
-    health.worker = "unknown";
-  }
-};
-
 const startPolling = () => {
   if (pollTimer) return;
   pollTimer = setInterval(fetchStatus, 4000);
@@ -335,6 +298,5 @@ const stopPolling = () => {
   }
 };
 
-onMounted(fetchHealth);
 onUnmounted(stopPolling);
 </script>

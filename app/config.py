@@ -175,14 +175,23 @@ def get_gpu_memory_gb():
         sys.exit(1)
 
 def get_smart_tile_size():
-    env_tile = get_env_int("DEFAULT_TILE_SIZE", 0)
-    if env_tile > 0: return env_tile
     vram = get_gpu_memory_gb()
-    if vram < 4: res = 128
-    elif vram < 6: res = 256
-    elif vram < 10: res = 400
-    else: return 512
-    return res
+    if vram < 4:
+        res = 128
+    elif vram < 6:
+        res = 256
+    elif vram < 10:
+        res = 400
+    else:
+        res = 512
+    return res, vram
+
+def resolve_default_tile_size():
+    env_tile = get_env_int("DEFAULT_TILE_SIZE", 0)
+    if env_tile > 0:
+        return env_tile, None
+    smart_tile, vram = get_smart_tile_size()
+    return smart_tile, vram
 
 # --- Execution Lifecycle ---
 _initialized = False
@@ -214,9 +223,14 @@ def initialize_context():
         logger.critical(f"[FAILED] Unable to query NVIDIA GPU: {e}")
         sys.exit(1)
     verify_models()
-    DEFAULT_SMART_TILE_SIZE = get_smart_tile_size()
+    DEFAULT_SMART_TILE_SIZE, vram = resolve_default_tile_size()
+    if vram is None:
+        logger.info("Tile Size: %s (env override)", DEFAULT_SMART_TILE_SIZE)
+    else:
+        logger.info("Tile Size: %s (auto by VRAM %.2f GB)", DEFAULT_SMART_TILE_SIZE, vram)
     logger.info(f"Application context initialized. Smart Tile Size: {DEFAULT_SMART_TILE_SIZE}")
     _initialized = True
+    return {"tile_size": DEFAULT_SMART_TILE_SIZE, "vram_gb": vram}
 
 if __name__ == "__main__":
     initialize_context()

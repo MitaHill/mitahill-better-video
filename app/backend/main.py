@@ -25,8 +25,9 @@ def main():
         level=logging.INFO,
         format="[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s",
     )
-    config.initialize_context()
+    init_info = config.initialize_context()
     db.init_db()
+    logger.info("Init recommendations: %s", init_info)
 
     worker_service = _build_worker_service()
     worker_service.start()

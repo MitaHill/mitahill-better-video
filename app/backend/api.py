@@ -47,9 +47,7 @@ def create_app(worker_service=None):
         input_type = request.form.get("input_type", "Video")
         model_name = request.form.get("model_name", "realesrgan-x4plus")
         upscale = int(request.form.get("upscale", 3))
-        tile = int(request.form.get("tile", 0))
-        if tile <= 0:
-            tile = config.DEFAULT_SMART_TILE_SIZE
+        tile = int(request.form.get("tile", config.DEFAULT_SMART_TILE_SIZE))
         denoise = float(request.form.get("denoise_strength", 0.5))
         keep_audio = request.form.get("keep_audio", "true").lower() == "true"
         crf = int(request.form.get("crf", 18))
