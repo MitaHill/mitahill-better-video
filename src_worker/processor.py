@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from PIL import Image
 import numpy as np
+import torch
 
 import db
 import config
@@ -48,16 +49,37 @@ def process_single_task(task):
             duration = get_video_duration(input_path)
             logger.info(f"Video Duration: {duration}s (Segment Threshold: {config.SEGMENT_TIME_SECONDS}s)")
             
-            # --- GENERATE PREVIEW ---
+            # --- GENERATE PREVIEW (ORIGINAL & UPSCALED) ---
             try:
-                preview_path = run_dir / "preview_original.jpg"
-                if not preview_path.exists():
+                preview_orig = run_dir / "preview_original.jpg"
+                preview_ups = run_dir / "preview_upscaled.jpg"
+                
+                if not preview_orig.exists():
                     logger.debug(f"Generating preview for {input_path.name}...")
                     run_ffmpeg([
                         "ffmpeg", "-y", "-i", str(input_path), 
                         "-ss", "00:00:00", "-vframes", "1", 
-                        "-q:v", "2", str(preview_path)
+                        "-q:v", "2", str(preview_orig)
                     ])
+                
+                if preview_orig.exists() and not preview_ups.exists():
+                    logger.info("Generating upscaled preview...")
+                    # Temporarily load model
+                    upsampler = build_model(
+                        params['model_name'], params['upscale'], params['tile'], params['tile_pad'],
+                        params['fp16'], weights_dir, params.get('denoise_strength')
+                    )
+                    img = Image.open(preview_orig).convert("RGB")
+                    output, _ = upsampler.enhance(np.array(img)[:,:,::-1], outscale=params['upscale'])
+                    out_img = Image.fromarray(output[:,:,::-1])
+                    out_img.save(preview_ups)
+                    
+                    # Cleanup to save VRAM for main task
+                    del upsampler
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    logger.info("Preview generation complete.")
+
             except Exception as e:
                 logger.warning(f"Failed to generate preview: {e}")
 
