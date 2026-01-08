@@ -197,6 +197,7 @@ const preview = reactive({
   originalReady: false,
   upscaledReady: false
 });
+const lastPreviewId = ref("");
 const health = reactive({ status: "unknown", db: "unknown", worker: "unknown" });
 let pollTimer = null;
 
@@ -275,10 +276,14 @@ const fetchStatus = async () => {
       throw new Error(err.error || "未找到任务，请确认 ID 是否正确。");
     }
     status.value = await res.json();
-    preview.original = `/api/tasks/${statusQuery.value}/preview/original`;
-    preview.upscaled = `/api/tasks/${statusQuery.value}/preview/upscaled`;
-    preview.originalReady = false;
-    preview.upscaledReady = false;
+    const currentId = statusQuery.value;
+    if (lastPreviewId.value !== currentId) {
+      preview.originalReady = false;
+      preview.upscaledReady = false;
+      lastPreviewId.value = currentId;
+    }
+    preview.original = `/api/tasks/${currentId}/preview/original`;
+    preview.upscaled = `/api/tasks/${currentId}/preview/upscaled`;
 
     if (status.value.status === "PROCESSING" || status.value.status === "PENDING") {
       startPolling();
