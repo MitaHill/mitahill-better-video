@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app:
-    image: realesrgan-web-app:20260108-1432
+    image: realesrgan-web-app:20260108-1450
     container_name: realesrgan_app
     runtime: nvidia
     environment:
