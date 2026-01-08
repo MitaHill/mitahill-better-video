@@ -14,4 +14,4 @@ services:
       NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
     runtime: nvidia
     ipc: host
-    command: python3 /workspace/app/backend/main.py
+    command: python3 -m backend.main

@@ -35,4 +35,4 @@ COPY --from=frontend-build /frontend/dist /workspace/app/frontend/dist
 
 EXPOSE 8501
 
-CMD ["python3", "/workspace/app/backend/main.py"]
+CMD ["python3", "-m", "backend.main"]

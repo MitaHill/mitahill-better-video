@@ -7,4 +7,4 @@ export PYTHONPATH="/workspace/app:${PYTHONPATH}"
 
 # Flask main entrypoint starts API + worker.
 echo "Starting Flask backend..."
-python3 /workspace/app/backend/main.py
+python3 -m backend.main
