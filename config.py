@@ -191,6 +191,23 @@ def initialize_context():
     if _initialized: return
     
     log_system_info()
+    # Fail-fast GPU checks
+    try:
+        import torch
+    except Exception as e:
+        logger.critical(f"[FAILED] PyTorch not available for CUDA checks: {e}")
+        sys.exit(1)
+    if not torch.cuda.is_available():
+        logger.critical("[FAILED] CUDA not available. NVIDIA GPU required.")
+        sys.exit(1)
+    try:
+        gpu_name = torch.cuda.get_device_name(0)
+        if "nvidia" not in gpu_name.lower():
+            logger.critical(f"[FAILED] Non-NVIDIA GPU detected: {gpu_name}")
+            sys.exit(1)
+    except Exception as e:
+        logger.critical(f"[FAILED] Unable to query NVIDIA GPU: {e}")
+        sys.exit(1)
     verify_models()
     DEFAULT_SMART_TILE_SIZE = get_smart_tile_size()
     logger.info(f"Application context initialized. Smart Tile Size: {DEFAULT_SMART_TILE_SIZE}")

@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from PIL import Image
 import numpy as np
+import torch
 from realesrgan import RealESRGANer
 from realesrgan.archs.srvgg_arch import SRVGGNetCompact
 from basicsr.archs.rrdbnet_arch import RRDBNet
@@ -64,7 +65,7 @@ class Upscaler:
             tile=tile,
             tile_pad=tile_pad,
             pre_pad=0,
-            half=fp16
+            half=fp16 and torch.cuda.is_available()
         )
         logger.info("Model loaded and ready.")
 

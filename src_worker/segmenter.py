@@ -31,14 +31,14 @@ def process_video_with_model(input_path, output_path, upsampler, params, task_id
         except:
             logger.warning(f"Audio extraction failed for {input_path.name}, continuing without audio.")
 
-        # 2. Extract Frames (lossless PNG to avoid codec artifacts)
+        # 2. Extract Frames (align with upstream pipeline)
         run_ffmpeg([
             "ffmpeg", "-y", "-i", str(input_path),
-            "-vsync", "0", "-f", "image2", str(frames_in / "f_%06d.png")
+            "-vsync", "0", "-q:v", "2", "-f", "image2", str(frames_in / "f_%06d.jpg")
         ])
 
         # 3. Inference
-        frame_list = sorted(list(frames_in.glob("*.png")))
+        frame_list = sorted(list(frames_in.glob("*.jpg")))
         total = len(frame_list)
         
         for i, f_path in enumerate(frame_list):
@@ -51,7 +51,10 @@ def process_video_with_model(input_path, output_path, upsampler, params, task_id
 
         # 4. Recombine
         fps = get_video_fps(input_path)
-        cmd = ["ffmpeg", "-y", "-framerate", str(fps), "-i", str(frames_out / "f_%06d.png")]
+        cmd = [
+            "ffmpeg", "-y", "-framerate", str(fps), "-start_number", "1",
+            "-i", str(frames_out / "f_%06d.jpg")
+        ]
         
         if audio_path.exists() and params.get('keep_audio', True):
             cmd += ["-i", str(audio_path), "-map", "0:v:0", "-map", "1:a:0?", "-c:a", "copy"]
