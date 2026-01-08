@@ -22,3 +22,15 @@ def get_video_duration(file_path):
         return float(result.stdout.strip())
     except:
         return 0.0
+
+def get_video_fps(file_path):
+    cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate", "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        raw = result.stdout.strip()
+        if '/' in raw:
+            num, den = raw.split('/')
+            return float(num) / float(den)
+        return float(raw)
+    except:
+        return 30.0
