@@ -20,15 +20,15 @@ class WorkerManager:
         self._proc = self._start_worker()
 
     def _build_worker_cmd(self):
-        base_dir = Path(__file__).resolve().parents[2]
-        worker_script = base_dir / "worker.py"
+        app_dir = Path(__file__).resolve().parents[1]
+        worker_script = app_dir / "worker.py"
         return [sys.executable, "-u", str(worker_script)]
 
     def _resolve_log_path(self):
         workspace_log = Path("/workspace/worker.log")
         if workspace_log.parent.exists():
             return workspace_log
-        return Path(__file__).resolve().parents[2] / "worker.log"
+        return Path(__file__).resolve().parents[1] / "worker.log"
 
     def _start_worker(self):
         self._log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -37,5 +37,5 @@ class WorkerManager:
             self._worker_cmd,
             stdout=log_file,
             stderr=subprocess.STDOUT,
-            cwd=str(Path(__file__).resolve().parents[2]),
+            cwd=str(Path(__file__).resolve().parents[1]),
         )
