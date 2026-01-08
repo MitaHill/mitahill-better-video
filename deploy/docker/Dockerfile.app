@@ -8,7 +8,7 @@ COPY app/frontend/src ./src
 RUN npm install
 RUN npm run build
 
-FROM realesrgan-base:20260108-0930
+FROM realesrgan-base:20260108-1353
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
