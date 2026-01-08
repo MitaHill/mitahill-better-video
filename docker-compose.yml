@@ -1,21 +1,15 @@
 services:
   realesrgan_app:
     build: .
-    container_name: realesrgan_video_app
+    container_name: realesrgan_app
     ports:
       - "8501:8501"
     volumes:
       - ./:/workspace
     environment:
-      PYTHONPATH: "/workspace/Real-ESRGAN:${PYTHONPATH}"
+      PYTHONPATH: "/workspace/app:/workspace/vendor/Real-ESRGAN:${PYTHONPATH}"
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
     runtime: nvidia
     ipc: host
-    command: >
-      bash -lc "
-        # Start worker daemon in background
-        python /workspace/worker.py &
-        # Start Streamlit
-        streamlit run /workspace/streamlit_app.py --server.port=8501 --server.address=0.0.0.0
-      "
+    command: /workspace/scripts/start.sh

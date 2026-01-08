@@ -1,12 +1,12 @@
 # Real-ESRGAN Image/Video Upscaler (Streamlit)
 
 <p align="center">
-  <img src="Real-ESRGAN/assets/realesrgan_logo.png" alt="Real-ESRGAN" width="300"/>
+  <img src="vendor/Real-ESRGAN/assets/realesrgan_logo.png" alt="Real-ESRGAN" width="300"/>
 </p>
 A lightweight Streamlit UI around Real-ESRGAN for upscaling videos and images. It supports GPU inference, adjustable tiling, FP16, denoise control for the general v3 model, multi-image batch processing, and robust video encoding.
 
 <p align="center">
-  <img src="demo.gif" alt="Real-ESRGAN"/>
+  <!-- demo.gif removed; keep header clean -->
 </p>
 
 ## Features
@@ -17,7 +17,7 @@ A lightweight Streamlit UI around Real-ESRGAN for upscaling videos and images. I
 - Video mode: keeps original audio (optional); CRF quality control
 - Performance: JPEG frame extraction, CUDA decode, FP16, tiling controls
 - Cancellation: Stop button halts ffmpeg and processing cleanly
-- Large uploads: 1 GB upload limit via `.streamlit/config.toml`
+- Large uploads: 1 GB upload limit via `app/.streamlit/config.toml`
 - Persistent outputs under `/workspace/output`
 
 ## Quick Start
@@ -59,9 +59,9 @@ With the default `docker-compose.yml`, your project folder is mounted to `/works
 
 ## Model Weights
 Place weights in either location (container paths):
-- `/workspace/data/models`
+- `/workspace/app/data/models`
 
-The app attempts to download these if not present. In restricted environments, download manually into `data/models/` on the host.
+The app attempts to download these if not present. In restricted environments, download manually into `app/data/models/` on the host.
 
 ## Performance Tips
 - Disable tiling (`tile=0`) if your GPU has enough VRAM for the frame size.
@@ -70,18 +70,17 @@ The app attempts to download these if not present. In restricted environments, d
 
 
 ## Configuration
-- Upload limit: `.streamlit/config.toml` sets `maxUploadSize = 1024` (1 GB)
-- Model search path and outputs are configurable in `streamlit_app.py` near the top-level helpers
+- Upload limit: `app/.streamlit/config.toml` sets `maxUploadSize = 1024` (1 GB)
+- Model search path and outputs are configurable in `app/streamlit_app.py` near the top-level helpers
 
 
 ## Project Structure
-- `streamlit_app.py` — Streamlit UI and pipeline
-- `Real-ESRGAN/` — Upstream Real-ESRGAN submodule/code
-- `data/models/` — Place model weights here (mounted on host)
+- `app/` — Streamlit UI, worker pipeline, configs, and data assets
+- `vendor/Real-ESRGAN/` — Upstream Real-ESRGAN code
+- `scripts/` — Local entrypoints (worker + UI)
+- `deploy/` — Deployment compose files
 - `output/` — Outputs and per-run scratch
 - `Dockerfile`, `docker-compose.yml` — Container setup
-- `.streamlit/config.toml` — Streamlit config (upload size)
 
 ## Acknowledgements
 - Real-ESRGAN by Xintao et al. https://github.com/xinntao/Real-ESRGAN
-

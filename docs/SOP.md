@@ -47,7 +47,7 @@
 1. **无缓存构建**：进行逻辑变更后，优先使用 `docker build --no-cache` 以排除层干扰。
 2. **集成审计测试**：
    - 构建镜像后，必须先运行临时容器执行审计脚本：
-     `docker run --rm --gpus all <image_tag> python3 config.py`
+     `docker run --rm --gpus all <image_tag> python3 app/config.py`
    - 只有输出 `[SUCCESS]` 后，方可推送到镜像仓库或部署生产环境。
 3. **端口冲突解决**：
    - 若 8501 端口被占用，使用 `lsof -ti:8501 | xargs kill -9` 强力清理，严禁在端口冲突状态下强行重启。
@@ -68,7 +68,7 @@
   - `docs:` 仅文档变更（如更新 SOP）。
 
 **3. 源码与镜像同步 [CRITICAL]**：
-- **操作顺序**：修改代码 -> 构建新镜像并打标 -> **更新 `r/docker-compose.yml` 中的镜像标签** -> 提交 Git。
+- **操作顺序**：修改代码 -> 构建新镜像并打标 -> **更新 `deploy/docker-compose.yml` 中的镜像标签** -> 提交 Git。
 - **严禁**：在 `docker-compose.yml` 指向旧镜像或标签不匹配的状态下提交代码。
 - **标签规范**：推荐使用日期时间戳，如 `20260107-1530`。
 
