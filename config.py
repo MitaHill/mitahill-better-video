@@ -6,7 +6,6 @@ import platform
 import hashlib
 import yaml
 from pathlib import Path
-from dotenv import load_dotenv
 
 # --- Standardized Logging ---
 LOG_FORMAT = "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
@@ -16,6 +15,38 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger("CONFIG")
+
+# --- Native .env Parser (No Dependencies) ---
+def load_env_file(env_path):
+    """Parses .env file and injects into os.environ"""
+    path = Path(env_path)
+    if not path.exists():
+        logger.warning(f"No .env file found at {path}")
+        return
+
+    logger.info(f"Loading configuration from {path}")
+    try:
+        with open(path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    key = key.strip()
+                    value = value.strip()
+                    # Remove quotes if present
+                    if (value.startswith('"') and value.endswith('"')) or \
+                       (value.startswith("'") and value.endswith("'")):
+                        value = value[1:-1]
+                    
+                    if key and key not in os.environ:
+                        os.environ[key] = value
+    except Exception as e:
+        logger.error(f"Failed to parse .env file: {e}")
+
+# Load environment immediately
+load_env_file(".env")
 
 # --- System Information Collection (DEBUG) ---
 def log_system_info():
@@ -89,8 +120,6 @@ def verify_models():
     logger.info("[SUCCESS] All model files verified (SHA256 matched).")
 
 # --- Fail-Fast Configuration Loading ---
-env_path = Path(".env")
-load_dotenv(dotenv_path=env_path, override=True)
 
 def get_env_bool(key, default):
     val = os.getenv(key, str(default)).lower()
