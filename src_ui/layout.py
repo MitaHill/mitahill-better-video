@@ -231,15 +231,22 @@ def render_status_tab():
             
             # Download Button
             if task['status'] == "COMPLETED":
-                msg = task['message']
-                if "Output:" in msg:
+                msg = task['message'] or ""
+                out_name = None
+                if "Completed:" in msg:
+                    out_name = msg.split("Completed:")[1].strip()
+                elif "Output:" in msg:
                     out_name = msg.split("Output:")[1].strip()
+                
+                if out_name:
                     out_path = Path("/workspace/output") / out_name
                     if out_path.exists():
                         with open(out_path, "rb") as f:
-                            st.download_button(f"📥 Download {out_name}", f, file_name=out_name)
+                            st.download_button(f"📥 下载结果 ({out_name})", f, file_name=out_name)
                     else:
-                        st.error("Result file not found on disk.")
+                        st.error(f"文件 {out_name} 在磁盘上未找到。")
+                else:
+                    st.warning("任务已完成，但无法从消息中解析出文件名。")
 
             # Smart Auto-Refresh: Only if THIS task is running
             if auto_refresh and task['status'] in ["PENDING", "PROCESSING"]:
