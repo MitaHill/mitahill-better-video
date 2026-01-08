@@ -37,11 +37,11 @@ def init_db():
                       video_info TEXT,
                       progress INTEGER,
                       message TEXT)''')
+        _ensure_columns(conn)
         c.execute("CREATE INDEX IF NOT EXISTS idx_task_status ON task_queue(status)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_task_created ON task_queue(created_at)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_task_updated ON task_queue(updated_at)")
         conn.commit()
-        _ensure_columns(conn)
         conn.close()
         logger.debug("Database initialized successfully.")
     except Exception as e:
