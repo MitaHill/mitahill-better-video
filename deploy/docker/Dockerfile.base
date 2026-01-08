@@ -3,10 +3,18 @@ FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+
+ARG UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu/
 
 # Core system dependencies and tooling
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN sed -i.bak \
+        -e "s|http://archive.ubuntu.com/ubuntu/|${UBUNTU_MIRROR}|g" \
+        -e "s|http://security.ubuntu.com/ubuntu/|${UBUNTU_MIRROR}|g" \
+        /etc/apt/sources.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
     python3.10 python3.10-dev python3.10-distutils python3.10-venv \
     ffmpeg git wget curl ca-certificates build-essential pkg-config \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxfixes3 libxkbcommon0 \
@@ -19,21 +27,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /workspace
 
 # Python dependencies (heavy, rarely changes)
-RUN pip install --upgrade pip setuptools wheel "numpy<2" && \
-    pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu116 \
-        torch==1.12.1+cu116 torchvision==0.13.1+cu116 torchaudio==0.12.1+cu116 && \
-    pip install --no-cache-dir \
-        basicsr==1.4.2 \
-        facexlib==0.2.5 \
-        gfpgan==1.3.5 \
-        numpy==1.24.4 \
-        opencv-python==4.8.0.76 \
-        Pillow==9.5.0 \
-        tqdm==4.65.0 \
-        ffmpeg-python==0.2.0 \
-        pyyaml==6.0 \
-        flask==2.3.3 \
-        gunicorn==21.2.0
+RUN pip install --upgrade pip setuptools wheel "numpy<2"
+
+RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu116 \
+    torch==1.12.1+cu116 torchvision==0.13.1+cu116 torchaudio==0.12.1+cu116
+
+RUN pip install --no-cache-dir \
+    basicsr==1.4.2 \
+    facexlib==0.2.5 \
+    gfpgan==1.3.5 \
+    numpy==1.24.4 \
+    opencv-python==4.8.0.76 \
+    Pillow==9.5.0 \
+    tqdm==4.65.0 \
+    ffmpeg-python==0.2.0 \
+    pyyaml==6.0 \
+    flask==2.3.3 \
+    gunicorn==21.2.0
 
 # Pre-download weights (huge layer, fixed)
 RUN mkdir -p /workspace/weights && \

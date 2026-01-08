@@ -1,6 +1,7 @@
 FROM node:20-alpine AS frontend-build
 
 WORKDIR /frontend
+RUN npm config set registry https://registry.npmmirror.com
 COPY app/frontend/package.json .
 COPY app/frontend/vite.config.js .
 COPY app/frontend/index.html .
@@ -14,6 +15,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn \
     PYTHONPATH=/workspace/app
 
 WORKDIR /workspace
