@@ -41,7 +41,7 @@ RUN mkdir -p /workspace/weights && \
     wget -q -P /workspace/weights https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth
 
 # --- CACHE BUSTER TO ENSURE SOURCE CODE IS ALWAYS RE-COPIED AND RE-VERIFIED ---
-RUN echo "Triggering Re-build at: $(date)"
+RUN echo "Triggering Re-build (Force Update 2026-01-08-0715)"
 
 # 4. Copy Source Code
 COPY . .
