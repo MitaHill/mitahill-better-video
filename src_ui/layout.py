@@ -166,52 +166,145 @@ def render_create_tab():
             st.info("Worker process will pick this up automatically.")
 
 def render_status_tab():
-    st.header("Check Status")
-    auto_refresh = st.toggle("Auto-refresh", value=True)
-    query_id = st.text_input("Task ID")
+
+    st.header("Task Monitoring")
+
     
+
+    # Auto-refresh toggle
+
+    auto_refresh = st.toggle("Auto-refresh (every 3s)", value=True)
+
+    
+
+    # 1. Fetch all active tasks to show an overview
+
+    active_tasks = db.get_unfinished_tasks()
+
+    
+
+    if active_tasks:
+
+        st.subheader("Active Queue")
+
+        for t in active_tasks:
+
+            with st.container():
+
+                # Display Task ID and Status
+
+                c1, c2 = st.columns([1, 4])
+
+                c1.write(f"**Task ID:** `{t['task_id'][:8]}...`")
+
+                
+
+                status = t['status']
+
+                msg = t['message'] or "No message"
+
+                
+
+                if status == "PROCESSING":
+
+                    c2.info(f"🔄 **{status}**: {msg}")
+
+                else:
+
+                    c2.warning(f"⏳ **{status}**: {msg}")
+
+                
+
+                # Progress Bar logic
+
+                prog_val = t['progress'] if t['progress'] is not None else 0
+
+                # Ensure it's 0-100 clamped, then to 0.0-1.0
+
+                clamped_prog = max(0, min(100, prog_val))
+
+                st.progress(clamped_prog / 100.0)
+
+                st.write("---")
+
+    else:
+
+        st.info("No tasks are currently being processed.")
+
+
+
+    # 2. Manual Query for Downloads/Full Details
+
+    st.subheader("Query specific Task ID")
+
+    query_id = st.text_input("Enter Full Task ID to download or view logs").strip()
+
+    
+
     if query_id:
-        task = db.get_task(query_id.strip())
+
+        task = db.get_task(query_id)
+
         if not task:
-            st.error("Task not found or expired.")
+
+            st.error("Task not found.")
+
         else:
-            st.metric("Status", task['status'], task['message'])
-            st.progress(task['progress']/100)
+
+            st.write(f"### Full Details for `{query_id}`")
+
+            st.write(f"**Status:** {task['status']}")
+
+            st.write(f"**Last Message:** {task['message']}")
+
             
-            # Details
-            with st.expander("Task Details"):
+
+            # Details Expander
+
+            with st.expander("Parameters & Info"):
+
                 try:
+
                     v_info = json.loads(task['video_info'])
+
                     t_params = json.loads(task['task_params'])
-                    details = {
-                        "Created At": str(task['created_at']),
-                        "Input File": v_info.get("filename"),
-                        "Model": t_params.get("model_name"),
-                        "Duration": f"{v_info.get('duration', 0)}s"
-                    }
-                    st.table(details)
+
+                    st.json({"params": t_params, "video": v_info})
+
                 except: pass
 
-            # Preview
-            run_dir = Path(f"/workspace/output/run_{query_id}")
-            p_orig = run_dir / "preview_original.jpg"
-            p_ups = run_dir / "preview_upscaled.jpg"
-            
-            if p_orig.exists() and p_ups.exists():
-                c1, c2 = st.columns(2)
-                ts = int(time.time()) # cache buster
-                with c1: st.image(str(p_orig), caption="Original")
-                with c2: st.image(str(p_ups), caption="Upscaled")
-            
-            if task['status'] == "COMPLETED":
-                msg = task['message']
-                if "Output:" in msg:
-                    out_name = msg.split("Output:")[1].strip()
-                    out_path = Path("/workspace/output") / out_name
-                    if out_path.exists():
-                        with open(out_path, "rb") as f:
-                            st.download_button("Download", f, file_name=out_name)
 
-            if auto_refresh and task['status'] in ["PENDING", "PROCESSING"]:
-                time.sleep(2)
-                st.rerun()
+
+            if task['status'] == "COMPLETED":
+
+                msg = task['message']
+
+                if "Output:" in msg:
+
+                    out_name = msg.split("Output:")[1].strip()
+
+                    out_path = Path("/workspace/output") / out_name
+
+                    if out_path.exists():
+
+                        with open(out_path, "rb") as f:
+
+                            st.download_button(f"📥 Download {out_name}", f, file_name=out_name)
+
+                    else:
+
+                        st.error("Result file not found on disk.")
+
+
+
+    # 3. Handle Refresh
+
+    if auto_refresh:
+
+        # Only rerun if there are tasks in transition states
+
+        if any(t['status'] in ["PENDING", "PROCESSING"] for t in active_tasks):
+
+            time.sleep(3)
+
+            st.rerun()
