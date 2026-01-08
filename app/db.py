@@ -157,8 +157,8 @@ def cleanup_old_tasks(hours_ttl):
     conn = get_connection()
     c = conn.cursor()
     c.execute("""SELECT task_id FROM task_queue 
-                 WHERE (status IN ('COMPLETED', 'FAILED') AND created_at < ?)
-                 OR (created_at < ?)""", (finished_cutoff, stuck_cutoff))
+                 WHERE (status IN ('COMPLETED', 'FAILED') AND COALESCE(updated_at, created_at) < ?)
+                 OR (COALESCE(updated_at, created_at) < ?)""", (finished_cutoff, stuck_cutoff))
     rows = c.fetchall()
     conn.close()
     
@@ -172,7 +172,7 @@ def mark_stuck_tasks(timeout_seconds):
     conn = get_connection()
     c = conn.cursor()
     c.execute(
-        "SELECT task_id FROM task_queue WHERE status = 'PROCESSING' AND (updated_at < ? OR updated_at IS NULL)",
+        "SELECT task_id FROM task_queue WHERE status = 'PROCESSING' AND COALESCE(updated_at, created_at) < ?",
         (cutoff,),
     )
     rows = c.fetchall()
