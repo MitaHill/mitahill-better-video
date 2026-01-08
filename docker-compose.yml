@@ -12,4 +12,4 @@ services:
       NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
     runtime: nvidia
     ipc: host
-    command: /workspace/scripts/start.sh
+    command: streamlit run /workspace/app/src_ui/main.py --server.port=8501 --server.address=0.0.0.0

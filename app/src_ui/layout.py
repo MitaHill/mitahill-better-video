@@ -120,8 +120,16 @@ def render_create_tab():
 
 def render_status_tab():
     st.header("🔍 Task Monitor")
-    
-    query_id = st.text_input("Enter Task ID to check progress").strip()
+    st.caption("Track progress, preview results, and download outputs once ready.")
+
+    query_id = st.text_input(
+        "Enter Task ID",
+        placeholder="e.g. 884744db9e25435486a0e3d26fc5e634",
+    ).strip()
+
+    if not query_id:
+        st.info("Paste a Task ID above to view live status updates.")
+        return
     
     if query_id:
         task = db.get_task(query_id)
@@ -129,23 +137,29 @@ def render_status_tab():
             st.warning("Task not found. It might be expired or the ID is incorrect.")
             return
 
-        # Simple Status Header
         status_colors = {"PENDING": "gray", "PROCESSING": "blue", "COMPLETED": "green", "FAILED": "red"}
-        color = status_colors.get(task['status'], "white")
+        color = status_colors.get(task["status"], "white")
+
         st.markdown(f"### Status: :{color}[{task['status']}]")
-        
-        if task['status'] == "PROCESSING":
-            st.progress(task['progress'] / 100.0)
-            st.caption(f"Progress: {task['progress']}% - {task['message']}")
-        elif task['status'] == "FAILED":
-            st.error(f"Error: {task['message']}")
+        status_cols = st.columns([2, 1])
+        with status_cols[0]:
+            st.code(query_id)
+            if task["status"] == "PROCESSING":
+                st.progress(task["progress"] / 100.0)
+                st.caption(f"{task['progress']}% · {task['message']}")
+            elif task["status"] == "FAILED":
+                st.error(f"Error: {task['message']}")
+            elif task["status"] == "COMPLETED":
+                st.success("Processing complete. Download available below.")
+        with status_cols[1]:
+            st.metric("Progress", f"{task['progress']}%")
         
         # Display Info
-        v_info = json.loads(task['video_info'])
+        v_info = json.loads(task["video_info"])
         res_str = f"{v_info.get('width','?')}x{v_info.get('height','?')}"
-        
+
         col1, col2, col3 = st.columns(3)
-        col1.metric("File", v_info.get("filename", "Unknown")[:20])
+        col1.metric("File", v_info.get("filename", "Unknown")[:28])
         col2.metric("Resolution", res_str)
         col3.metric("Size", f"{v_info.get('size_mb', 0)} MB")
 
@@ -157,7 +171,8 @@ def render_status_tab():
         if p_orig.exists():
             st.divider()
             c1, c2 = st.columns(2)
-            with c1: st.image(str(p_orig), caption="Original Sample")
+            with c1:
+                st.image(str(p_orig), caption="Original Sample")
             with c2: 
                 if p_ups.exists():
                     st.image(str(p_ups), caption="Upscaled Preview")

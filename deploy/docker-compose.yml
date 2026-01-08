@@ -2,14 +2,14 @@ version: '3.8'
 
 services:
   app:
-    image: realesrgan-web-app:20260108-1126
+    image: realesrgan-web-app:20260108-1139
     container_name: realesrgan_app
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
       - PYTHONUNBUFFERED=1
-    command: /workspace/scripts/start.sh
+    command: streamlit run /workspace/app/src_ui/main.py --server.port=8501 --server.address=0.0.0.0
     ports:
       - "8501:8501"
     volumes:
