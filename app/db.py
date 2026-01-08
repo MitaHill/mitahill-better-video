@@ -30,6 +30,7 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS task_queue
                      (task_id TEXT PRIMARY KEY,
                       created_at DATETIME,
+                      updated_at DATETIME,
                       client_ip TEXT,
                       status TEXT,
                       task_params TEXT,
@@ -38,7 +39,9 @@ def init_db():
                       message TEXT)''')
         c.execute("CREATE INDEX IF NOT EXISTS idx_task_status ON task_queue(status)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_task_created ON task_queue(created_at)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_task_updated ON task_queue(updated_at)")
         conn.commit()
+        _ensure_columns(conn)
         conn.close()
         logger.debug("Database initialized successfully.")
     except Exception as e:
@@ -51,9 +54,9 @@ def create_task(task_id, client_ip, task_params, video_info):
     conn = get_connection()
     c = conn.cursor()
     c.execute("""INSERT INTO task_queue 
-                 (task_id, created_at, client_ip, status, task_params, video_info, progress, message) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-              (task_id, datetime.datetime.now(), client_ip, "PENDING", 
+                 (task_id, created_at, updated_at, client_ip, status, task_params, video_info, progress, message) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+              (task_id, datetime.datetime.now(), datetime.datetime.now(), client_ip, "PENDING", 
                json.dumps(task_params), json.dumps(video_info), 0, "Waiting to start"))
     conn.commit()
     conn.close()
@@ -72,8 +75,8 @@ def update_task_status(task_id, status, progress=None, message=None):
     logger.debug(f"Updating Task {task_id}: {status} ({progress}%) - {message}")
     conn = get_connection()
     c = conn.cursor()
-    updates = ["status = ?"]
-    params = [status]
+    updates = ["status = ?", "updated_at = ?"]
+    params = [status, datetime.datetime.now()]
     if progress is not None:
         updates.append("progress = ?")
         params.append(progress)
@@ -130,7 +133,10 @@ def get_next_task_atomic():
         if row:
             task_id = row['task_id']
             logger.info(f"Task {task_id} picked by worker.")
-            c.execute("UPDATE task_queue SET status = 'PROCESSING', message = 'Initializing...' WHERE task_id = ?", (task_id,))
+            c.execute(
+                "UPDATE task_queue SET status = 'PROCESSING', message = 'Initializing...', updated_at = ? WHERE task_id = ?",
+                (datetime.datetime.now(), task_id),
+            )
             conn.commit()
             return dict(row)
         else:
@@ -160,6 +166,29 @@ def cleanup_old_tasks(hours_ttl):
         logger.info(f"Starting cleanup of {len(rows)} tasks...")
         for row in rows:
             delete_task(row[0])
+
+def mark_stuck_tasks(timeout_seconds):
+    cutoff = datetime.datetime.now() - datetime.timedelta(seconds=timeout_seconds)
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        "SELECT task_id FROM task_queue WHERE status = 'PROCESSING' AND (updated_at < ? OR updated_at IS NULL)",
+        (cutoff,),
+    )
+    rows = c.fetchall()
+    conn.close()
+    if rows:
+        logger.warning(f"Marking {len(rows)} stuck tasks as FAILED...")
+        for row in rows:
+            update_task_status(row[0], "FAILED", message="Task timed out")
+
+def _ensure_columns(conn):
+    c = conn.cursor()
+    c.execute("PRAGMA table_info(task_queue)")
+    columns = {row[1] for row in c.fetchall()}
+    if "updated_at" not in columns:
+        c.execute("ALTER TABLE task_queue ADD COLUMN updated_at DATETIME")
+    conn.commit()
 
 def get_unfinished_tasks():
     conn = get_connection()

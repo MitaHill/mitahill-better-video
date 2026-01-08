@@ -154,6 +154,7 @@ try:
     MAX_VIDEO_SIZE_MB = get_env_int("MAX_VIDEO_SIZE_MB", 1024)
     MAX_IMAGE_SIZE_MB = get_env_int("MAX_IMAGE_SIZE_MB", 1024)
     SEGMENT_TIME_SECONDS = get_env_int("SEGMENT_TIME_SECONDS", 300)
+    TASK_TIMEOUT_SECONDS = get_env_int("TASK_TIMEOUT_SECONDS", 21600)
     FALLBACK_VRAM_GB = get_env_float("FALLBACK_VRAM_GB", 4.0)
 except Exception as e:
     logger.critical(f"[FAILED] Configuration error: {e}")

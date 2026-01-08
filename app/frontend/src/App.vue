@@ -51,7 +51,7 @@
         </div>
 
         <div class="field">
-          <label>切片大小：{{ form.tile }}</label>
+          <label>切片大小：{{ tileLabel }}</label>
           <input
             v-model.number="form.tile"
             type="range"
@@ -178,7 +178,7 @@ const form = reactive({
   inputType: "Video",
   modelName: "realesrgan-x4plus",
   upscale: 3,
-  tile: 256,
+  tile: 0,
   denoise: 0.5,
   keepAudio: true,
   crf: 18,
@@ -205,6 +205,11 @@ const resolution = computed(() => {
   const w = status.value.video_info.width || "?";
   const h = status.value.video_info.height || "?";
   return `${w}x${h}`;
+});
+
+const tileLabel = computed(() => {
+  if (form.tile === 0) return "自动";
+  return `${form.tile}`;
 });
 
 const statusClass = computed(() => {
