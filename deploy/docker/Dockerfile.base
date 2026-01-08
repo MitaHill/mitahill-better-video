@@ -1,13 +1,15 @@
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
+ARG UBUNTU_MIRROR=https://mirrors.aliyun.com/ubuntu/
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ARG PIP_TRUSTED_HOST=mirrors.aliyun.com
+
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-    PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
-
-ARG UBUNTU_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/ubuntu/
+    PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST}
 
 # Core system dependencies and tooling
 RUN sed -i.bak \
