@@ -73,12 +73,17 @@ class Upscaler:
 
     def enhance_to_file(self, input_path, output_path, outscale=2):
         """Helper to enhance image file to another file directly."""
-        img = cv2.imread(str(input_path))
+        img = cv2.imread(str(input_path), cv2.IMREAD_UNCHANGED)
         if img is None:
             logger.error(f"Failed to read image: {input_path}")
             return
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        elif img.shape[2] == 4:
+            img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
         output, _ = self.enhance(img, outscale=outscale)
-        cv2.imwrite(str(output_path), output)
+        output_rgb = cv2.cvtColor(output, cv2.COLOR_BGR2RGB)
+        cv2.imwrite(str(output_path), output_rgb)
 
 def build_model(model_name, scale, tile, tile_pad, fp16, weights_dir, denoise_strength=None):
     return Upscaler(model_name, scale, tile, tile_pad, fp16, weights_dir, denoise_strength)
