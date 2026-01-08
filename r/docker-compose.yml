@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app:
-    image: kindmitaishere/realesrgan-web:20260107-1301
+    image: kindmitaishere/realesrgan-web:test-build
     container_name: realesrgan_app
     runtime: nvidia
     environment:
