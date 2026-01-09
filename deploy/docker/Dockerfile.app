@@ -28,7 +28,7 @@ COPY . .
 RUN pip install -e vendor/Real-ESRGAN/
 
 # 3. Install web backend dependencies
-RUN pip install --no-cache-dir flask==2.3.3 gunicorn==21.2.0
+RUN pip install --no-cache-dir flask==2.3.3 gunicorn==21.2.0 flask-socketio==5.3.6 eventlet==0.36.1
 
 # 4. Copy built frontend assets
 COPY --from=frontend-build /frontend/dist /workspace/app/frontend/dist

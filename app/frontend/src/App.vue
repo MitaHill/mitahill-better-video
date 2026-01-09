@@ -106,6 +106,7 @@
             <span :style="{ width: status.progress + '%' }"></span>
           </div>
           <p class="notice">{{ status.message }}</p>
+          <p v-if="progressDetails" class="notice">{{ progressDetails }}</p>
 
           <div class="panel" style="margin-top: 16px; background: rgba(255,255,255,0.05);">
           <p class="notice">文件：{{ status.video_info?.filename || '未知' }}</p>
@@ -114,6 +115,17 @@
         </div>
 
           <div class="preview-grid" v-if="status.status !== 'PENDING'">
+            <div class="preview">
+              <p class="notice">实时预览</p>
+              <img
+                v-if="live.previewUrl"
+                :src="live.previewUrl"
+                @load="preview.liveReady = true"
+                @error="preview.liveReady = false"
+                v-show="preview.liveReady"
+              />
+              <p v-if="!preview.liveReady" class="notice">未生成</p>
+            </div>
             <div class="preview">
               <p class="notice">原始预览</p>
               <img
@@ -157,6 +169,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { io } from "socket.io-client";
 
 const form = reactive({
   inputType: "Video",
@@ -179,9 +192,19 @@ const preview = reactive({
   original: "",
   upscaled: "",
   originalReady: false,
-  upscaledReady: false
+  upscaledReady: false,
+  liveReady: false
 });
 const lastPreviewId = ref("");
+const live = reactive({
+  gpu: null,
+  totalFrame: 0,
+  totalFrames: 0,
+  segmentFrame: 0,
+  segmentTotal: 0,
+  previewUrl: ""
+});
+let socket = null;
 let pollTimer = null;
 
 const resolution = computed(() => {
@@ -200,6 +223,15 @@ const statusClass = computed(() => {
     FAILED: "status-failed"
   };
   return map[status.value.status] || "status-pending";
+});
+
+const progressDetails = computed(() => {
+  if (!status.value) return "";
+  const parts = [];
+  if (live.gpu !== null) parts.push(`GPU ${live.gpu}%`);
+  if (live.totalFrames) parts.push(`总帧 ${live.totalFrame}/${live.totalFrames}`);
+  if (live.segmentTotal) parts.push(`分段 ${live.segmentFrame}/${live.segmentTotal}`);
+  return parts.join(" | ");
 });
 
 const onFileChange = (event) => {
@@ -233,6 +265,7 @@ const submitTask = async () => {
     const payload = await res.json();
     taskId.value = payload.task_id;
     statusQuery.value = payload.task_id;
+    joinRoom();
     await fetchStatus();
   } catch (error) {
     submitError.value = error.message;
@@ -258,8 +291,11 @@ const fetchStatus = async () => {
     if (lastPreviewId.value !== currentId) {
       preview.originalReady = false;
       preview.upscaledReady = false;
+      preview.liveReady = false;
+      live.previewUrl = "";
       lastPreviewId.value = currentId;
     }
+    joinRoom();
     preview.original = `/api/tasks/${currentId}/preview/original`;
     preview.upscaled = `/api/tasks/${currentId}/preview/upscaled`;
 
@@ -311,6 +347,25 @@ const stopPolling = () => {
   }
 };
 
-onMounted(fetchRecommendations);
+const joinRoom = () => {
+  if (socket && statusQuery.value) {
+    socket.emit("join", { task_id: statusQuery.value });
+  }
+};
+
+onMounted(() => {
+  fetchRecommendations();
+  socket = io();
+  socket.on("frame", (payload) => {
+    if (!payload || payload.task_id !== statusQuery.value) return;
+    live.gpu = payload.gpu_util ?? null;
+    live.totalFrame = payload.total_frame || 0;
+    live.totalFrames = payload.total_total || live.totalFrames;
+    live.segmentFrame = payload.segment_frame || 0;
+    live.segmentTotal = payload.segment_total || 0;
+    live.previewUrl = `/api/tasks/${payload.task_id}/preview/live?ts=${Date.now()}`;
+    preview.liveReady = true;
+  });
+});
 onUnmounted(stopPolling);
 </script>

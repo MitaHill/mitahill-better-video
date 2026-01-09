@@ -3,6 +3,7 @@ import os
 import shutil
 import json
 from pathlib import Path
+import time
 
 def run_ffmpeg(args):
     """Run ffmpeg and raise error on failure."""
@@ -61,3 +62,12 @@ def get_video_total_frames(file_path):
     except Exception:
         pass
     return 0
+
+def get_gpu_utilization():
+    cmd = ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        val = result.stdout.strip().split("\n")[0].strip()
+        return int(val)
+    except Exception:
+        return None

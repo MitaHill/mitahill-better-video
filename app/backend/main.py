@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch()
+
 import logging
 import signal
 import sys
@@ -11,6 +14,7 @@ import config
 import db
 from backend.api import create_app
 from backend.worker_service import WorkerService
+from flask_socketio import SocketIO, join_room
 
 logger = logging.getLogger("MAIN")
 
@@ -42,7 +46,16 @@ def main():
     signal.signal(signal.SIGINT, shutdown_handler)
 
     app = create_app(worker_service)
-    app.run(host="0.0.0.0", port=8501, threaded=True)
+    socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+    app.extensions["socketio"] = socketio
+
+    @socketio.on("join")
+    def on_join(data):
+        task_id = (data or {}).get("task_id")
+        if task_id:
+            join_room(task_id)
+
+    socketio.run(app, host="0.0.0.0", port=8501)
 
 
 if __name__ == "__main__":

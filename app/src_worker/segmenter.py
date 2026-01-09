@@ -6,16 +6,22 @@ from pathlib import Path
 from .utils import run_ffmpeg, get_video_fps
 import db
 import config
+from .utils import get_gpu_utilization
+from .notifier import send_event
 
 logger = logging.getLogger("SEGMENTER")
 
 class ProgressRecorder:
-    def __init__(self, task_id, segment_key, p_base, p_scale, total_frames):
+    def __init__(self, task_id, segment_key, p_base, p_scale, total_frames, segment_start_frame, total_total_frames):
         self.task_id = task_id
         self.segment_key = segment_key
         self.p_base = p_base
         self.p_scale = p_scale
         self.total_frames = total_frames
+        self.segment_start_frame = segment_start_frame
+        self.total_total_frames = total_total_frames
+        self._last_gpu_check = 0.0
+        self._last_gpu_util = None
         self._last_flush = 0.0
         self._pending_frame = None
         self._pending_message = None
@@ -37,6 +43,25 @@ class ProgressRecorder:
         db.update_segment_progress(self.task_id, self.segment_key, self._pending_frame)
         self._last_flush = time.time()
 
+    def emit_frame(self, frame_index):
+        total_done = self.segment_start_frame + frame_index - 1
+        now = time.time()
+        if now - self._last_gpu_check >= config.PROGRESS_FLUSH_SECONDS:
+            self._last_gpu_util = get_gpu_utilization()
+            self._last_gpu_check = now
+        send_event(
+            {
+                "task_id": self.task_id,
+                "segment_key": self.segment_key,
+                "segment_frame": frame_index,
+                "segment_total": self.total_frames,
+                "total_frame": total_done,
+                "total_total": self.total_total_frames,
+                "progress": self.p_base + int((frame_index / self.total_frames) * self.p_scale),
+                "gpu_util": self._last_gpu_util,
+            }
+        )
+
 
 def process_video_with_model(
     input_path,
@@ -48,6 +73,9 @@ def process_video_with_model(
     p_scale=100,
     segment_key=None,
     resume_from_frame=1,
+    preview_path=None,
+    segment_start_frame=1,
+    total_total_frames=0,
 ):
     """
     Common logic to process a video file (or segment) using a provided upsampler model.
@@ -92,7 +120,15 @@ def process_video_with_model(
                 resume_from_frame = 1
 
         if task_id and segment_key:
-            recorder = ProgressRecorder(task_id, segment_key, p_base, p_scale, total)
+            recorder = ProgressRecorder(
+                task_id,
+                segment_key,
+                p_base,
+                p_scale,
+                total,
+                segment_start_frame,
+                total_total_frames=total_total_frames or (segment_start_frame + total - 1),
+            )
         else:
             recorder = None
         
@@ -102,10 +138,15 @@ def process_video_with_model(
                 continue
             out_f = frames_out / f_path.name
             upsampler.enhance_to_file(f_path, out_f, params['upscale'])
+            if preview_path:
+                try:
+                    shutil.copyfile(out_f, preview_path)
+                except Exception:
+                    pass
             
-            if recorder and (frame_index % 20 == 0 or frame_index == total):
+            if recorder:
+                recorder.emit_frame(frame_index)
                 recorder.record(frame_index, f"Upscaling {input_path.name}: {frame_index}/{total} frames")
-                recorder.flush()
         if recorder:
             recorder.record(total, f"Upscaling {input_path.name}: {total}/{total} frames")
             recorder.flush(force=True)

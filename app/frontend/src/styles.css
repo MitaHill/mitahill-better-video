@@ -9,7 +9,6 @@
   --accent: #d39b00;
   --accent-2: #d9534f;
   --border: rgba(28, 28, 28, 0.12);
-  --shadow: 0 10px 24px rgba(28, 28, 28, 0.08);
 }
 
 * {
@@ -50,7 +49,6 @@ body {
   border: 1px solid var(--border);
   border-radius: 0;
   padding: 28px 32px;
-  box-shadow: var(--shadow);
 }
 
 .hero-title {
@@ -93,7 +91,6 @@ body {
   border: 1px solid var(--border);
   border-radius: 0;
   padding: 22px;
-  box-shadow: var(--shadow);
 }
 
 .panel h2 {
@@ -149,7 +146,6 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 0;
   background: #1b1b1b;
   border: 2px solid #ffffff;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
   cursor: pointer;
 }
 
@@ -159,7 +155,6 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 0;
   background: #1b1b1b;
   border: 2px solid #ffffff;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
   cursor: pointer;
 }
 
@@ -175,7 +170,7 @@ button {
   color: #1b1b1b;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease;
 }
 
 button.secondary {
@@ -186,7 +181,6 @@ button.secondary {
 
 button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(211, 155, 0, 0.2);
 }
 
 .status-pill {

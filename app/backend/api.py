@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_file, send_from_directory
+from flask import Flask, jsonify, request, send_file, send_from_directory, current_app
 from pathlib import Path
 import uuid
 import json
@@ -113,12 +113,25 @@ def create_app(worker_service=None):
             path = run_dir / "preview_original.jpg"
         elif kind == "upscaled":
             path = run_dir / "preview_upscaled.jpg"
+        elif kind == "live":
+            path = run_dir / "preview_live.jpg"
         else:
             return jsonify({"error": "invalid preview type"}), 400
 
         if not path.exists():
             return jsonify({"error": "preview not ready"}), 404
         return send_file(path, mimetype="image/jpeg")
+
+    @app.post("/api/events")
+    def ingest_events():
+        payload = request.get_json(silent=True) or {}
+        task_id = payload.get("task_id")
+        if not task_id:
+            return jsonify({"error": "task_id required"}), 400
+        socketio = current_app.extensions.get("socketio")
+        if socketio is not None:
+            socketio.emit("frame", payload, to=task_id)
+        return jsonify({"ok": True})
 
     @app.get("/api/tasks/<task_id>/result")
     def download_result(task_id):

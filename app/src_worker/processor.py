@@ -129,6 +129,9 @@ def process_single_task(task):
                                 p_scale,
                                 segment_key=segment_key,
                                 resume_from_frame=resume_frame,
+                                preview_path=run_dir / "preview_live.jpg",
+                                segment_start_frame=start_frame,
+                                total_total_frames=total_frames,
                             )
                         f.write(f"file 'segments/{out_s_path.name}'\n")
                         cumulative_frames += seg_frames
@@ -163,6 +166,9 @@ def process_single_task(task):
                         80,
                         segment_key=segment_key,
                         resume_from_frame=resume_frame,
+                        preview_path=run_dir / "preview_live.jpg",
+                        segment_start_frame=1,
+                        total_total_frames=total_frames,
                     )
 
         else:
