@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app:
-    image: kindmitaishere/mitahill-better-video:260109-1258
+    image: kindmitaishere/mitahill-better-video:260109-1307
     container_name: realesrgan_app
     runtime: nvidia
     environment:

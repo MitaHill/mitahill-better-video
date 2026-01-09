@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, request, send_file, send_from_directory, current_app
+from werkzeug.exceptions import RequestEntityTooLarge
 from pathlib import Path
 import uuid
 import json
@@ -15,6 +16,11 @@ def create_app(worker_service=None):
     app.config["MAX_CONTENT_LENGTH"] = (
         max(config.MAX_VIDEO_SIZE_MB, config.MAX_IMAGE_SIZE_MB) * 1024 * 1024
     )
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def handle_request_too_large(_err):
+        limit_mb = max(config.MAX_VIDEO_SIZE_MB, config.MAX_IMAGE_SIZE_MB)
+        return jsonify({"error": f"file exceeds limit ({limit_mb} MB)"}), 413
 
     @app.get("/api/health")
     def health():
@@ -115,8 +121,6 @@ def create_app(worker_service=None):
             path = run_dir / "preview_original.jpg"
         elif kind == "upscaled":
             path = run_dir / "preview_upscaled.jpg"
-        elif kind == "live":
-            path = run_dir / "preview_live.jpg"
         else:
             return jsonify({"error": "invalid preview type"}), 400
 

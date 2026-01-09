@@ -116,17 +116,6 @@
 
           <div class="preview-grid" v-if="status.status !== 'PENDING'">
             <div class="preview">
-              <p class="notice">实时预览</p>
-              <img
-                v-if="live.previewUrl"
-                :src="live.previewUrl"
-                @load="preview.liveReady = true"
-                @error="preview.liveReady = false"
-                v-show="preview.liveReady"
-              />
-              <p v-if="!preview.liveReady" class="notice">未生成</p>
-            </div>
-            <div class="preview">
               <p class="notice">原始预览</p>
               <img
                 v-if="preview.original"
@@ -192,8 +181,7 @@ const preview = reactive({
   original: "",
   upscaled: "",
   originalReady: false,
-  upscaledReady: false,
-  liveReady: false
+  upscaledReady: false
 });
 const lastPreviewId = ref("");
 const live = reactive({
@@ -203,8 +191,7 @@ const live = reactive({
   totalFrame: 0,
   totalFrames: 0,
   segmentFrame: 0,
-  segmentTotal: 0,
-  previewUrl: ""
+  segmentTotal: 0
 });
 let socket = null;
 let pollTimer = null;
@@ -319,8 +306,6 @@ const fetchStatus = async () => {
     if (lastPreviewId.value !== currentId) {
       preview.originalReady = false;
       preview.upscaledReady = false;
-      preview.liveReady = false;
-      live.previewUrl = "";
       lastPreviewId.value = currentId;
     }
     joinRoom();
@@ -393,8 +378,10 @@ onMounted(() => {
     live.totalFrames = payload.total_total || live.totalFrames;
     live.segmentFrame = payload.segment_frame || 0;
     live.segmentTotal = payload.segment_total || 0;
-    live.previewUrl = `/api/tasks/${payload.task_id}/preview/live?ts=${Date.now()}`;
-    preview.liveReady = true;
+    preview.original = `/api/tasks/${payload.task_id}/preview/original?ts=${Date.now()}`;
+    preview.upscaled = `/api/tasks/${payload.task_id}/preview/upscaled?ts=${Date.now()}`;
+    preview.originalReady = true;
+    preview.upscaledReady = true;
   });
 });
 onUnmounted(stopPolling);
