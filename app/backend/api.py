@@ -5,7 +5,7 @@ import json
 
 import config
 import db
-from .utils import ffprobe_info, secure_filename
+from .utils import ffprobe_info, secure_filename, is_filename_safe
 
 OUTPUT_ROOT = Path("/workspace/output")
 
@@ -42,6 +42,8 @@ def create_app(worker_service=None):
         upload = request.files["file"]
         if not upload.filename:
             return jsonify({"error": "filename is required"}), 400
+        if not is_filename_safe(upload.filename):
+            return jsonify({"error": "invalid filename"}), 400
 
         task_id = uuid.uuid4().hex
         run_dir = OUTPUT_ROOT / f"run_{task_id}"

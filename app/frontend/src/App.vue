@@ -239,7 +239,32 @@ const progressDetails = computed(() => {
 
 const onFileChange = (event) => {
   const file = event.target.files[0];
-  form.file = file || null;
+  if (!file) {
+    form.file = null;
+    return;
+  }
+  if (!isFilenameSafe(file.name)) {
+    submitError.value = "文件名包含非法字符或过长，请重命名后上传。";
+    form.file = null;
+    event.target.value = "";
+    return;
+  }
+  form.file = file;
+};
+
+const isFilenameSafe = (name) => {
+  if (!name || name.length > 180) return false;
+  if (name.includes("/") || name.includes("\\")) return false;
+  return !/[\u0000-\u001f\u007f]/.test(name);
+};
+
+const parseJsonSafe = async (res) => {
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return res.json();
+  }
+  const text = await res.text();
+  throw new Error(text || "服务返回非JSON响应。");
 };
 
 const submitTask = async () => {
@@ -262,10 +287,10 @@ const submitTask = async () => {
 
     const res = await fetch("/api/tasks", { method: "POST", body: data });
     if (!res.ok) {
-      const err = await res.json();
+      const err = await parseJsonSafe(res);
       throw new Error(err.error || "提交失败，请稍后重试。");
     }
-    const payload = await res.json();
+    const payload = await parseJsonSafe(res);
     taskId.value = payload.task_id;
     statusQuery.value = payload.task_id;
     joinRoom();
@@ -286,10 +311,10 @@ const fetchStatus = async () => {
   try {
     const res = await fetch(`/api/tasks/${statusQuery.value}`);
     if (!res.ok) {
-      const err = await res.json();
+      const err = await parseJsonSafe(res);
       throw new Error(err.error || "未找到任务，请确认 ID 是否正确。");
     }
-    status.value = await res.json();
+    status.value = await parseJsonSafe(res);
     const currentId = statusQuery.value;
     if (lastPreviewId.value !== currentId) {
       preview.originalReady = false;
