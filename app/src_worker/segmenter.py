@@ -152,23 +152,16 @@ def process_video_with_model(
         else:
             recorder = None
         
-        last_preview_time = 0.0
         for i, f_path in enumerate(frame_list):
             frame_index = i + 1
             if frame_index < resume_from_frame:
                 continue
             out_f = frames_out / f_path.name
             upsampler.enhance_to_file(f_path, out_f, params['upscale'])
-            now = time.time()
-            if (
-                preview_original_path
-                and preview_upscaled_path
-                and (now - last_preview_time) >= config.PROGRESS_FLUSH_SECONDS
-            ):
+            if preview_original_path and preview_upscaled_path:
                 try:
                     shutil.copyfile(f_path, preview_original_path)
                     shutil.copyfile(out_f, preview_upscaled_path)
-                    last_preview_time = now
                 except Exception:
                     pass
             
