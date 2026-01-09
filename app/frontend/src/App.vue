@@ -198,6 +198,8 @@ const preview = reactive({
 const lastPreviewId = ref("");
 const live = reactive({
   gpu: null,
+  segmentIndex: 0,
+  segmentCount: 0,
   totalFrame: 0,
   totalFrames: 0,
   segmentFrame: 0,
@@ -230,6 +232,7 @@ const progressDetails = computed(() => {
   const parts = [];
   if (live.gpu !== null) parts.push(`GPU ${live.gpu}%`);
   if (live.totalFrames) parts.push(`总帧 ${live.totalFrame}/${live.totalFrames}`);
+  if (live.segmentCount) parts.push(`第${live.segmentIndex}/${live.segmentCount}段`);
   if (live.segmentTotal) parts.push(`分段 ${live.segmentFrame}/${live.segmentTotal}`);
   return parts.join(" | ");
 });
@@ -359,6 +362,8 @@ onMounted(() => {
   socket.on("frame", (payload) => {
     if (!payload || payload.task_id !== statusQuery.value) return;
     live.gpu = payload.gpu_util ?? null;
+    live.segmentIndex = payload.segment_index || 0;
+    live.segmentCount = payload.segment_count || 0;
     live.totalFrame = payload.total_frame || 0;
     live.totalFrames = payload.total_total || live.totalFrames;
     live.segmentFrame = payload.segment_frame || 0;

@@ -12,7 +12,18 @@ from .notifier import send_event
 logger = logging.getLogger("SEGMENTER")
 
 class ProgressRecorder:
-    def __init__(self, task_id, segment_key, p_base, p_scale, total_frames, segment_start_frame, total_total_frames):
+    def __init__(
+        self,
+        task_id,
+        segment_key,
+        p_base,
+        p_scale,
+        total_frames,
+        segment_start_frame,
+        total_total_frames,
+        segment_index,
+        segment_count,
+    ):
         self.task_id = task_id
         self.segment_key = segment_key
         self.p_base = p_base
@@ -20,6 +31,8 @@ class ProgressRecorder:
         self.total_frames = total_frames
         self.segment_start_frame = segment_start_frame
         self.total_total_frames = total_total_frames
+        self.segment_index = segment_index
+        self.segment_count = segment_count
         self._last_gpu_check = 0.0
         self._last_gpu_util = None
         self._last_flush = 0.0
@@ -53,6 +66,8 @@ class ProgressRecorder:
             {
                 "task_id": self.task_id,
                 "segment_key": self.segment_key,
+                "segment_index": self.segment_index,
+                "segment_count": self.segment_count,
                 "segment_frame": frame_index,
                 "segment_total": self.total_frames,
                 "total_frame": total_done,
@@ -76,6 +91,8 @@ def process_video_with_model(
     preview_path=None,
     segment_start_frame=1,
     total_total_frames=0,
+    segment_index=0,
+    segment_count=0,
 ):
     """
     Common logic to process a video file (or segment) using a provided upsampler model.
@@ -128,6 +145,8 @@ def process_video_with_model(
                 total,
                 segment_start_frame,
                 total_total_frames=total_total_frames or (segment_start_frame + total - 1),
+                segment_index=segment_index,
+                segment_count=segment_count,
             )
         else:
             recorder = None

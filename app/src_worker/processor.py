@@ -21,11 +21,13 @@ def generate_previews(input_path, run_dir, upsampler, upscale_factor):
     p_ups = run_dir / "preview_upscaled.jpg"
     
     try:
-        # Extract first frame
+        # Extract a representative frame (avoid black intro)
         if not p_orig.exists():
+            duration = get_video_duration(input_path)
+            seek_time = max(0.1, min(1.0, duration * 0.1)) if duration > 0 else 0.0
             run_ffmpeg([
-                "ffmpeg", "-y", "-i", str(input_path), 
-                "-ss", "00:00:00", "-vframes", "1", 
+                "ffmpeg", "-y", "-i", str(input_path),
+                "-ss", f"{seek_time:.2f}", "-vframes", "1",
                 "-q:v", "2", str(p_orig)
             ])
         
@@ -132,6 +134,8 @@ def process_single_task(task):
                                 preview_path=run_dir / "preview_live.jpg",
                                 segment_start_frame=start_frame,
                                 total_total_frames=total_frames,
+                                segment_index=i + 1,
+                                segment_count=len(segs),
                             )
                         f.write(f"file 'segments/{out_s_path.name}'\n")
                         cumulative_frames += seg_frames
@@ -169,6 +173,8 @@ def process_single_task(task):
                         preview_path=run_dir / "preview_live.jpg",
                         segment_start_frame=1,
                         total_total_frames=total_frames,
+                        segment_index=1,
+                        segment_count=1,
                     )
 
         else:
