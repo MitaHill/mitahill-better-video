@@ -42,7 +42,10 @@
    - 构建镜像后，必须先运行临时容器执行审计脚本：
      `docker run --rm --gpus all <image_tag> python3 app/config.py`
    - 只有输出 `[SUCCESS]` 后，方可推送到镜像仓库或部署生产环境。
-3. **端口冲突解决**：
+3. **镜像标签规范**：
+   - 生产镜像统一推送到 `kindmitaishere/mitahill-better-video`
+   - 标签格式：`YYMMDD-HHMM`（UTC+8）
+4. **端口冲突解决**：
    - 若 8501 端口被占用，使用 `lsof -ti:8501 | xargs kill -9` 强力清理，严禁在端口冲突状态下强行重启。
 
 ---
