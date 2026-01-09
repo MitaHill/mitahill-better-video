@@ -1,7 +1,0 @@
-models:
-  RealESRGAN_x4plus.pth: "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1"
-  RealESRNet_x4plus.pth: "a820b9bde89a874d7599d545567308ce6c128fc8754a53208eda016d40aa81df"
-  realesr-animevideov3.pth: "b8a8376811077954d82ca3fcf476f1ac3da3e8a68a4f4d71363008000a18b75d"
-  RealESRGAN_x4plus_anime_6B.pth: "f872d837d3c90ed2e05227bed711af5671a6fd1c9f7d7e91c911a61f155e99da"
-  realesr-general-x4v3.pth: "8dc7edb9ac80ccdc30c3a5dca6616509367f05fbc184ad95b731f05bece96292"
-  realesr-general-wdn-x4v3.pth: "1641f8c4464b9f097c9fdda5589273713f67cf59f3d909e0bd688f0cee269dca"

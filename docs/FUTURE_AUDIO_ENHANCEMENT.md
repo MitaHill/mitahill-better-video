@@ -1,6 +1,6 @@
 # 未来功能规划：VoiceFixer 音频增强
 
-**状态**: 规划中 / 草案
+**状态**: 已实现（默认关闭）
 **目标约束**: < 4GB 显存 (生产环境安全水位: 3.5GB)
 **选定模型**: VoiceFixer (修复 + 超分辨率)
 
@@ -40,23 +40,23 @@
 
 ## 4. 实施计划
 
-### A. 基础镜像 (Dockerfile.base)
+### A. 基础镜像 (deploy/docker/base/Dockerfile)
 我们必须将依赖和权重“固化”在基础镜像中，以避免运行时下载（网络限制策略）。
 
-**修改 `deploy/docker/Dockerfile.base`**:
+**修改 `deploy/docker/base/Dockerfile`**:
 1.  **安装库**: `pip install voicefixer`
 2.  **预下载权重**:
-    - 创建目录: `/workspace/weights/voicefixer`
+- 创建目录: `/workspace/app/models/audio/voicefixer`
     - 下载 `analysis_module.ckpt` (Zenodo/HF)
     - 下载 `model.ckpt-1490000_trimed.pt` (Zenodo/HF)
 
-### B. 应用镜像 (Dockerfile.app)
-**修改 `deploy/docker/Dockerfile.app`**:
+### B. 应用镜像 (deploy/docker/for-app/Dockerfile)
+**修改 `deploy/docker/for-app/Dockerfile`**:
 - 在构建时创建软链接，以便 VoiceFixer 自动找到模型：
   `mkdir -p /root/.cache/voicefixer/analysis_module/checkpoints`
-  `ln -s /workspace/weights/voicefixer/analysis_module.ckpt ...`
+  `ln -s /workspace/app/models/audio/voicefixer/analysis_module.ckpt ...`
 
-### C. 核心逻辑 (`app/src_worker/audio_enhancer.py`)
+### C. 核心逻辑 (`app/src/Audio/enhancer.py`)
 创建一个包装类 `AudioEnhancer`:
 - **init**: 轻量级，不加载模型。
 - **process(input_path, output_path)**:
@@ -64,10 +64,19 @@
   - `voicefixer.restore(...)`: 运行处理。
   - `unload_model()`: 删除实例，调用 `torch.cuda.empty_cache()`。
 
-### D. Worker 集成 (`app/worker.py`)
+### D. Worker 集成 (`app/src/Worker/processor.py`)
 修改主任务循环以插入阶段 2。
 - 添加配置检查: `if config.ENABLE_AUDIO_ENHANCEMENT:`
 - 确保异常处理: 如果音频失败，回退到原始音频 (故障安全)。
+
+**配置开关**:
+- `ENABLE_AUDIO_ENHANCEMENT=false` 时关闭（默认）
+
+**前置降噪**:
+- `PRE_DENOISE_MODE=off` | `speech_enhance` | `vhs_hiss`
+- `speech_enhance` 使用 DeepFilterNet2，人声降噪
+- `vhs_hiss` 使用谱减式降噪，针对 VHS 嘶声
+- DeepFilterNet2 权重随镜像打包，路径：`/root/.cache/DeepFilterNet/DeepFilterNet2`
 
 ## 5. 模型权重下载地址
 - **分析模块**: `https://huggingface.co/Diogodiogod/voicefixer-models/resolve/main/vf.ckpt` (重命名为 `analysis_module.ckpt`)

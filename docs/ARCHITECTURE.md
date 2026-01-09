@@ -2,8 +2,8 @@
 
 ## Overview
 - Flask provides REST endpoints for task submission, status, previews, and download.
-- Worker runs in a dedicated subprocess started by `app/backend/main.py`.
-- Vue (Vite) builds to static assets served by Flask from `app/frontend/dist`.
+- Worker runs in a dedicated subprocess started by `app/main.py`.
+- Vue (Vite) builds to static assets served by Flask from `app/src/Frontend/dist`.
 
 ## Service Flow
 1. Frontend uploads file to `POST /api/tasks`.

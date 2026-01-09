@@ -7,6 +7,7 @@
 - **前后端分离**：Flask 提供 API，Vue 负责 UI 与交互。
 - **可维护性**：清晰目录结构 + 可扩展模块设计。
 - **长视频可用性**：分段处理，稳定资源占用。
+- **配置一致性**：通过 `python-dotenv` 统一加载 `.env`。
 
 ## 2. 核心架构
 - **后端**：Flask API + Worker 子进程
@@ -15,11 +16,11 @@
 - **模型运行**：Real-ESRGAN (CUDA)
 
 ## 3. 程序入口规范
-- **主入口**：`app/backend/main.py`
+- **主入口**：`app/main.py`
   - 初始化配置与数据库
   - 启动 Worker 子进程
   - 启动 Flask API
-- **Worker 入口**：`app/worker.py`
+- **Worker 入口**：`app/src/Worker/entrypoint.py`
   - 轮询 SQLite 队列
   - 处理视频/图像并写入输出
   - 持续更新任务状态
@@ -53,12 +54,21 @@
 ```
 mitahill-better-video/
   app/
-    backend/             # Flask API
-    frontend/            # Vue UI
-    src_worker/          # Worker 核心逻辑
-    worker.py            # Worker 入口
-    config.py            # 统一配置
-    db.py                # SQLite 操作
+    main.py                # 主入口
+    models/                # 模型目录 (video/audio)
+    src/
+    vendor/                # 上游依赖
+    Api/                 # Flask API
+    Audio/               # 音频增强/降噪
+    Config/              # 统一配置
+    Data/                # 模型校验数据
+    Database/            # SQLite 操作
+    Frontend/            # Vue UI
+    Media/               # 视频/图像处理
+    Notifications/       # 事件推送
+    Services/            # 进程服务
+    Utils/               # 通用工具
+    Worker/              # 任务处理
   config/
     .env                 # 环境变量
   deploy/
@@ -66,7 +76,7 @@ mitahill-better-video/
     compose/             # Compose 文件
   docs/                  # 设计、规范、迁移文档
   output/                # 结果与临时文件
-  vendor/Real-ESRGAN/    # 上游模型代码
+  app/vendor/Real-ESRGAN/    # 上游模型代码
 ```
 
 ## 8. SOP 标准流程

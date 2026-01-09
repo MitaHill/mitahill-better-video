@@ -1,7 +1,7 @@
 # MitaHill Better Video (Flask + Vue)
 
 <p align="center">
-  <img src="vendor/Real-ESRGAN/assets/realesrgan_logo.png" alt="Real-ESRGAN" width="300"/>
+  <img src="app/vendor/Real-ESRGAN/assets/realesrgan_logo.png" alt="Real-ESRGAN" width="300"/>
 </p>
 A lightweight Flask + Vue UI around Real-ESRGAN for upscaling videos and images. It supports GPU inference, adjustable tiling, FP16, denoise control for the general v3 model, multi-image batch processing, and robust video encoding.
 
@@ -58,10 +58,11 @@ Prerequisites:
 With `deploy/compose/docker-compose.dev.yml`, your project folder is mounted to `/workspace`, so outputs appear at `./output` on the host.
 
 ## Model Weights
-Place weights in either location (container paths):
-- `/workspace/app/data/models`
+Place weights under:
+- `/workspace/app/models/video` (Real-ESRGAN)
+- `/workspace/app/models/audio` (VoiceFixer)
 
-The app attempts to download these if not present. In restricted environments, download manually into `app/data/models/` on the host.
+Audio models are packaged into the image and symlinked into `/root/.cache/voicefixer`.
 
 ## Performance Tips
 - Disable tiling (`tile=0`) if your GPU has enough VRAM for the frame size.
@@ -71,17 +72,20 @@ The app attempts to download these if not present. In restricted environments, d
 
 ## Configuration
 - Upload limit: set via `config/.env`
-- Model search path and outputs are configurable in `app/config.py`
+- Model search path and outputs are configurable in `app/src/Config/settings.py`
 - Local env file: `config/.env` (mounted to `/workspace/config/.env`)
 - Template: `config/.env.example`
+- Env parsing uses `python-dotenv` (loaded in `app/src/Config/settings.py`).
 
 
 ## Project Structure
-- `app/backend/` — Flask API service
-- `app/frontend/` — Vue UI (Vite)
-- `app/src_worker/` — Worker pipeline core
-- `app/` — Shared configs and entrypoints
-- `vendor/Real-ESRGAN/` — Upstream Real-ESRGAN code
+- `app/src/Api/` — Flask API service
+- `app/src/Frontend/` — Vue UI (Vite)
+- `app/src/Worker/` — Worker pipeline core
+- `app/src/Config/`, `app/src/Database/`, `app/src/Media/` — Core modules
+- `app/models/` — Model weights (video/audio)
+- `app/main.py` — Service entrypoint
+- `app/vendor/Real-ESRGAN/` — Upstream Real-ESRGAN code
 - `scripts/` — Local entrypoints (worker + UI)
 - `deploy/` — Deployment compose files
 - `output/` — Outputs and per-run scratch

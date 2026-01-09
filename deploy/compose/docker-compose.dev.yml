@@ -2,16 +2,16 @@ services:
   realesrgan_app:
     build:
       context: ../..
-      dockerfile: deploy/docker/Dockerfile.app
+      dockerfile: deploy/docker/for-app/Dockerfile
     container_name: realesrgan_app
     ports:
       - "8501:8501"
     volumes:
       - ../../:/workspace
     environment:
-      PYTHONPATH: "/workspace/app:/workspace/vendor/Real-ESRGAN:${PYTHONPATH}"
+      PYTHONPATH: "/workspace/app:/workspace/app/vendor/Real-ESRGAN:${PYTHONPATH}"
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
     runtime: nvidia
     ipc: host
-    command: python3 -m backend.main
+    command: python3 app/main.py

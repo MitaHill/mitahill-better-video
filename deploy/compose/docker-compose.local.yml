@@ -2,14 +2,14 @@ version: '3.8'
 
 services:
   app:
-    image: kindmitaishere/mitahill-better-video:260109-1340
+    image: kindmitaishere/mitahill-better-video:260109-0747
     container_name: realesrgan_app
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
       - PYTHONUNBUFFERED=1
-    command: python3 -m backend.main
+    command: python3 app/main.py
     ports:
       - "8501:8501"
     volumes:

@@ -18,7 +18,7 @@
 **原因分析**：主进程未统一管理子进程生命周期，导致 Worker 丢失或僵尸进程残留。
 
 ### ✅ 解决方案：
-- **唯一启动点**：只能由 `app/backend/main.py` 启动 Worker。
+- **唯一启动点**：只能由 `app/main.py` 启动 Worker。
 - **显式退出**：主进程收到 SIGTERM/SIGINT 时，必须终止 Worker。
 - **禁止 UI 拉起 Worker**：前端仅调用 API，禁止在 UI 侧创建后台进程。
 
@@ -40,7 +40,7 @@
 1. **优先使用缓存构建**：除非排查缓存污染问题，否则使用缓存加速构建。
 2. **集成审计测试**：
    - 构建镜像后，必须先运行临时容器执行审计脚本：
-     `docker run --rm --gpus all <image_tag> python3 app/config.py`
+     `docker run --rm --gpus all <image_tag> python3 -c "from app.src.Config import settings as config; config.initialize_context(); print('[SUCCESS]')"`
    - 只有输出 `[SUCCESS]` 后，方可推送到镜像仓库或部署生产环境。
 3. **镜像标签规范**：
    - 生产镜像统一推送到 `kindmitaishere/mitahill-better-video`
