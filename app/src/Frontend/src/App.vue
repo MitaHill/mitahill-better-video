@@ -19,14 +19,7 @@
             </div>
             <div class="field">
               <label>上传文件</label>
-              <input type="file" :multiple="form.batchUpload" @change="onFileChange" />
-            </div>
-            <div class="field">
-              <label>批量上传</label>
-              <select v-model="form.batchUpload">
-                <option :value="false">关闭</option>
-                <option :value="true">开启</option>
-              </select>
+              <input type="file" multiple @change="onFileChange" />
             </div>
             <p v-if="form.inputType === 'Video'" class="notice">
               仅支持 H.264/H.265 视频 + AAC 音频（拒绝 AV1/VP9/非 AAC）。
@@ -267,8 +260,7 @@ const form = reactive({
   haasLead: "left",
   crf: 18,
   file: null,
-  files: [],
-  batchUpload: false
+  files: []
 });
 
 const taskIds = ref([]);
@@ -402,12 +394,7 @@ const parseJsonSafe = async (res) => {
 const submitTask = async () => {
   submitError.value = "";
   submitWarnings.value = "";
-  if (form.batchUpload) {
-    if (!form.files || form.files.length === 0) {
-      submitError.value = "请先选择要上传的文件。";
-      return;
-    }
-  } else if (!form.file) {
+  if (!form.files || form.files.length === 0) {
     submitError.value = "请先选择要上传的文件。";
     return;
   }
@@ -416,10 +403,10 @@ const submitTask = async () => {
   loading.submit = true;
   try {
     const data = new FormData();
-    if (form.batchUpload) {
+    if (form.files.length > 1) {
       form.files.forEach((file) => data.append("files", file));
     } else {
-      data.append("file", form.file);
+      data.append("file", form.files[0]);
     }
     data.append("input_type", form.inputType);
     data.append("model_name", form.modelName);
@@ -434,7 +421,7 @@ const submitTask = async () => {
     data.append("haas_lead", String(form.haasLead));
     data.append("crf", String(form.crf));
 
-    const endpoint = form.batchUpload ? "/api/tasks/batch" : "/api/tasks";
+    const endpoint = form.files.length > 1 ? "/api/tasks/batch" : "/api/tasks";
     const res = await fetch(endpoint, { method: "POST", body: data });
     if (!res.ok) {
       const err = await parseJsonSafe(res);
@@ -445,7 +432,7 @@ const submitTask = async () => {
       throw new Error(err.error || "提交失败，请稍后重试。");
     }
     const payload = await parseJsonSafe(res);
-    if (form.batchUpload) {
+    if (endpoint.endsWith("/batch")) {
       taskIds.value = payload.task_ids || [];
       if (payload.errors && payload.errors.length) {
         submitWarnings.value = payload.errors.map(e => `${e.filename}: ${e.error}`).join("；");
