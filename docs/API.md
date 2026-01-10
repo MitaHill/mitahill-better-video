@@ -17,6 +17,8 @@ Fields:
 - `haas_delay_ms`
 - `haas_lead`
 - `crf`
+- `output_codec` (h264 | h265)
+- `deinterlace` (true | false)
 - `tile_pad`
 - `fp16`
 

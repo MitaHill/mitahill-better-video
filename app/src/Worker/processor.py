@@ -20,6 +20,7 @@ from app.src.Media.upscaler import build_model
 from app.src.Media.segmenter import process_segment
 from app.src.Audio.enhancer import AudioEnhancer
 from app.src.Audio.denoiser import apply_pre_denoise
+from app.src.Audio.haas_effect import apply_haas_effect
 
 logger = logging.getLogger("PROCESSOR")
 
@@ -33,11 +34,20 @@ def generate_previews(input_path, run_dir, upsampler, upscale_factor):
         if not p_orig.exists():
             duration = get_video_duration(input_path)
             seek_time = max(0.1, min(1.0, duration * 0.1)) if duration > 0 else 0.0
-            run_ffmpeg([
-                "ffmpeg", "-y", "-i", str(input_path),
+            hwaccel = ["-hwaccel", "cuda"] if config.FFMPEG_USE_GPU else []
+            cmd = [
+                "ffmpeg", "-y", *hwaccel, "-i", str(input_path),
                 "-ss", f"{seek_time:.2f}", "-vframes", "1",
                 "-q:v", "2", str(p_orig)
-            ])
+            ]
+            fallback = None
+            if hwaccel:
+                fallback = [
+                    "ffmpeg", "-y", "-i", str(input_path),
+                    "-ss", f"{seek_time:.2f}", "-vframes", "1",
+                    "-q:v", "2", str(p_orig)
+                ]
+            run_ffmpeg(cmd, fallback_args=fallback)
         
         # Upscale that frame if model is provided
         if p_orig.exists() and not p_ups.exists() and upsampler:
@@ -57,12 +67,17 @@ def process_single_task(task):
     try:
         db.update_task_status(task_id, "PROCESSING", 0, "Initializing...")
         params = json.loads(task['task_params'])
-        output_root = Path("/workspace/output")
+        video_info = json.loads(task.get('video_info') or "{}")
+        output_root = Path("/workspace/storage/output")
         run_dir = output_root / f"run_{task_id}"
         weights_dir = Path("/workspace/app/models/video")
         logger.info("Task %s started (%s)", task_id, params.get("input_type"))
         
-        input_path = run_dir / params['filename']
+        input_path = Path(
+            params.get("upload_path")
+            or video_info.get("upload_path")
+            or (run_dir / params['filename'])
+        )
         if not input_path.exists():
             raise FileNotFoundError(f"Input missing: {params['filename']}")
 
@@ -82,8 +97,16 @@ def process_single_task(task):
                 and params.get('audio_enhance', False)
             )
             pre_denoise_mode = (params.get("pre_denoise_mode") or config.PRE_DENOISE_MODE).lower()
+            haas_enabled = bool(params.get("haas_enabled")) and params.get("keep_audio", True)
+            haas_delay_ms = int(params.get("haas_delay_ms") or 0)
+            if haas_delay_ms < 0:
+                haas_delay_ms = 0
+            if haas_delay_ms > 3000:
+                haas_delay_ms = 3000
+            haas_lead = params.get("haas_lead", "left")
             video_params = dict(params)
-            if enable_audio:
+            needs_audio_post = enable_audio or (pre_denoise_mode != "off") or haas_enabled
+            if needs_audio_post:
                 video_params["keep_audio"] = False
 
             final_out_name = f"sr_{input_path.stem}.mp4"
@@ -180,12 +203,38 @@ def process_single_task(task):
                         cumulative_frames += seg_frames
                 
                 db.update_task_status(task_id, "PROCESSING", 95, "Merging Parts...")
-                logger.info("Merging %s segments.", len(segs))
+                logger.info("Merging %s segments with NVENC.", len(segs))
                 out_name = video_out_name
-                run_ffmpeg([
-                    "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list),
-                    "-c:v", "libx264", "-pix_fmt", "yuv420p", str(output_root / out_name)
-                ])
+                output_codec = (params.get("output_codec") or "h264").lower()
+                crf = params.get("crf", 18)
+                if output_codec in ("h265", "hevc"):
+                    nvenc_cmd = [
+                        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list),
+                        "-c:v", "hevc_nvenc", "-preset", "p4", "-rc:v", "vbr",
+                        "-cq:v", str(crf), "-b:v", "0", "-pix_fmt", "yuv420p",
+                        str(output_root / out_name)
+                    ]
+                    fallback_cmd = [
+                        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list),
+                        "-c:v", "libx265", "-crf", str(crf), "-pix_fmt", "yuv420p",
+                        str(output_root / out_name)
+                    ]
+                else:
+                    nvenc_cmd = [
+                        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list),
+                        "-c:v", "h264_nvenc", "-preset", "p4", "-rc:v", "vbr",
+                        "-cq:v", str(crf), "-b:v", "0", "-pix_fmt", "yuv420p",
+                        str(output_root / out_name)
+                    ]
+                    fallback_cmd = [
+                        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list),
+                        "-c:v", "libx264", "-crf", str(crf), "-pix_fmt", "yuv420p",
+                        str(output_root / out_name)
+                    ]
+                if config.FFMPEG_USE_GPU:
+                    run_ffmpeg(nvenc_cmd, fallback_args=fallback_cmd)
+                else:
+                    run_ffmpeg(fallback_cmd)
                 shutil.rmtree(segments_dir, ignore_errors=True)
             else:
                 # Single pass video
@@ -226,8 +275,11 @@ def process_single_task(task):
                 audio_input = audio_source
                 audio_denoised = run_dir / "audio_denoised.wav"
                 audio_enhanced = run_dir / "audio_enhanced.wav"
+                audio_haas = run_dir / "audio_haas.wav"
                 final_output = output_root / final_out_name
                 try:
+                    if audio_denoised.exists() and audio_denoised.is_dir():
+                        shutil.rmtree(audio_denoised, ignore_errors=True)
                     run_ffmpeg([
                         "ffmpeg", "-y", "-i", str(input_path),
                         "-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "1",
@@ -238,8 +290,12 @@ def process_single_task(task):
                         audio_input = audio_denoised
                     enhancer = AudioEnhancer()
                     enhancer.process(audio_input, audio_enhanced)
+                    audio_final = audio_enhanced
+                    if haas_enabled:
+                        apply_haas_effect(audio_final, audio_haas, haas_delay_ms, haas_lead)
+                        audio_final = audio_haas
                     run_ffmpeg([
-                        "ffmpeg", "-y", "-i", str(video_only_path), "-i", str(audio_enhanced),
+                        "ffmpeg", "-y", "-i", str(video_only_path), "-i", str(audio_final),
                         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest",
                         str(final_output)
                     ])
@@ -258,6 +314,46 @@ def process_single_task(task):
                 logger.info("Audio pre-denoise mode: %s", pre_denoise_mode)
                 audio_source = run_dir / "audio_source.wav"
                 audio_denoised = run_dir / "audio_denoised.wav"
+                audio_haas = run_dir / "audio_haas.wav"
+                final_output = output_root / final_out_name
+                try:
+                    if audio_denoised.exists() and audio_denoised.is_dir():
+                        shutil.rmtree(audio_denoised, ignore_errors=True)
+                    run_ffmpeg([
+                        "ffmpeg", "-y", "-i", str(input_path),
+                        "-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "1",
+                        str(audio_source)
+                    ])
+                    apply_pre_denoise(pre_denoise_mode, audio_source, audio_denoised)
+                    audio_final = audio_denoised
+                    if haas_enabled:
+                        apply_haas_effect(audio_final, audio_haas, haas_delay_ms, haas_lead)
+                        audio_final = audio_haas
+                    merge_output = final_output
+                    if video_only_path == final_output:
+                        merge_output = output_root / f"{input_path.stem}_denoised_tmp.mp4"
+                    run_ffmpeg([
+                        "ffmpeg", "-y", "-i", str(video_only_path), "-i", str(audio_final),
+                        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest",
+                        str(merge_output)
+                    ])
+                    if merge_output != final_output:
+                        merge_output.replace(final_output)
+                except Exception:
+                    logger.error("Pre-denoise failed", exc_info=True)
+                    raise
+                finally:
+                    if video_only_path.exists() and video_only_path != final_output:
+                        try:
+                            video_only_path.unlink()
+                        except Exception:
+                            pass
+                out_name = final_out_name
+            elif haas_enabled and params.get('keep_audio', True):
+                db.update_task_status(task_id, "PROCESSING", 96, "Applying Haas effect...")
+                logger.info("Haas effect enabled.")
+                audio_source = run_dir / "audio_source.wav"
+                audio_haas = run_dir / "audio_haas.wav"
                 final_output = output_root / final_out_name
                 try:
                     run_ffmpeg([
@@ -265,14 +361,19 @@ def process_single_task(task):
                         "-vn", "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "1",
                         str(audio_source)
                     ])
-                    apply_pre_denoise(pre_denoise_mode, audio_source, audio_denoised)
+                    apply_haas_effect(audio_source, audio_haas, haas_delay_ms, haas_lead)
+                    merge_output = final_output
+                    if video_only_path == final_output:
+                        merge_output = output_root / f"{input_path.stem}_haas_tmp.mp4"
                     run_ffmpeg([
-                        "ffmpeg", "-y", "-i", str(video_only_path), "-i", str(audio_denoised),
+                        "ffmpeg", "-y", "-i", str(video_only_path), "-i", str(audio_haas),
                         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest",
-                        str(final_output)
+                        str(merge_output)
                     ])
+                    if merge_output != final_output:
+                        merge_output.replace(final_output)
                 except Exception:
-                    logger.error("Pre-denoise failed", exc_info=True)
+                    logger.error("Haas effect failed", exc_info=True)
                     raise
                 finally:
                     if video_only_path.exists() and video_only_path != final_output:

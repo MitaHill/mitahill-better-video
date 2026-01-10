@@ -36,6 +36,7 @@ class ProgressRecorder:
         self._last_gpu_check = 0.0
         self._last_gpu_util = None
         self._last_flush = 0.0
+        self._last_emit = 0.0
         self._pending_frame = None
         self._pending_message = None
 
@@ -68,6 +69,9 @@ class ProgressRecorder:
     def emit_frame(self, frame_index, preview_updated=False):
         total_done = self.segment_start_frame + frame_index - 1
         now = time.time()
+        if not preview_updated and config.EVENT_FLUSH_SECONDS > 0:
+            if now - self._last_emit < config.EVENT_FLUSH_SECONDS:
+                return
         if now - self._last_gpu_check >= config.PROGRESS_FLUSH_SECONDS:
             self._last_gpu_util = get_gpu_utilization()
             self._last_gpu_check = now
@@ -86,6 +90,7 @@ class ProgressRecorder:
         if preview_updated:
             payload["preview_frame"] = total_done
         send_event(payload)
+        self._last_emit = now
 
 
 def process_video_with_model(
@@ -136,10 +141,26 @@ def process_video_with_model(
 
         # 2. Extract Frames (align with upstream pipeline)
         if not any(frames_in.glob("f_*.jpg")):
-            run_ffmpeg([
-                "ffmpeg", "-y", "-i", str(input_path),
-                "-vsync", "0", "-q:v", "2", "-f", "image2", str(frames_in / "f_%06d.jpg")
-            ])
+            hwaccel = ["-hwaccel", "cuda"] if config.FFMPEG_USE_GPU else []
+            deinterlace = bool(params.get("deinterlace"))
+            vf = None
+            if deinterlace:
+                vf = "yadif_cuda=mode=send_frame:parity=auto:deint=all" if config.FFMPEG_USE_GPU else "yadif=mode=send_frame:parity=auto:deint=all"
+            cmd = [
+                "ffmpeg", "-y", *hwaccel, "-i", str(input_path),
+                "-vsync", "0", "-q:v", "2"
+            ]
+            if vf:
+                cmd += ["-vf", vf]
+            cmd += ["-f", "image2", str(frames_in / "f_%06d.jpg")]
+            fallback = None
+            if hwaccel or vf:
+                fb_vf = "yadif=mode=send_frame:parity=auto:deint=all" if deinterlace else None
+                fallback = ["ffmpeg", "-y", "-i", str(input_path), "-vsync", "0", "-q:v", "2"]
+                if fb_vf:
+                    fallback += ["-vf", fb_vf]
+                fallback += ["-f", "image2", str(frames_in / "f_%06d.jpg")]
+            run_ffmpeg(cmd, fallback_args=fallback)
 
         # 3. Inference
         frame_list = sorted(list(frames_in.glob("*.jpg")))
@@ -167,24 +188,44 @@ def process_video_with_model(
         else:
             recorder = None
         
-        hash_cache = {}
+        hash_to_first = {}
+        frame_hashes = []
+        for i, f_path in enumerate(frame_list):
+            try:
+                frame_hash = hashlib.md5(f_path.read_bytes()).hexdigest()
+            except Exception:
+                frame_hash = None
+            frame_hashes.append(frame_hash)
+            if frame_hash and frame_hash not in hash_to_first:
+                hash_to_first[frame_hash] = i + 1
+
+        unique_frames = len(set(hash_to_first.values()))
+        if unique_frames != total:
+            logger.info(
+                "Dedup scan: %s unique / %s total frames in segment %s",
+                unique_frames,
+                total,
+                segment_key or "full",
+            )
+
         for i, f_path in enumerate(frame_list):
             frame_index = i + 1
             if frame_index < resume_from_frame:
                 continue
             out_f = frames_out / f_path.name
-            frame_hash = None
-            try:
-                frame_hash = hashlib.sha256(f_path.read_bytes()).hexdigest()
-            except Exception:
-                frame_hash = None
-            cached = hash_cache.get(frame_hash) if frame_hash else None
-            if cached and cached.exists():
-                shutil.copyfile(cached, out_f)
+            frame_hash = frame_hashes[i]
+            first_index = hash_to_first.get(frame_hash) if frame_hash else None
+            if out_f.exists():
+                pass
+            elif first_index and first_index != frame_index:
+                src_out = frames_out / frame_list[first_index - 1].name
+                if src_out.exists():
+                    shutil.copyfile(src_out, out_f)
+                else:
+                    upsampler.enhance_to_file(f_path, out_f, params['upscale'])
             else:
                 upsampler.enhance_to_file(f_path, out_f, params['upscale'])
-                if frame_hash:
-                    hash_cache[frame_hash] = out_f
+
             preview_updated = False
             if preview_original_path and preview_upscaled_path:
                 try:
@@ -196,7 +237,7 @@ def process_video_with_model(
                         preview_updated = True
                 except Exception:
                     pass
-            
+
             if recorder:
                 recorder.emit_frame(frame_index, preview_updated=preview_updated)
                 recorder.record(frame_index, f"Upscaling {input_path.name}: {frame_index}/{total} frames")
@@ -214,8 +255,36 @@ def process_video_with_model(
         if audio_path.exists() and params.get('keep_audio', True):
             cmd += ["-i", str(audio_path), "-map", "0:v:0", "-map", "1:a:0?", "-c:a", "copy"]
         
-        cmd += ["-c:v", "libx264", "-crf", str(params.get('crf', 18)), "-pix_fmt", "yuv420p", str(output_path)]
-        run_ffmpeg(cmd)
+        output_codec = (params.get("output_codec") or "h264").lower()
+        crf = params.get("crf", 18)
+        if config.FFMPEG_USE_GPU:
+            if output_codec in ("h265", "hevc"):
+                nvenc_cmd = cmd + [
+                    "-c:v", "hevc_nvenc", "-preset", "p4", "-rc:v", "vbr",
+                    "-cq:v", str(crf), "-b:v", "0", "-pix_fmt", "yuv420p",
+                    str(output_path)
+                ]
+                fallback_cmd = cmd + [
+                    "-c:v", "libx265", "-crf", str(crf), "-pix_fmt", "yuv420p",
+                    str(output_path)
+                ]
+            else:
+                nvenc_cmd = cmd + [
+                    "-c:v", "h264_nvenc", "-preset", "p4", "-rc:v", "vbr",
+                    "-cq:v", str(crf), "-b:v", "0", "-pix_fmt", "yuv420p",
+                    str(output_path)
+                ]
+                fallback_cmd = cmd + [
+                    "-c:v", "libx264", "-crf", str(crf), "-pix_fmt", "yuv420p",
+                    str(output_path)
+                ]
+            run_ffmpeg(nvenc_cmd, fallback_args=fallback_cmd)
+        else:
+            if output_codec in ("h265", "hevc"):
+                cmd += ["-c:v", "libx265", "-crf", str(crf), "-pix_fmt", "yuv420p", str(output_path)]
+            else:
+                cmd += ["-c:v", "libx264", "-crf", str(crf), "-pix_fmt", "yuv420p", str(output_path)]
+            run_ffmpeg(cmd)
 
     finally:
         pass

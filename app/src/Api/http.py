@@ -25,6 +25,8 @@ def _parse_task_params(form):
     haas_delay_ms = int(form.get("haas_delay_ms", 0))
     haas_lead = form.get("haas_lead", "left")
     crf = int(form.get("crf", 18))
+    output_codec = form.get("output_codec", "h264").lower()
+    deinterlace = form.get("deinterlace", "false").lower() == "true"
     tile_pad = int(form.get("tile_pad", config.DEFAULT_TILE_PADDING))
     fp16 = form.get("fp16", str(config.DEFAULT_FP16)).lower() == "true"
 
@@ -41,6 +43,8 @@ def _parse_task_params(form):
         "haas_delay_ms": haas_delay_ms,
         "haas_lead": haas_lead,
         "crf": crf,
+        "output_codec": output_codec,
+        "deinterlace": deinterlace,
         "tile_pad": tile_pad,
         "fp16": fp16,
     }
@@ -80,10 +84,19 @@ def _handle_upload(upload, params, client_ip):
         **info,
     }
 
+    if input_type == "Video":
+        video_codec = (video_info.get("video_codec") or "").lower()
+        if video_codec == "mpeg2video" and not params.get("deinterlace"):
+            params["deinterlace"] = True
+            params["mpeg2_adapted"] = True
+        else:
+            params["mpeg2_adapted"] = False
+
     task_params = {
         **params,
         "filename": filename,
         "upload_path": str(input_path),
+        "source_video_codec": video_info.get("video_codec"),
     }
 
     db.create_task(task_id, client_ip, task_params, video_info)
@@ -91,7 +104,7 @@ def _handle_upload(upload, params, client_ip):
     if input_type == "Video":
         video_codec = (video_info.get("video_codec") or "").lower()
         audio_codec = (video_info.get("audio_codec") or "").lower()
-        allowed_video = {"h264", "hevc", "h265"}
+        allowed_video = {"h264", "hevc", "h265", "mpeg2video"}
         allowed_audio = {"aac"}
 
         reject_reason = None

@@ -68,6 +68,13 @@
                 step="0.05"
               />
             </div>
+            <div class="field" v-if="form.inputType === 'Video'">
+              <label>反交错</label>
+              <select v-model="form.deinterlace">
+                <option :value="false">关闭</option>
+                <option :value="true">启用</option>
+              </select>
+            </div>
           </div>
 
           <div class="param-section" v-if="form.inputType === 'Video'">
@@ -133,6 +140,13 @@
 
           <div class="param-section" v-if="form.inputType === 'Video'">
             <div class="param-title">编码参数</div>
+            <div class="field">
+              <label>输出格式</label>
+              <select v-model="form.outputCodec">
+                <option value="h264">H264</option>
+                <option value="h265">H265-8bit</option>
+              </select>
+            </div>
             <div class="field">
               <label>CRF 质量：{{ form.crf }}</label>
               <input v-model.number="form.crf" type="range" min="10" max="30" />
@@ -256,6 +270,8 @@ const form = reactive({
   haasDelayMs: 0,
   haasLead: "left",
   crf: 18,
+  outputCodec: "h264",
+  deinterlace: false,
   file: null,
   files: []
 });
@@ -316,6 +332,8 @@ const paramRows = computed(() => {
     { label: "音频增强", value: params.audio_enhance !== undefined ? formatBool(params.audio_enhance) : "-" },
     { label: "前置降噪", value: params.pre_denoise_mode || "-" },
     { label: "哈斯效应", value: formatHaas(params) },
+    { label: "反交错", value: params.deinterlace !== undefined ? formatBool(params.deinterlace) : "-" },
+    { label: "输出格式", value: params.output_codec ? params.output_codec.toUpperCase() : "-" },
     { label: "CRF 质量", value: params.crf ?? "-" },
     { label: "Tile Pad", value: params.tile_pad ?? "-" },
     { label: "FP16", value: params.fp16 !== undefined ? formatBool(params.fp16) : "-" },
@@ -417,6 +435,8 @@ const submitTask = async () => {
     data.append("haas_delay_ms", String(form.haasDelayMs));
     data.append("haas_lead", String(form.haasLead));
     data.append("crf", String(form.crf));
+    data.append("output_codec", String(form.outputCodec));
+    data.append("deinterlace", String(form.deinterlace));
 
     const endpoint = form.files.length > 1 ? "/api/tasks/batch" : "/api/tasks";
     const res = await fetch(endpoint, { method: "POST", body: data });
