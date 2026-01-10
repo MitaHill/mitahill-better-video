@@ -11,6 +11,11 @@ Fields:
 - `tile`
 - `denoise_strength`
 - `keep_audio`
+- `audio_enhance`
+- `pre_denoise_mode`
+- `haas_enabled`
+- `haas_delay_ms`
+- `haas_lead`
 - `crf`
 - `tile_pad`
 - `fp16`
@@ -18,6 +23,18 @@ Fields:
 Response:
 ```
 { "task_id": "<uuid>" }
+```
+
+## POST /api/tasks/batch
+**Content-Type**: multipart/form-data
+
+Fields:
+- `files` (required, multiple)
+- 其余字段同 `/api/tasks`，批量任务共享同一组参数
+
+Response:
+```
+{ "task_ids": ["<uuid>", "..."], "errors": [{ "filename": "...", "error": "...", "task_id": "<uuid>" }] }
 ```
 
 ## GET /api/tasks/<task_id>

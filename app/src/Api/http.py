@@ -8,7 +8,103 @@ from app.src.Config import settings as config
 from app.src.Database import core as db
 from app.src.Utils.http import ffprobe_info, secure_filename, is_filename_safe
 
-OUTPUT_ROOT = Path("/workspace/output")
+STORAGE_ROOT = Path("/workspace/storage")
+OUTPUT_ROOT = STORAGE_ROOT / "output"
+UPLOAD_ROOT = STORAGE_ROOT / "upload"
+
+def _parse_task_params(form):
+    input_type = form.get("input_type", "Video")
+    model_name = form.get("model_name", "realesrgan-x4plus")
+    upscale = int(form.get("upscale", 3))
+    tile = int(form.get("tile", config.DEFAULT_SMART_TILE_SIZE))
+    denoise = float(form.get("denoise_strength", 0.5))
+    keep_audio = form.get("keep_audio", "true").lower() == "true"
+    audio_enhance = form.get("audio_enhance", str(config.ENABLE_AUDIO_ENHANCEMENT)).lower() == "true"
+    pre_denoise_mode = form.get("pre_denoise_mode", config.PRE_DENOISE_MODE)
+    haas_enabled = form.get("haas_enabled", "false").lower() == "true"
+    haas_delay_ms = int(form.get("haas_delay_ms", 0))
+    haas_lead = form.get("haas_lead", "left")
+    crf = int(form.get("crf", 18))
+    tile_pad = int(form.get("tile_pad", config.DEFAULT_TILE_PADDING))
+    fp16 = form.get("fp16", str(config.DEFAULT_FP16)).lower() == "true"
+
+    return {
+        "input_type": input_type,
+        "model_name": model_name,
+        "upscale": upscale,
+        "tile": tile,
+        "denoise_strength": denoise,
+        "keep_audio": keep_audio,
+        "audio_enhance": audio_enhance,
+        "pre_denoise_mode": pre_denoise_mode,
+        "haas_enabled": haas_enabled,
+        "haas_delay_ms": haas_delay_ms,
+        "haas_lead": haas_lead,
+        "crf": crf,
+        "tile_pad": tile_pad,
+        "fp16": fp16,
+    }
+
+def _handle_upload(upload, params, client_ip):
+    if not upload.filename or not is_filename_safe(upload.filename):
+        return None, "invalid filename"
+
+    task_id = uuid.uuid4().hex
+    run_dir = OUTPUT_ROOT / f"run_{task_id}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    upload_dir = UPLOAD_ROOT / f"run_{task_id}"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    filename = secure_filename(upload.filename)
+    input_path = upload_dir / filename
+    upload.save(input_path)
+
+    input_type = params["input_type"]
+    size_mb = input_path.stat().st_size / (1024 * 1024)
+    max_mb = config.MAX_VIDEO_SIZE_MB if input_type == "Video" else config.MAX_IMAGE_SIZE_MB
+    if size_mb > max_mb:
+        input_path.unlink(missing_ok=True)
+        db.create_task(task_id, client_ip, {**params, "filename": filename, "upload_path": str(input_path)}, {})
+        db.update_task_status(task_id, "FAILED", progress=0, message=f"file exceeds limit ({max_mb} MB)")
+        return task_id, f"file exceeds limit ({max_mb} MB)"
+
+    if input_type == "Video":
+        info = ffprobe_info(input_path)
+    else:
+        info = {"width": 0, "height": 0, "fps": 0, "duration": 0, "video_codec": None, "audio_codec": None}
+
+    video_info = {
+        "size_mb": round(size_mb, 2),
+        "filename": filename,
+        "upload_path": str(input_path),
+        **info,
+    }
+
+    task_params = {
+        **params,
+        "filename": filename,
+        "upload_path": str(input_path),
+    }
+
+    db.create_task(task_id, client_ip, task_params, video_info)
+
+    if input_type == "Video":
+        video_codec = (video_info.get("video_codec") or "").lower()
+        audio_codec = (video_info.get("audio_codec") or "").lower()
+        allowed_video = {"h264", "hevc", "h265"}
+        allowed_audio = {"aac"}
+
+        reject_reason = None
+        if not video_codec or video_codec not in allowed_video:
+            reject_reason = "仅支持 H.264/H.265 视频编码（拒绝 AV1/VP9 等非主流编码）。"
+        elif audio_codec and audio_codec not in allowed_audio:
+            reject_reason = "仅支持 AAC 音频编码（拒绝非 AAC 音频）。"
+
+        if reject_reason:
+            db.update_task_status(task_id, "FAILED", progress=0, message=reject_reason)
+            return task_id, reject_reason
+
+    return task_id, None
 
 
 def create_app(worker_service=None):
@@ -48,67 +144,36 @@ def create_app(worker_service=None):
         upload = request.files["file"]
         if not upload.filename:
             return jsonify({"error": "filename is required"}), 400
-        if not is_filename_safe(upload.filename):
-            return jsonify({"error": "invalid filename"}), 400
-
-        task_id = uuid.uuid4().hex
-        run_dir = OUTPUT_ROOT / f"run_{task_id}"
-        run_dir.mkdir(parents=True, exist_ok=True)
-
-        filename = secure_filename(upload.filename)
-        input_type = request.form.get("input_type", "Video")
-        model_name = request.form.get("model_name", "realesrgan-x4plus")
-        upscale = int(request.form.get("upscale", 3))
-        tile = int(request.form.get("tile", config.DEFAULT_SMART_TILE_SIZE))
-        denoise = float(request.form.get("denoise_strength", 0.5))
-        keep_audio = request.form.get("keep_audio", "true").lower() == "true"
-        audio_enhance = request.form.get(
-            "audio_enhance", str(config.ENABLE_AUDIO_ENHANCEMENT)
-        ).lower() == "true"
-        pre_denoise_mode = request.form.get("pre_denoise_mode", config.PRE_DENOISE_MODE)
-        crf = int(request.form.get("crf", 18))
-        tile_pad = int(request.form.get("tile_pad", config.DEFAULT_TILE_PADDING))
-        fp16 = request.form.get("fp16", str(config.DEFAULT_FP16)).lower() == "true"
-
-        input_path = run_dir / filename
-        upload.save(input_path)
-
-        size_mb = input_path.stat().st_size / (1024 * 1024)
-        max_mb = config.MAX_VIDEO_SIZE_MB if input_type == "Video" else config.MAX_IMAGE_SIZE_MB
-        if size_mb > max_mb:
-            input_path.unlink(missing_ok=True)
-            return jsonify({"error": f"file exceeds limit ({max_mb} MB)"}), 400
-
-        if input_type == "Video":
-            info = ffprobe_info(input_path)
-        else:
-            info = {"width": 0, "height": 0, "fps": 0, "duration": 0}
-
-        video_info = {
-            "size_mb": round(size_mb, 2),
-            "filename": filename,
-            **info,
-        }
-
-        task_params = {
-            "model_name": model_name,
-            "upscale": upscale,
-            "tile": tile,
-            "denoise_strength": denoise,
-            "input_type": input_type,
-            "keep_audio": keep_audio,
-            "audio_enhance": audio_enhance,
-            "pre_denoise_mode": pre_denoise_mode,
-            "crf": crf,
-            "filename": filename,
-            "tile_pad": tile_pad,
-            "fp16": fp16,
-        }
-
+        params = _parse_task_params(request.form)
         client_ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown")
         client_ip = client_ip.split(",")[0].strip()
-        db.create_task(task_id, client_ip, task_params, video_info)
+        task_id, err = _handle_upload(upload, params, client_ip)
+        if err:
+            return jsonify({"error": err, "task_id": task_id}), 400
         return jsonify({"task_id": task_id}), 201
+
+    @app.post("/api/tasks/batch")
+    def create_tasks_batch():
+        uploads = request.files.getlist("files")
+        if not uploads:
+            uploads = request.files.getlist("file")
+        if not uploads:
+            return jsonify({"error": "files are required"}), 400
+
+        params = _parse_task_params(request.form)
+        client_ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown")
+        client_ip = client_ip.split(",")[0].strip()
+
+        task_ids = []
+        errors = []
+        for upload in uploads:
+            task_id, err = _handle_upload(upload, params, client_ip)
+            if task_id:
+                task_ids.append(task_id)
+            if err:
+                errors.append({"filename": upload.filename, "error": err, "task_id": task_id})
+
+        return jsonify({"task_ids": task_ids, "errors": errors}), 201
 
     @app.get("/api/tasks/<task_id>")
     def get_task(task_id):
@@ -118,6 +183,8 @@ def create_app(worker_service=None):
 
         task["task_params"] = json.loads(task.get("task_params", "{}"))
         task["video_info"] = json.loads(task.get("video_info", "{}"))
+        task["task_progress"] = db.get_task_progress(task_id)
+        task["segment_progress"] = db.get_latest_segment_progress(task_id)
         return jsonify(task)
 
     @app.get("/api/tasks/<task_id>/preview/<kind>")
