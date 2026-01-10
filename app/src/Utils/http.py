@@ -8,33 +8,57 @@ def ffprobe_info(file_path: Path):
         cmd = [
             "ffprobe",
             "-v",
-            "quiet",
-            "-select_streams",
-            "v:0",
+            "error",
             "-show_entries",
-            "stream=width,height,r_frame_rate,duration",
+            "stream=codec_type,codec_name,width,height,r_frame_rate:format=duration",
             "-of",
             "json",
             str(file_path),
         ]
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, text=True, check=False)
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
         data = json.loads(res.stdout or "{}")
-        stream = data.get("streams", [{}])[0]
+        streams = data.get("streams", []) or []
 
-        width = int(stream.get("width", 0) or 0)
-        height = int(stream.get("height", 0) or 0)
-        duration = float(stream.get("duration", 0) or 0)
+        video_codec = None
+        audio_codec = None
+        width = 0
+        height = 0
+        fps_raw = "30/1"
 
-        fps_raw = stream.get("r_frame_rate", "30/1")
+        for s in streams:
+            stype = s.get("codec_type")
+            if stype == "video" and video_codec is None:
+                video_codec = (s.get("codec_name") or "").lower() or None
+                width = int(s.get("width", 0) or 0)
+                height = int(s.get("height", 0) or 0)
+                fps_raw = s.get("r_frame_rate", fps_raw)
+            elif stype == "audio" and audio_codec is None:
+                audio_codec = (s.get("codec_name") or "").lower() or None
+
+        duration = float((data.get("format") or {}).get("duration", 0) or 0)
         if "/" in fps_raw:
             n, d = fps_raw.split("/")
             fps = float(n) / float(d) if float(d) != 0 else 30.0
         else:
             fps = float(fps_raw)
 
-        return {"duration": duration, "fps": round(fps, 2), "width": width, "height": height}
+        return {
+            "duration": duration,
+            "fps": round(fps, 2),
+            "width": width,
+            "height": height,
+            "video_codec": video_codec,
+            "audio_codec": audio_codec,
+        }
     except Exception:
-        return {"duration": 0.0, "fps": 30.0, "width": 0, "height": 0}
+        return {
+            "duration": 0.0,
+            "fps": 30.0,
+            "width": 0,
+            "height": 0,
+            "video_codec": None,
+            "audio_codec": None,
+        }
 
 
 def secure_filename(name: str) -> str:
