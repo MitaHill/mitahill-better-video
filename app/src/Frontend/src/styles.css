@@ -282,34 +282,14 @@ button:hover {
 }
 
 .task-id-list {
-  margin-top: 10px;
+  margin-top: 8px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
-  font-size: 13px;
-}
-
-.task-id-panel {
-  padding: 10px 12px;
-  border: 1px dashed var(--border);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.task-id-chip {
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
-  padding: 6px 10px;
-  font-size: 13px;
-  color: var(--text-strong);
-  cursor: pointer;
-  border-radius: 0;
-}
-
-.task-id-chip:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .preview-grid {
