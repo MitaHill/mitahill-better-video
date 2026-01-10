@@ -144,14 +144,6 @@
           {{ loading.submit ? "提交中..." : "提交任务" }}
         </button>
 
-        <div v-if="taskIds.length" class="notice" style="margin-top: 12px;">
-          <div class="task-id-header">
-            <span>任务 ID：</span>
-          </div>
-          <div class="task-id-list">
-            <span v-for="id in taskIds" :key="id">{{ id }}</span>
-          </div>
-        </div>
         <p v-if="submitError" class="notice" style="color: var(--accent-2);">
           {{ submitError }}
         </p>
@@ -172,6 +164,14 @@
           <button class="secondary" @click="fetchStatus">查询</button>
           <div v-if="status" :class="['status-pill', statusClass]">
             {{ status.status }}
+          </div>
+        </div>
+        <div v-if="taskIds.length" class="notice task-id-panel" style="margin-top: 12px;">
+          <div class="task-id-header">
+            <span>任务 ID：</span>
+          </div>
+          <div class="task-id-list">
+            <span v-for="id in taskIds" :key="id" class="task-id-item">{{ id }}</span>
           </div>
         </div>
 
