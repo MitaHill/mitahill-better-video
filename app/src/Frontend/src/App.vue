@@ -147,9 +147,6 @@
         <div v-if="taskIds.length" class="notice" style="margin-top: 12px;">
           <div class="task-id-header">
             <span>任务 ID：</span>
-            <button class="secondary" style="margin-left: 8px;" @click="copyTaskId">
-              复制
-            </button>
           </div>
           <div class="task-id-list">
             <span v-for="id in taskIds" :key="id">{{ id }}</span>
@@ -537,15 +534,6 @@ const fetchRecommendations = async () => {
 
 const downloadResult = () => {
   window.location.href = `/api/tasks/${statusQuery.value}/result`;
-};
-
-const copyTaskId = async () => {
-  if (!taskIds.value.length) return;
-  try {
-    await navigator.clipboard.writeText(taskIds.value.join("\n"));
-  } catch (error) {
-    submitError.value = "无法访问剪贴板，请手动复制。";
-  }
 };
 
 const startPolling = () => {
