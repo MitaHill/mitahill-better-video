@@ -166,6 +166,9 @@
         <p v-if="submitWarnings" class="notice" style="color: var(--text-muted);">
           {{ submitWarnings }}
         </p>
+        <p v-if="submitNotice" class="notice" style="color: var(--accent);">
+          {{ submitNotice }}
+        </p>
       </div>
 
       <div class="panel">
@@ -271,6 +274,7 @@ const form = reactive({
 const taskIds = ref([]);
 const submitError = ref("");
 const submitWarnings = ref("");
+const submitNotice = ref("");
 const statusQuery = ref("");
 const status = ref(null);
 const statusError = ref("");
@@ -398,6 +402,7 @@ const parseJsonSafe = async (res) => {
 
 const submitTask = async () => {
   submitError.value = "";
+  submitNotice.value = "";
   submitWarnings.value = "";
   if (!form.files || form.files.length === 0) {
     submitError.value = "请先选择要上传的文件。";
@@ -547,17 +552,39 @@ const downloadResult = () => {
 const copyTaskId = async () => {
   if (!taskIds.value.length) return;
   try {
-    await navigator.clipboard.writeText(taskIds.value.join("\n"));
+    await copyText(taskIds.value.join("\n"));
+    submitNotice.value = "已复制任务 ID。";
   } catch (error) {
-    submitError.value = "无法访问剪贴板，请手动复制。";
+    submitError.value = error.message || "无法访问剪贴板，请手动复制。";
   }
 };
 
 const copySingleTaskId = async (id) => {
+  submitNotice.value = "";
   try {
-    await navigator.clipboard.writeText(id);
+    await copyText(id);
+    submitNotice.value = "已复制任务 ID。";
   } catch (error) {
-    submitError.value = "无法访问剪贴板，请手动复制。";
+    submitError.value = error.message || "无法访问剪贴板，请手动复制。";
+  }
+};
+
+const copyText = async (text) => {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const ok = document.execCommand("copy");
+  document.body.removeChild(textarea);
+  if (!ok) {
+    throw new Error("无法访问剪贴板，请手动复制。");
   }
 };
 
