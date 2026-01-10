@@ -146,12 +146,18 @@
 
         <div v-if="taskIds.length" class="notice task-id-panel" style="margin-top: 12px;">
           <div class="task-id-header">
-            <span>任务 ID：</span>
+            <span>任务 ID（点击复制）：</span>
           </div>
           <div class="task-id-list">
-            <span v-for="id in taskIds" :key="id" class="task-id-chip">
+            <button
+              v-for="id in taskIds"
+              :key="id"
+              type="button"
+              class="task-id-chip"
+              @click="copySingleTaskId(id)"
+            >
               {{ id }}
-            </span>
+            </button>
           </div>
         </div>
         <p v-if="submitError" class="notice" style="color: var(--accent-2);">
@@ -159,6 +165,9 @@
         </p>
         <p v-if="submitWarnings" class="notice" style="color: var(--text-muted);">
           {{ submitWarnings }}
+        </p>
+        <p v-if="submitNotice" class="notice" style="color: var(--accent);">
+          {{ submitNotice }}
         </p>
       </div>
 
@@ -265,6 +274,7 @@ const form = reactive({
 const taskIds = ref([]);
 const submitError = ref("");
 const submitWarnings = ref("");
+const submitNotice = ref("");
 const statusQuery = ref("");
 const status = ref(null);
 const statusError = ref("");
@@ -392,6 +402,7 @@ const parseJsonSafe = async (res) => {
 
 const submitTask = async () => {
   submitError.value = "";
+  submitNotice.value = "";
   submitWarnings.value = "";
   if (!form.files || form.files.length === 0) {
     submitError.value = "请先选择要上传的文件。";
@@ -538,6 +549,44 @@ const downloadResult = () => {
   window.location.href = `/api/tasks/${statusQuery.value}/result`;
 };
 
+const copyTaskId = async () => {
+  if (!taskIds.value.length) return;
+  try {
+    await copyText(taskIds.value.join("\n"));
+    submitNotice.value = "已复制任务 ID。";
+  } catch (error) {
+    submitError.value = error.message || "无法访问剪贴板，请手动复制。";
+  }
+};
+
+const copySingleTaskId = async (id) => {
+  submitNotice.value = "";
+  try {
+    await copyText(id);
+    submitNotice.value = "已复制任务 ID。";
+  } catch (error) {
+    submitError.value = error.message || "无法访问剪贴板，请手动复制。";
+  }
+};
+
+const copyText = async (text) => {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const ok = document.execCommand("copy");
+  document.body.removeChild(textarea);
+  if (!ok) {
+    throw new Error("无法访问剪贴板，请手动复制。");
+  }
+};
 
 const startPolling = () => {
   if (pollTimer) return;

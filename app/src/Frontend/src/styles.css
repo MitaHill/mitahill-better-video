@@ -303,9 +303,14 @@ button:hover {
   padding: 6px 10px;
   font-size: 13px;
   color: var(--text-strong);
+  cursor: pointer;
   border-radius: 0;
 }
 
+.task-id-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 .preview-grid {
   display: grid;
