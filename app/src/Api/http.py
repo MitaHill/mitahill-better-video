@@ -8,7 +8,7 @@ import json
 from app.src.Config import settings as config
 from app.src.Database import core as db
 from app.src.Utils.http import ffprobe_info, secure_filename, is_filename_safe
-from app.src.Utils.preview_cache import get_preview
+from app.src.Utils.preview_cache import get_preview as get_cached_preview
 
 STORAGE_ROOT = Path("/workspace/storage")
 OUTPUT_ROOT = STORAGE_ROOT / "output"
@@ -211,7 +211,7 @@ def create_app(worker_service=None):
             path = run_dir / "preview_upscaled.jpg"
         else:
             return jsonify({"error": "invalid preview type"}), 400
-        payload, _frame = get_preview(task_id, kind)
+        payload, _frame = get_cached_preview(task_id, kind)
         if payload:
             resp = send_file(io.BytesIO(payload), mimetype="image/jpeg")
         elif path.exists():
