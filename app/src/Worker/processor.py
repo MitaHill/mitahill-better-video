@@ -132,7 +132,7 @@ def process_single_task(task):
                 segments_dir = run_dir / "segments"
                 segments_dir.mkdir(exist_ok=True)
                 
-                segs = sorted(list(segments_dir.glob("seg_*.mp4")))
+                segs = sorted([p for p in segments_dir.glob("seg_*.mp4") if not p.stem.endswith("_sr")])
                 if not segs:
                     # Split
                     run_ffmpeg([
@@ -141,7 +141,7 @@ def process_single_task(task):
                         "-reset_timestamps", "1", str(segments_dir / "seg_%03d.mp4")
                     ])
                 
-                segs = sorted(list(segments_dir.glob("seg_*.mp4")))
+                segs = sorted([p for p in segments_dir.glob("seg_*.mp4") if not p.stem.endswith("_sr")])
                 if not segs:
                     raise RuntimeError("Video split produced no segments.")
                 db.upsert_task_progress(task_id, total_frames, len(segs))

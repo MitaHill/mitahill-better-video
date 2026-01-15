@@ -3,6 +3,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from pathlib import Path
 import uuid
 import json
+import shutil
 
 from app.src.Config import settings as config
 from app.src.Database import core as db
@@ -86,11 +87,16 @@ def _handle_upload(upload, params, client_ip):
 
     if input_type == "Video":
         video_codec = (video_info.get("video_codec") or "").lower()
+        audio_codec = (video_info.get("audio_codec") or "").lower()
         if video_codec == "mpeg2video" and not params.get("deinterlace"):
             params["deinterlace"] = True
             params["mpeg2_adapted"] = True
         else:
             params["mpeg2_adapted"] = False
+        if video_codec == "mpeg2video" and audio_codec == "mp2":
+            current_app.logger.info(
+                "MPEG2 + MP2 detected for task %s; allowing non-AAC audio.", task_id
+            )
 
     task_params = {
         **params,
@@ -103,21 +109,57 @@ def _handle_upload(upload, params, client_ip):
 
     if input_type == "Video":
         video_codec = (video_info.get("video_codec") or "").lower()
-        audio_codec = (video_info.get("audio_codec") or "").lower()
         allowed_video = {"h264", "hevc", "h265", "mpeg2video"}
-        allowed_audio = {"aac"}
 
         reject_reason = None
         if not video_codec or video_codec not in allowed_video:
-            reject_reason = "仅支持 H.264/H.265 视频编码（拒绝 AV1/VP9 等非主流编码）。"
-        elif audio_codec and audio_codec not in allowed_audio:
-            reject_reason = "仅支持 AAC 音频编码（拒绝非 AAC 音频）。"
+            reject_reason = "仅支持 H.264/H.265/MPEG2 视频编码（拒绝 AV1/VP9 等非主流编码）。"
 
         if reject_reason:
             db.update_task_status(task_id, "FAILED", progress=0, message=reject_reason)
             return task_id, reject_reason
 
     return task_id, None
+
+def _read_cached_frame(cache_dir):
+    try:
+        path = cache_dir / "preview_last_frame.txt"
+        if path.exists():
+            return int(path.read_text(encoding="utf-8").strip())
+    except Exception:
+        pass
+    return 0
+
+def _write_cached_frame(cache_dir, frame_number):
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        (cache_dir / "preview_last_frame.txt").write_text(str(int(frame_number)), encoding="utf-8")
+    except Exception:
+        pass
+
+def _try_recover_preview(task_id, kind):
+    progress = db.get_latest_segment_progress(task_id) or {}
+    last_done = int(progress.get("last_done_frame") or 0)
+    segment_index = int(progress.get("segment_index") or 0)
+    start_frame = int(progress.get("start_frame") or 0)
+    if not (segment_index and last_done and start_frame):
+        return None
+    segment_dir = OUTPUT_ROOT / f"run_{task_id}" / "segments"
+    seg_path = segment_dir / f"seg_{segment_index - 1:03d}.mp4"
+    temp_dir = seg_path.parent / f"tmp_{seg_path.stem}"
+    frames_dir = temp_dir / ("out" if kind == "upscaled" else "in")
+    frame_path = frames_dir / f"f_{last_done:06d}.jpg"
+    if not frame_path.exists():
+        return None
+    cache_dir = Path("/workspace/storage/data/preview_images") / task_id / ("after" if kind == "upscaled" else "before")
+    cache_path = cache_dir / "preview_last.jpg"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    tmp_path = cache_dir / f".preview_last.tmp"
+    shutil.copyfile(frame_path, tmp_path)
+    tmp_path.replace(cache_path)
+    total_done = start_frame + last_done - 1
+    _write_cached_frame(cache_dir, total_done)
+    return cache_path
 
 
 def create_app(worker_service=None):
@@ -205,14 +247,37 @@ def create_app(worker_service=None):
         run_dir = OUTPUT_ROOT / f"run_{task_id}"
         if kind == "original":
             path = run_dir / "preview_original.jpg"
+            cache_dir = Path("/workspace/storage/data/preview_images") / task_id / "before"
+            cache_path = cache_dir / "preview_last.jpg"
         elif kind == "upscaled":
             path = run_dir / "preview_upscaled.jpg"
+            cache_dir = Path("/workspace/storage/data/preview_images") / task_id / "after"
+            cache_path = cache_dir / "preview_last.jpg"
         else:
             return jsonify({"error": "invalid preview type"}), 400
+        use_path = None
+        latest_total = 0
+        progress = db.get_latest_segment_progress(task_id) or {}
+        last_done = int(progress.get("last_done_frame") or 0)
+        start_frame = int(progress.get("start_frame") or 0)
+        if last_done and start_frame:
+            latest_total = start_frame + last_done - 1
+        cached_total = _read_cached_frame(cache_dir)
 
-        if not path.exists():
+        if latest_total and cached_total < latest_total:
+            use_path = _try_recover_preview(task_id, kind)
+
+        if not use_path:
+            if path.exists():
+                use_path = path
+            elif cache_path.exists():
+                use_path = cache_path
+            else:
+                use_path = _try_recover_preview(task_id, kind)
+
+        if not use_path:
             return jsonify({"error": "preview not ready"}), 404
-        resp = send_file(path, mimetype="image/jpeg")
+        resp = send_file(use_path, mimetype="image/jpeg")
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         resp.headers["Pragma"] = "no-cache"
         return resp

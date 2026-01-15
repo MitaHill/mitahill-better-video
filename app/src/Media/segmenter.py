@@ -66,7 +66,7 @@ class ProgressRecorder:
             )
         self._last_flush = time.time()
 
-    def emit_frame(self, frame_index, preview_updated=False):
+    def emit_frame(self, frame_index, preview_updated=False, preview_reset=False):
         total_done = self.segment_start_frame + frame_index - 1
         now = time.time()
         if not preview_updated and config.EVENT_FLUSH_SECONDS > 0:
@@ -89,6 +89,8 @@ class ProgressRecorder:
         }
         if preview_updated:
             payload["preview_frame"] = total_done
+            if preview_reset:
+                payload["preview_reset"] = True
         send_event(payload)
         self._last_emit = now
 
@@ -120,6 +122,22 @@ def process_video_with_model(
         tmp_path = dst.with_name(f".{dst.name}.tmp")
         shutil.copyfile(src, tmp_path)
         os.replace(tmp_path, dst)
+
+    def cache_preview(task_id_value, kind, src_path, frame_number=None):
+        if not task_id_value or not src_path:
+            return
+        if not src_path.exists():
+            return
+        bucket = "before" if kind == "original" else "after"
+        cache_dir = Path("/workspace/storage/data/preview_images") / task_id_value / bucket
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_path = cache_dir / "preview_last.jpg"
+        atomic_copy(src_path, cache_path)
+        if frame_number:
+            try:
+                (cache_dir / "preview_last_frame.txt").write_text(str(int(frame_number)), encoding="utf-8")
+            except Exception:
+                pass
     
     # Create temp workspace inside the run directory
     temp_dir = input_path.parent / f"tmp_{input_path.stem}"
@@ -187,7 +205,34 @@ def process_video_with_model(
             )
         else:
             recorder = None
+
+        def seed_preview(frame_index):
+            if not (preview_original_path and preview_upscaled_path):
+                return False
+            in_path = frames_in / f"f_{frame_index:06d}.jpg"
+            if not in_path.exists():
+                return False
+            try:
+                total_done = segment_start_frame + frame_index - 1
+                atomic_copy(in_path, preview_original_path)
+                if task_id:
+                    cache_preview(task_id, "original", preview_original_path, total_done)
+                out_path = frames_out / f"f_{frame_index:06d}.jpg"
+                if not out_path.exists() and frame_index > 1:
+                    out_path = frames_out / f"f_{frame_index - 1:06d}.jpg"
+                if out_path.exists():
+                    atomic_copy(out_path, preview_upscaled_path)
+                    if task_id:
+                        cache_preview(task_id, "upscaled", preview_upscaled_path, total_done)
+                return True
+            except Exception:
+                return False
         
+        if resume_from_frame > 1:
+            seed_index = min(resume_from_frame, total)
+            if seed_index >= 1 and seed_preview(seed_index) and recorder:
+                recorder.emit_frame(seed_index, preview_updated=True, preview_reset=True)
+
         hash_to_first = {}
         frame_hashes = []
         for i, f_path in enumerate(frame_list):
@@ -232,8 +277,12 @@ def process_video_with_model(
                     stride = config.PREVIEW_EVERY_N_FRAMES
                     should_write = True if stride is None else (frame_index % stride == 0)
                     if should_write:
+                        total_done = segment_start_frame + frame_index - 1
                         atomic_copy(f_path, preview_original_path)
                         atomic_copy(out_f, preview_upscaled_path)
+                        if task_id:
+                            cache_preview(task_id, "original", preview_original_path, total_done)
+                            cache_preview(task_id, "upscaled", preview_upscaled_path, total_done)
                         preview_updated = True
                 except Exception:
                     pass

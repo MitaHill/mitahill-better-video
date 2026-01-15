@@ -2,11 +2,12 @@ import sqlite3
 import json
 import datetime
 import logging
+import os
 from pathlib import Path
 
 
 logger = logging.getLogger("DB")
-DB_PATH = Path("/workspace/output/tasks.db")
+DB_PATH = Path(os.getenv("DB_PATH", "/workspace/storage/data/tasks.db"))
 
 def _apply_pragmas(conn):
     conn.execute("PRAGMA journal_mode=WAL;")
@@ -124,12 +125,17 @@ def delete_task(task_id):
     conn.commit()
     conn.close()
     
-    output_root = Path("/workspace/output")
+    output_root = Path("/workspace/storage/output")
+    upload_root = Path("/workspace/storage/upload")
     run_dir = output_root / f"run_{task_id}"
     import shutil
     if run_dir.exists():
         logger.debug(f"Removing run dir: {run_dir}")
         shutil.rmtree(run_dir, ignore_errors=True)
+    upload_dir = upload_root / f"run_{task_id}"
+    if upload_dir.exists():
+        logger.debug(f"Removing upload dir: {upload_dir}")
+        shutil.rmtree(upload_dir, ignore_errors=True)
             
     if result_filename:
         stem = Path(result_filename).stem
@@ -235,8 +241,7 @@ def upsert_segment(task_id, segment_key, segment_index, start_frame, end_frame, 
              segment_index = excluded.segment_index,
              start_frame = excluded.start_frame,
              end_frame = excluded.end_frame,
-             total_frames = excluded.total_frames,
-             updated_at = excluded.updated_at""",
+             total_frames = excluded.total_frames""",
         (task_id, segment_key, segment_index, start_frame, end_frame, total_frames, 0, datetime.datetime.now()),
     )
     conn.commit()
@@ -261,6 +266,21 @@ def get_segment_progress(task_id, segment_key):
     c.execute(
         "SELECT * FROM segment_progress WHERE task_id = ? AND segment_key = ?",
         (task_id, segment_key),
+    )
+    row = c.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_latest_segment_progress(task_id):
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute(
+        """SELECT * FROM segment_progress
+           WHERE task_id = ?
+           ORDER BY (start_frame + COALESCE(last_done_frame, 0)) DESC, updated_at DESC
+           LIMIT 1""",
+        (task_id,),
     )
     row = c.fetchone()
     conn.close()

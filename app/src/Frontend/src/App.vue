@@ -21,9 +21,6 @@
               <label>上传文件</label>
               <input type="file" multiple @change="onFileChange" />
             </div>
-            <p v-if="form.inputType === 'Video'" class="notice">
-              仅支持 H.264/H.265 视频 + AAC 音频（拒绝 AV1/VP9/非 AAC）。
-            </p>
           </div>
 
           <div class="param-section">
@@ -497,11 +494,9 @@ const fetchStatus = async () => {
       lastPreviewFrame.value = 0;
     }
     joinRoom();
-    if (status.value.status !== "PROCESSING") {
-      const ts = Date.now();
-      swapPreview("original", `/api/tasks/${currentId}/preview/original?ts=${ts}`);
-      swapPreview("upscaled", `/api/tasks/${currentId}/preview/upscaled?ts=${ts}`);
-    }
+    const ts = Date.now();
+    swapPreview("original", `/api/tasks/${currentId}/preview/original?ts=${ts}`);
+    swapPreview("upscaled", `/api/tasks/${currentId}/preview/upscaled?ts=${ts}`);
 
     if (status.value.status === "PROCESSING" || status.value.status === "PENDING") {
       startPolling();
@@ -588,7 +583,8 @@ onMounted(() => {
     live.segmentTotal = payload.segment_total || 0;
     if (payload.preview_frame) {
       const nextFrame = Number(payload.preview_frame) || 0;
-      if (nextFrame >= lastPreviewFrame.value) {
+      const shouldReset = payload.preview_reset === true;
+      if (shouldReset || nextFrame >= lastPreviewFrame.value) {
         lastPreviewFrame.value = nextFrame;
         swapPreview("original", `/api/tasks/${payload.task_id}/preview/original?v=${nextFrame}`);
         swapPreview("upscaled", `/api/tasks/${payload.task_id}/preview/upscaled?v=${nextFrame}`);

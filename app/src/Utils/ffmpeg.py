@@ -1,16 +1,37 @@
 import subprocess
-import os
-import shutil
 import json
+import logging
+from datetime import datetime
 from pathlib import Path
-import time
 
-def run_ffmpeg(args):
+logger = logging.getLogger("FFMPEG")
+
+
+def _write_ffmpeg_stderr(stderr_text):
+    logs_dir = Path("/workspace/storage/logs/ffmpeg_stderr")
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_path = logs_dir / f"{stamp}.log"
+    log_path.write_text(stderr_text or "", encoding="utf-8")
+    return log_path
+
+
+def run_ffmpeg(args, fallback_args=None):
     """Run ffmpeg and raise error on failure."""
-    print(f"Running: {' '.join(args)}")
+    logger.info("Running: %s", " ".join(args))
     proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if proc.returncode != 0 and fallback_args:
+        logger.warning("ffmpeg failed, retrying without HWAccel.")
+        logger.info("Fallback: %s", " ".join(fallback_args))
+        proc = subprocess.run(fallback_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if proc.returncode != 0:
-        raise RuntimeError(f"ffmpeg failed: {proc.stderr}")
+        stderr_text = proc.stderr or ""
+        log_path = _write_ffmpeg_stderr(stderr_text)
+        tail_lines = stderr_text.strip().splitlines()[-20:]
+        tail_text = "\n".join(tail_lines)
+        logger.error("ffmpeg failed (last 20 lines):\n%s", tail_text)
+        logger.error("Full ffmpeg stderr archived at %s", log_path)
+        raise RuntimeError(f"ffmpeg failed: {tail_text}")
 
 def get_video_codec(file_path):
     cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)]
@@ -63,11 +84,34 @@ def get_video_total_frames(file_path):
         pass
     return 0
 
-def get_gpu_utilization():
-    cmd = ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"]
+
+def get_audio_channels(file_path):
+    cmd = [
+        "ffprobe", "-v", "error", "-select_streams", "a:0",
+        "-show_entries", "stream=channels",
+        "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)
+    ]
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     try:
-        val = result.stdout.strip().split("\n")[0].strip()
-        return int(val)
+        return int(result.stdout.strip())
     except Exception:
-        return None
+        return 0
+
+def get_gpu_utilization():
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "dmon", "-s", "u", "-c", "1"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        lines = [ln for ln in result.stdout.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+        if not lines:
+            return None
+        last = lines[-1].split()
+        numeric = [int(n) for n in last if n.isdigit()]
+        if len(numeric) >= 2:
+            return max(numeric[1:4]) if len(numeric) >= 4 else max(numeric[1:])
+    except Exception:
+        pass
+    return None
