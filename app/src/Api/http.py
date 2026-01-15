@@ -1,13 +1,14 @@
 from flask import Flask, jsonify, request, send_file, send_from_directory, current_app
 from werkzeug.exceptions import RequestEntityTooLarge
 from pathlib import Path
+import io
 import uuid
 import json
-import shutil
 
 from app.src.Config import settings as config
 from app.src.Database import core as db
 from app.src.Utils.http import ffprobe_info, secure_filename, is_filename_safe
+from app.src.Utils.preview_cache import get_preview
 
 STORAGE_ROOT = Path("/workspace/storage")
 OUTPUT_ROOT = STORAGE_ROOT / "output"
@@ -121,47 +122,6 @@ def _handle_upload(upload, params, client_ip):
 
     return task_id, None
 
-def _read_cached_frame(cache_dir):
-    try:
-        path = cache_dir / "preview_last_frame.txt"
-        if path.exists():
-            return int(path.read_text(encoding="utf-8").strip())
-    except Exception:
-        pass
-    return 0
-
-def _write_cached_frame(cache_dir, frame_number):
-    try:
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        (cache_dir / "preview_last_frame.txt").write_text(str(int(frame_number)), encoding="utf-8")
-    except Exception:
-        pass
-
-def _try_recover_preview(task_id, kind):
-    progress = db.get_latest_segment_progress(task_id) or {}
-    last_done = int(progress.get("last_done_frame") or 0)
-    segment_index = int(progress.get("segment_index") or 0)
-    start_frame = int(progress.get("start_frame") or 0)
-    if not (segment_index and last_done and start_frame):
-        return None
-    segment_dir = OUTPUT_ROOT / f"run_{task_id}" / "segments"
-    seg_path = segment_dir / f"seg_{segment_index - 1:03d}.mp4"
-    temp_dir = seg_path.parent / f"tmp_{seg_path.stem}"
-    frames_dir = temp_dir / ("out" if kind == "upscaled" else "in")
-    frame_path = frames_dir / f"f_{last_done:06d}.jpg"
-    if not frame_path.exists():
-        return None
-    cache_dir = Path("/workspace/storage/data/preview_images") / task_id / ("after" if kind == "upscaled" else "before")
-    cache_path = cache_dir / "preview_last.jpg"
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    tmp_path = cache_dir / f".preview_last.tmp"
-    shutil.copyfile(frame_path, tmp_path)
-    tmp_path.replace(cache_path)
-    total_done = start_frame + last_done - 1
-    _write_cached_frame(cache_dir, total_done)
-    return cache_path
-
-
 def create_app(worker_service=None):
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = (
@@ -247,37 +207,17 @@ def create_app(worker_service=None):
         run_dir = OUTPUT_ROOT / f"run_{task_id}"
         if kind == "original":
             path = run_dir / "preview_original.jpg"
-            cache_dir = Path("/workspace/storage/data/preview_images") / task_id / "before"
-            cache_path = cache_dir / "preview_last.jpg"
         elif kind == "upscaled":
             path = run_dir / "preview_upscaled.jpg"
-            cache_dir = Path("/workspace/storage/data/preview_images") / task_id / "after"
-            cache_path = cache_dir / "preview_last.jpg"
         else:
             return jsonify({"error": "invalid preview type"}), 400
-        use_path = None
-        latest_total = 0
-        progress = db.get_latest_segment_progress(task_id) or {}
-        last_done = int(progress.get("last_done_frame") or 0)
-        start_frame = int(progress.get("start_frame") or 0)
-        if last_done and start_frame:
-            latest_total = start_frame + last_done - 1
-        cached_total = _read_cached_frame(cache_dir)
-
-        if latest_total and cached_total < latest_total:
-            use_path = _try_recover_preview(task_id, kind)
-
-        if not use_path:
-            if path.exists():
-                use_path = path
-            elif cache_path.exists():
-                use_path = cache_path
-            else:
-                use_path = _try_recover_preview(task_id, kind)
-
-        if not use_path:
+        payload, _frame = get_preview(task_id, kind)
+        if payload:
+            resp = send_file(io.BytesIO(payload), mimetype="image/jpeg")
+        elif path.exists():
+            resp = send_file(path, mimetype="image/jpeg")
+        else:
             return jsonify({"error": "preview not ready"}), 404
-        resp = send_file(use_path, mimetype="image/jpeg")
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         resp.headers["Pragma"] = "no-cache"
         return resp

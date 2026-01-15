@@ -5,6 +5,7 @@ import logging
 import time
 from pathlib import Path
 from app.src.Utils.ffmpeg import run_ffmpeg, get_video_fps, get_gpu_utilization
+from app.src.Utils.preview_cache import set_preview_from_path
 from app.src.Database import core as db
 from app.src.Config import settings as config
 from app.src.Notifications.events import send_event
@@ -123,22 +124,6 @@ def process_video_with_model(
         shutil.copyfile(src, tmp_path)
         os.replace(tmp_path, dst)
 
-    def cache_preview(task_id_value, kind, src_path, frame_number=None):
-        if not task_id_value or not src_path:
-            return
-        if not src_path.exists():
-            return
-        bucket = "before" if kind == "original" else "after"
-        cache_dir = Path("/workspace/storage/data/preview_images") / task_id_value / bucket
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_path = cache_dir / "preview_last.jpg"
-        atomic_copy(src_path, cache_path)
-        if frame_number:
-            try:
-                (cache_dir / "preview_last_frame.txt").write_text(str(int(frame_number)), encoding="utf-8")
-            except Exception:
-                pass
-    
     # Create temp workspace inside the run directory
     temp_dir = input_path.parent / f"tmp_{input_path.stem}"
     frames_in = temp_dir / "in"
@@ -216,14 +201,14 @@ def process_video_with_model(
                 total_done = segment_start_frame + frame_index - 1
                 atomic_copy(in_path, preview_original_path)
                 if task_id:
-                    cache_preview(task_id, "original", preview_original_path, total_done)
+                    set_preview_from_path(task_id, "original", in_path, total_done)
                 out_path = frames_out / f"f_{frame_index:06d}.jpg"
                 if not out_path.exists() and frame_index > 1:
                     out_path = frames_out / f"f_{frame_index - 1:06d}.jpg"
                 if out_path.exists():
                     atomic_copy(out_path, preview_upscaled_path)
                     if task_id:
-                        cache_preview(task_id, "upscaled", preview_upscaled_path, total_done)
+                        set_preview_from_path(task_id, "upscaled", out_path, total_done)
                 return True
             except Exception:
                 return False
@@ -281,8 +266,8 @@ def process_video_with_model(
                         atomic_copy(f_path, preview_original_path)
                         atomic_copy(out_f, preview_upscaled_path)
                         if task_id:
-                            cache_preview(task_id, "original", preview_original_path, total_done)
-                            cache_preview(task_id, "upscaled", preview_upscaled_path, total_done)
+                            set_preview_from_path(task_id, "original", f_path, total_done)
+                            set_preview_from_path(task_id, "upscaled", out_f, total_done)
                         preview_updated = True
                 except Exception:
                     pass

@@ -16,6 +16,7 @@ from app.src.Utils.ffmpeg import (
     get_video_total_frames,
     get_video_fps,
 )
+from app.src.Utils.preview_cache import set_preview_from_path, clear_task as clear_preview_cache
 from app.src.Media.upscaler import build_model
 from app.src.Media.segmenter import process_segment
 from app.src.Audio.enhancer import AudioEnhancer
@@ -117,6 +118,10 @@ def process_single_task(task):
 
             # 2. Previews
             generate_previews(input_path, run_dir, upsampler, params['upscale'])
+            if run_dir.joinpath("preview_original.jpg").exists():
+                set_preview_from_path(task_id, "original", run_dir / "preview_original.jpg", 1)
+            if run_dir.joinpath("preview_upscaled.jpg").exists():
+                set_preview_from_path(task_id, "upscaled", run_dir / "preview_upscaled.jpg", 1)
             logger.info("Preview generation completed.")
             
             duration = get_video_duration(input_path)
@@ -393,6 +398,8 @@ def process_single_task(task):
             # Previews for image are just the files themselves
             img.save(run_dir / "preview_original.jpg")
             out_img.save(run_dir / "preview_upscaled.jpg")
+            set_preview_from_path(task_id, "original", run_dir / "preview_original.jpg", 1)
+            set_preview_from_path(task_id, "upscaled", run_dir / "preview_upscaled.jpg", 1)
 
         db.update_task_status(task_id, "COMPLETED", 100, f"Completed: {out_name}")
 
@@ -400,6 +407,7 @@ def process_single_task(task):
         logger.error(f"Task failed: {e}", exc_info=True)
         db.update_task_status(task_id, "FAILED", message=str(e))
     finally:
+        clear_preview_cache(task_id)
         if 'upsampler' in locals():
             del upsampler
         if torch.cuda.is_available():
