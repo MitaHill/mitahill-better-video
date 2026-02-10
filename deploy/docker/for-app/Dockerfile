@@ -24,25 +24,30 @@ RUN echo "Triggering Re-build (Force Update 2026-01-08-1051)"
 # 1. Copy Source Code (app-only)
 COPY app/ /workspace/app/
 
-# 2. Install Real-ESRGAN as a local library
-RUN pip install -e app/vendor/Real-ESRGAN/
+# 2. Install web backend dependencies
+RUN pip install --no-cache-dir \
+    flask==2.3.3 \
+    gunicorn==21.2.0 \
+    flask-socketio==5.3.6 \
+    eventlet==0.36.1 \
+    voicefixer \
+    deepfilternet \
+    python-dotenv==1.0.1 \
+    basicsr==1.4.2
 
-# 3. Install web backend dependencies
-RUN pip install --no-cache-dir flask==2.3.3 gunicorn==21.2.0 flask-socketio==5.3.6 eventlet==0.36.1 voicefixer deepfilternet python-dotenv==1.0.1
-
-# 4. Configure VoiceFixer cache (Symlink to pre-downloaded weights)
+# 3. Configure VoiceFixer cache (Symlink to pre-downloaded weights)
 RUN mkdir -p /root/.cache/voicefixer/analysis_module/checkpoints && \
     ln -s /workspace/app/models/audio/voicefixer/analysis_module.ckpt /root/.cache/voicefixer/analysis_module/checkpoints/vf.ckpt && \
     ln -s /workspace/app/models/audio/voicefixer/model.ckpt-1490000_trimed.pt /root/.cache/voicefixer/model.ckpt-1490000_trimed.pt
 
-# 4b. Pre-download DeepFilterNet2 weights to avoid runtime fetch
+# 3b. Pre-download DeepFilterNet2 weights to avoid runtime fetch
 RUN mkdir -p /root/.cache/DeepFilterNet && \
     wget -q -O /root/.cache/DeepFilterNet/DeepFilterNet2.zip \
       https://github.com/Rikorose/DeepFilterNet/raw/main/models/DeepFilterNet2.zip && \
     unzip -q /root/.cache/DeepFilterNet/DeepFilterNet2.zip -d /root/.cache/DeepFilterNet && \
     rm /root/.cache/DeepFilterNet/DeepFilterNet2.zip
 
-# 5. Copy built frontend assets
+# 4. Copy built frontend assets
 COPY --from=frontend-build /frontend/dist /workspace/app/WebUI/dist
 
 EXPOSE 8501

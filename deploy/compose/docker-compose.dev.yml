@@ -9,7 +9,7 @@ services:
     volumes:
       - ../../:/workspace
     environment:
-      PYTHONPATH: "/workspace/app:/workspace/app/vendor/Real-ESRGAN:${PYTHONPATH}"
+      PYTHONPATH: "/workspace/app:${PYTHONPATH}"
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
     runtime: nvidia
