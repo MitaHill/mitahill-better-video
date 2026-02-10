@@ -7,7 +7,7 @@
 
     <div class="status-row">
       <button class="secondary" @click="onFetchStatus">查询</button>
-      <div v-if="status" :class="['status-pill', statusClass]">{{ status.status }}</div>
+      <div v-if="status" :class="['status-pill', statusClass]">{{ statusText(status.status) }}</div>
       <button v-if="status && status.status === 'COMPLETED'" @click="onDownloadResult">下载</button>
     </div>
 
@@ -50,5 +50,15 @@ const emit = defineEmits(["update:statusQuery"]);
 
 const onStatusInput = (event) => {
   emit("update:statusQuery", event.target.value);
+};
+
+const statusText = (status) => {
+  const map = {
+    PENDING: "排队中",
+    PROCESSING: "处理中",
+    COMPLETED: "已完成",
+    FAILED: "失败",
+  };
+  return map[status] || status || "-";
 };
 </script>

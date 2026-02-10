@@ -8,38 +8,44 @@
     />
 
     <section class="panel-grid">
-      <TaskCreatePanel
-        :active-category="activeCategory"
-        :enhance-form="enhanceForm"
-        :convert-form="convertForm"
-        :convert-media-info="convertMediaInfo"
-        :loading-submit="loading.submit"
-        :submit-error="submitError"
-        :submit-warnings="submitWarnings"
-        :on-enhance-file-change="onEnhanceFileChange"
-        :on-convert-media-change="onConvertMediaChange"
-        :on-watermark-images-change="onWatermarkImagesChange"
-        :on-watermark-lua-file-change="onWatermarkLuaFileChange"
-        :add-watermark-segment="addWatermarkSegment"
-        :remove-watermark-segment="removeWatermarkSegment"
-        :submit-task="submitTask"
-      />
+      <template v-if="activeCategory !== 'admin'">
+        <TaskCreatePanel
+          :active-category="activeCategory"
+          :enhance-form="enhanceForm"
+          :convert-form="convertForm"
+          :convert-media-info="convertMediaInfo"
+          :loading-submit="loading.submit"
+          :submit-error="submitError"
+          :submit-warnings="submitWarnings"
+          :on-enhance-file-change="onEnhanceFileChange"
+          :on-convert-media-change="onConvertMediaChange"
+          :on-watermark-images-change="onWatermarkImagesChange"
+          :on-watermark-lua-file-change="onWatermarkLuaFileChange"
+          :add-watermark-segment="addWatermarkSegment"
+          :remove-watermark-segment="removeWatermarkSegment"
+          :submit-task="submitTask"
+        />
 
-      <TaskStatusPanel
-        :status-query="statusQuery"
-        :status="status"
-        :status-class="statusClass"
-        :progress-details="progressDetails"
-        :resolution="resolution"
-        :task-ids="taskIds"
-        :preview="preview"
-        :is-conversion-task="isConversionTask"
-        :param-rows="paramRows"
-        :status-error="statusError"
-        :fetch-status="fetchStatus"
-        :download-result="downloadResult"
-        @update:status-query="setStatusQuery"
-      />
+        <TaskStatusPanel
+          :status-query="statusQuery"
+          :status="status"
+          :status-class="statusClass"
+          :progress-details="progressDetails"
+          :resolution="resolution"
+          :task-ids="taskIds"
+          :preview="preview"
+          :is-conversion-task="isConversionTask"
+          :param-rows="paramRows"
+          :status-error="statusError"
+          :fetch-status="fetchStatus"
+          :download-result="downloadResult"
+          @update:status-query="setStatusQuery"
+        />
+      </template>
+
+      <template v-else>
+        <AdminPanel :active="activeCategory === 'admin'" />
+      </template>
     </section>
 
     <div class="app-signature">由CodeX和米塔山开发</div>
@@ -50,6 +56,7 @@
 import TaskCreatePanel from "../components/workbench/TaskCreatePanel.vue";
 import TaskStatusPanel from "../components/workbench/TaskStatusPanel.vue";
 import WorkbenchHeader from "../components/workbench/WorkbenchHeader.vue";
+import AdminPanel from "../components/admin/AdminPanel.vue";
 import { useWorkbenchController } from "../composables/useWorkbenchController";
 
 const {

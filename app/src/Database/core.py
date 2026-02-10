@@ -32,11 +32,13 @@ def init_db():
                       created_at DATETIME,
                       updated_at DATETIME,
                       client_ip TEXT,
+                      task_category TEXT,
                       status TEXT,
                       task_params TEXT,
                       video_info TEXT,
                       progress INTEGER,
-                      message TEXT)''')
+                      message TEXT,
+                      result_path TEXT)''')
         _ensure_columns(conn)
         c.execute("""CREATE TABLE IF NOT EXISTS task_progress
                      (task_id TEXT PRIMARY KEY,
@@ -58,6 +60,22 @@ def init_db():
         c.execute("CREATE INDEX IF NOT EXISTS idx_task_updated ON task_queue(updated_at)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_task_progress_updated ON task_progress(updated_at)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_segment_progress_task ON segment_progress(task_id)")
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS app_settings
+               (key TEXT PRIMARY KEY,
+                value TEXT,
+                updated_at DATETIME)"""
+        )
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS admin_sessions
+               (session_id TEXT PRIMARY KEY,
+                token_hash TEXT UNIQUE,
+                created_at DATETIME,
+                expires_at DATETIME,
+                client_ip TEXT,
+                user_agent TEXT)"""
+        )
+        c.execute("CREATE INDEX IF NOT EXISTS idx_admin_sessions_exp ON admin_sessions(expires_at)")
         conn.commit()
         conn.close()
         logger.debug("Database initialized successfully.")
@@ -66,15 +84,16 @@ def init_db():
         import sys
         sys.exit(1)
 
-def create_task(task_id, client_ip, task_params, video_info):
+def create_task(task_id, client_ip, task_params, video_info, task_category=None):
     logger.info(f"Creating new task: {task_id} from {client_ip}")
+    category = task_category or task_params.get("task_category") or "enhance"
     conn = get_connection()
     c = conn.cursor()
     c.execute("""INSERT INTO task_queue 
-                 (task_id, created_at, updated_at, client_ip, status, task_params, video_info, progress, message) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-              (task_id, datetime.datetime.now(), datetime.datetime.now(), client_ip, "PENDING", 
-               json.dumps(task_params), json.dumps(video_info), 0, "Waiting to start"))
+                 (task_id, created_at, updated_at, client_ip, task_category, status, task_params, video_info, progress, message, result_path) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+              (task_id, datetime.datetime.now(), datetime.datetime.now(), client_ip, category, "PENDING", 
+               json.dumps(task_params), json.dumps(video_info), 0, "Waiting to start", None))
     conn.commit()
     conn.close()
     logger.debug(f"Task {task_id} inserted into queue.")
@@ -104,6 +123,16 @@ def update_task_status(task_id, status, progress=None, message=None):
     
     sql = f"UPDATE task_queue SET {', '.join(updates)} WHERE task_id = ?"
     c.execute(sql, params)
+    conn.commit()
+    conn.close()
+
+def update_task_result(task_id, result_path):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        "UPDATE task_queue SET result_path = ?, updated_at = ? WHERE task_id = ?",
+        (str(result_path), datetime.datetime.now(), task_id),
+    )
     conn.commit()
     conn.close()
 
@@ -292,6 +321,10 @@ def _ensure_columns(conn):
     columns = {row[1] for row in c.fetchall()}
     if "updated_at" not in columns:
         c.execute("ALTER TABLE task_queue ADD COLUMN updated_at DATETIME")
+    if "task_category" not in columns:
+        c.execute("ALTER TABLE task_queue ADD COLUMN task_category TEXT DEFAULT 'enhance'")
+    if "result_path" not in columns:
+        c.execute("ALTER TABLE task_queue ADD COLUMN result_path TEXT")
     conn.commit()
 
 def get_unfinished_tasks():

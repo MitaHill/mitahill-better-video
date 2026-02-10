@@ -84,11 +84,13 @@ Audio models are packaged into the image and symlinked into `/root/.cache/voicef
 - `app/WebUI/` — Vue UI (Vite)
   - `src/pages/WorkbenchPage.vue` — Page shell only
   - `src/components/workbench/` — Workbench UI blocks (`TaskCreatePanel/EnhanceTaskForm/ConvertTaskForm/WatermarkTimelineEditor/TaskStatusPanel`)
+  - `src/components/admin/` — Admin UI blocks (auth, task dashboard, IP stats, password update)
   - `src/components/workbench/enhance/` — Enhance atomic sections
   - `src/components/workbench/convert/` — Conversion atomic sections
   - `src/components/workbench/status/` — Status submodules (`StatusQueryHeader/StatusProgressSummary/StatusPreviewGrid/StatusParamTable`)
   - `src/composables/useWorkbenchController.js` — Workbench orchestration logic
   - `src/composables/workbench/` — Workbench atomic logic modules
+    - `useWorkbenchAdmin.js` — Admin auth/session/dashboard logic
 - `app/src/Worker/` — Worker pipeline core
 - `app/src/Config/`, `app/src/Database/`, `app/src/Media/` — Core modules
 - `app/models/` — Model weights (video/audio)

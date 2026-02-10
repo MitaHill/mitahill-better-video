@@ -10,9 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from app.src.Config import settings as config
-from app.src.Database import core as db
-from app.src.Api.http import create_app
+from app.src.Config.logging_setup import configure_logging
 from app.src.Services.worker_service import WorkerService
 from flask_socketio import SocketIO, join_room
 
@@ -20,17 +18,18 @@ logger = logging.getLogger("MAIN")
 
 
 def _build_worker_service():
-    log_path = Path("/workspace/worker.log")
-    return WorkerService(log_path)
+    return WorkerService()
 
 
 def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s",
-    )
+    configure_logging(component="server")
+    from app.src.Config import settings as config
+    from app.src.Database import core as db
+    from app.src.Database import admin as db_admin
+    from app.src.Api.http import create_app
     init_info = config.initialize_context()
     db.init_db()
+    db_admin.ensure_admin_password(config.ADMIN_INITIAL_PASSWORD)
     logger.info("Init recommendations: %s", init_info)
 
     worker_service = _build_worker_service()

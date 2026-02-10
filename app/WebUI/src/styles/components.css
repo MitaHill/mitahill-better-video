@@ -530,6 +530,80 @@ button:hover {
   font-size: 0.9rem;
 }
 
+.admin-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  grid-column: 1 / -1;
+}
+
+.admin-card h2 {
+  margin-bottom: 12px;
+}
+
+.admin-head-row {
+  justify-content: space-between;
+}
+
+.admin-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.admin-kpi-card {
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  padding: 10px 12px;
+}
+
+.admin-kpi-label {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.admin-kpi-value {
+  margin-top: 6px;
+  color: var(--text-strong);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.admin-filters {
+  margin-bottom: 0;
+}
+
+.admin-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.86rem;
+  vertical-align: top;
+}
+
+.admin-table th {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.mono {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+}
+
 @media (max-width: 900px) {
   .hero {
     grid-template-columns: 1fr;
@@ -548,6 +622,10 @@ button:hover {
     justify-content: center;
   }
   .wm-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .admin-head-row {
     flex-direction: column;
     align-items: flex-start;
   }

@@ -7,14 +7,9 @@ import hashlib
 import yaml
 from pathlib import Path
 from dotenv import load_dotenv
+from app.src.Utils.client_ip import parse_trusted_proxies
 
-# --- Standardized Logging ---
 LOG_FORMAT = "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
-logging.basicConfig(
-    level=logging.INFO,
-    format=LOG_FORMAT,
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
 logger = logging.getLogger("CONFIG")
 
 # --- .env Loading (python-dotenv) ---
@@ -38,7 +33,12 @@ def log_system_info():
     # CPU Info
     try:
         if platform.system() == "Linux":
-            cpu_info = subprocess.check_output("cat /proc/cpuinfo | grep 'model name' | uniq", shell=True).decode().strip()
+            cpu_info = ""
+            with open("/proc/cpuinfo", "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if line.lower().startswith("model name"):
+                        cpu_info = line.split(":", 1)[1].strip()
+                        break
             logger.debug(f"CPU: {cpu_info}")
         logger.debug(f"CPU Cores: {os.cpu_count()}")
     except: pass
@@ -46,7 +46,7 @@ def log_system_info():
     # Memory Info
     try:
         if platform.system() == "Linux":
-            mem_info = subprocess.check_output("free -h", shell=True).decode()
+            mem_info = subprocess.check_output(["free", "-h"]).decode()
             logger.debug(f"Memory Status:\n{mem_info}")
     except: pass
 
@@ -152,11 +152,22 @@ try:
     SEGMENT_TIME_SECONDS = get_env_int("SEGMENT_TIME_SECONDS", 300)
     TASK_TIMEOUT_SECONDS = get_env_int("TASK_TIMEOUT_SECONDS", 21600)
     PROGRESS_FLUSH_SECONDS = get_env_float("PROGRESS_FLUSH_SECONDS", 3.0)
+    EVENT_FLUSH_SECONDS = get_env_float("EVENT_FLUSH_SECONDS", PROGRESS_FLUSH_SECONDS)
     PREVIEW_EVERY_N_FRAMES = get_env_preview_stride("PREVIEW_EVERY_N_FRAMES", 5)
     ENABLE_AUDIO_ENHANCEMENT = get_env_bool("ENABLE_AUDIO_ENHANCEMENT", False)
     PRE_DENOISE_MODE = os.getenv("PRE_DENOISE_MODE", "off")
+    FFMPEG_USE_GPU = get_env_bool("FFMPEG_USE_GPU", True)
     EVENTS_ENDPOINT = os.getenv("EVENTS_ENDPOINT", "http://127.0.0.1:8501/api/events")
     FALLBACK_VRAM_GB = get_env_float("FALLBACK_VRAM_GB", 4.0)
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+    ADMIN_INITIAL_PASSWORD = os.getenv("ADMIN_INITIAL_PASSWORD", "change_me_please")
+    ADMIN_SESSION_TTL_HOURS = get_env_float("ADMIN_SESSION_TTL_HOURS", 24.0)
+    REAL_IP_TRUSTED_PROXIES_RAW = os.getenv(
+        "REAL_IP_TRUSTED_PROXIES",
+        "127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7",
+    )
+    REAL_IP_TRUSTED_PROXIES = parse_trusted_proxies(REAL_IP_TRUSTED_PROXIES_RAW)
+    EVENTS_SHARED_TOKEN = os.getenv("EVENTS_SHARED_TOKEN", "")
 except Exception as e:
     logger.critical(f"[FAILED] Configuration error: {e}")
     sys.exit(1)
