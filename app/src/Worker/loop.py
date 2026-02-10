@@ -9,7 +9,7 @@ import torch
 
 from app.src.Database import core as db
 from app.src.Config import settings as config
-from app.src.Worker.processor import process_single_task
+from app.src.Worker.pipelines.dispatch import process_task
 
 logger = logging.getLogger("WORKER")
 
@@ -17,15 +17,25 @@ def recover_tasks():
     """Check for interrupted tasks on startup and reset or delete them."""
     logger.info("Scanning for interrupted tasks during startup...")
     tasks = db.get_unfinished_tasks()
-    output_root = Path("/workspace/output")
+    output_root = Path("/workspace/storage/output")
+    upload_root = Path("/workspace/storage/upload")
     
     for task in tasks:
         task_id = task['task_id']
         try:
             params = json.loads(task['task_params'])
+            video_info = json.loads(task.get('video_info') or "{}")
             filename = params.get('filename')
             run_dir = output_root / f"run_{task_id}"
-            input_path = run_dir / filename
+            upload_path = params.get("upload_path")
+            if upload_path:
+                input_path = Path(upload_path)
+            else:
+                input_path = Path(video_info.get("upload_path") or (run_dir / filename))
+            if not input_path.exists():
+                candidate = upload_root / f"run_{task_id}" / filename
+                if candidate.exists():
+                    input_path = candidate
             
             if input_path.exists():
                 logger.info(f"Task Recovery: Task {task_id} has source file. Resetting to PENDING.")
@@ -58,7 +68,7 @@ def worker_loop():
 
             if task:
                 try:
-                    process_single_task(task)
+                    process_task(task)
                 except Exception as e:
                     logger.error(f"Fatal error during task {task['task_id']}: {e}")
                     db.update_task_status(task['task_id'], "FAILED", message=str(e))

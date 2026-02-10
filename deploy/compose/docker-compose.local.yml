@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app:
-    image: kindmitaishere/mitahill-better-video:260109-0747
+    image: kindmitaishere/mitahill-better-video:260110-1140
     container_name: realesrgan_app
     runtime: nvidia
     environment:
@@ -13,8 +13,8 @@ services:
     ports:
       - "8501:8501"
     volumes:
-      # Mount the output directory to persist data
-      - ../../output:/workspace/output
+      # Mount storage root for outputs, uploads, data, logs
+      - ../../storage:/workspace/storage
       # Mount the env file for configuration
       - ../../config/.env:/workspace/config/.env
     restart: unless-stopped

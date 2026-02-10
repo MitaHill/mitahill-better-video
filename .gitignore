@@ -143,7 +143,12 @@ dmypy.json
 # App Outputs
 output/
 worker.log
+logs/
+data/
+storage/
 
 # Frontend
 app/frontend/node_modules/
 app/frontend/dist/
+app/WebUI/node_modules/
+app/WebUI/dist/

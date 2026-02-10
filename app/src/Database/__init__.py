@@ -13,6 +13,7 @@ from .core import (
     upsert_segment,
     update_segment_progress,
     get_segment_progress,
+    get_latest_segment_progress,
     get_unfinished_tasks,
 )
 
@@ -31,5 +32,6 @@ __all__ = [
     "upsert_segment",
     "update_segment_progress",
     "get_segment_progress",
+    "get_latest_segment_progress",
     "get_unfinished_tasks",
 ]

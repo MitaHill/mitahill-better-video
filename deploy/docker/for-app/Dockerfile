@@ -1,10 +1,10 @@
 FROM node:20-alpine AS frontend-build
 
 WORKDIR /frontend
-COPY app/src/Frontend/package.json .
-COPY app/src/Frontend/vite.config.js .
-COPY app/src/Frontend/index.html .
-COPY app/src/Frontend/src ./src
+COPY app/WebUI/package.json .
+COPY app/WebUI/vite.config.js .
+COPY app/WebUI/index.html .
+COPY app/WebUI/src ./src
 RUN npm install
 RUN npm run build
 
@@ -43,7 +43,7 @@ RUN mkdir -p /root/.cache/DeepFilterNet && \
     rm /root/.cache/DeepFilterNet/DeepFilterNet2.zip
 
 # 5. Copy built frontend assets
-COPY --from=frontend-build /frontend/dist /workspace/app/src/Frontend/dist
+COPY --from=frontend-build /frontend/dist /workspace/app/WebUI/dist
 
 EXPOSE 8501
 
