@@ -11,17 +11,22 @@
     </div>
 
     <div class="admin-sidebar-list">
-      <button
-        v-for="item in filteredItems"
-        :key="item.key"
-        class="admin-nav-item"
-        :class="{ 'is-active': item.key === activeKey }"
-        type="button"
-        @click="emit('select', item.key)"
-      >
-        {{ item.label }}
-      </button>
-      <p v-if="!filteredItems.length" class="notice">没有匹配的菜单项</p>
+      <div v-for="group in filteredGroups" :key="group.key" class="admin-nav-group">
+        <div class="admin-nav-group-title">{{ group.label }}</div>
+        <div class="admin-nav-sub-list">
+          <button
+            v-for="item in group.children"
+            :key="item.key"
+            class="admin-nav-item"
+            :class="{ 'is-active': item.key === activeKey }"
+            type="button"
+            @click="emit('select', item.key)"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+      </div>
+      <p v-if="!filteredGroups.length" class="notice">没有匹配的菜单项</p>
     </div>
   </aside>
 </template>
@@ -36,15 +41,11 @@ defineProps({
     type: String,
     required: true,
   },
-  items: {
-    type: Array,
-    required: true,
-  },
   activeKey: {
     type: String,
     required: true,
   },
-  filteredItems: {
+  filteredGroups: {
     type: Array,
     required: true,
   },

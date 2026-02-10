@@ -612,16 +612,39 @@ button:hover {
 
 .admin-sidebar-list {
   display: grid;
+  gap: 10px;
+}
+
+.admin-nav-group {
+  display: grid;
   gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+}
+
+.admin-nav-group-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.admin-nav-sub-list {
+  display: grid;
+  gap: 6px;
 }
 
 .admin-nav-item {
   width: 100%;
   text-align: left;
   justify-content: flex-start;
-  background: var(--surface-strong);
+  background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
+  min-height: 34px;
+  padding: 8px 10px;
+  font-size: 0.88rem;
 }
 
 .admin-nav-item.is-active {

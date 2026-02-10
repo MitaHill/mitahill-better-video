@@ -27,9 +27,8 @@
         <AdminSideDrawer
           :open="sidebarOpen"
           :query="menuSearch"
-          :items="menuItems"
           :active-key="activeMenuKey"
-          :filtered-items="filteredMenuItems"
+          :filtered-groups="filteredMenuGroups"
           @update:query="onMenuSearchChange"
           @select="onMenuSelect"
           @close="sidebarOpen = false"
@@ -159,15 +158,43 @@ const sidebarOpen = ref(true);
 const menuSearch = ref("");
 const activeMenuKey = ref("overview");
 
-const menuItems = Object.freeze([
-  { key: "overview", label: "任务总览", keywords: "overview summary 任务 总览" },
-  { key: "tasks", label: "任务状态浏览", keywords: "task queue processing 任务 状态" },
-  { key: "ips", label: "访问IP统计", keywords: "ip ipv6 stats 访问 统计" },
-  { key: "proxy", label: "受信代理配置", keywords: "proxy trusted frp nginx 代理" },
-  { key: "constraints_enhance", label: "增强参数约束", keywords: "enhance constraints 参数 约束 锁 范围" },
-  { key: "constraints_convert", label: "转换参数约束", keywords: "convert constraints 参数 约束 锁 范围" },
-  { key: "constraints_transcribe", label: "转录参数约束", keywords: "transcribe constraints 参数 约束 锁 范围 whisper subtitle" },
-  { key: "password", label: "修改管理密码", keywords: "password security 密码 安全" },
+const menuGroups = Object.freeze([
+  {
+    key: "monitoring",
+    label: "任务监控",
+    keywords: "monitor overview task ip 监控 总览 状态 统计",
+    children: Object.freeze([
+      { key: "overview", label: "任务总览", keywords: "overview summary 任务 总览" },
+      { key: "tasks", label: "任务状态浏览", keywords: "task queue processing 任务 状态" },
+      { key: "ips", label: "访问IP统计", keywords: "ip ipv6 stats 访问 统计" },
+    ]),
+  },
+  {
+    key: "network",
+    label: "网络配置",
+    keywords: "proxy trusted frp nginx 代理 网络",
+    children: Object.freeze([
+      { key: "proxy", label: "受信代理配置", keywords: "proxy trusted frp nginx 代理" },
+    ]),
+  },
+  {
+    key: "constraints",
+    label: "参数约束",
+    keywords: "constraints policy lock 参数 约束 锁 范围",
+    children: Object.freeze([
+      { key: "constraints_enhance", label: "增强参数约束", keywords: "enhance constraints 参数 约束 锁 范围" },
+      { key: "constraints_convert", label: "转换参数约束", keywords: "convert constraints 参数 约束 锁 范围" },
+      { key: "constraints_transcribe", label: "转录参数约束", keywords: "transcribe constraints 参数 约束 锁 范围 whisper subtitle" },
+    ]),
+  },
+  {
+    key: "security",
+    label: "安全设置",
+    keywords: "password security 密码 安全",
+    children: Object.freeze([
+      { key: "password", label: "修改管理密码", keywords: "password security 密码 安全" },
+    ]),
+  },
 ]);
 
 const fuzzyIncludes = (text, query) => {
@@ -183,12 +210,27 @@ const fuzzyIncludes = (text, query) => {
   return false;
 };
 
-const filteredMenuItems = computed(() => {
-  if (!menuSearch.value.trim()) return menuItems;
-  return menuItems.filter((item) => {
-    const target = `${item.label} ${item.keywords || ""}`;
-    return fuzzyIncludes(target, menuSearch.value);
-  });
+const filteredMenuGroups = computed(() => {
+  const query = menuSearch.value.trim();
+  if (!query) return menuGroups;
+
+  const out = [];
+  for (const group of menuGroups) {
+    const groupTarget = `${group.label} ${group.keywords || ""}`;
+    const groupMatched = fuzzyIncludes(groupTarget, query);
+    if (groupMatched) {
+      out.push(group);
+      continue;
+    }
+    const children = group.children.filter((item) => {
+      const target = `${item.label} ${item.keywords || ""}`;
+      return fuzzyIncludes(target, query);
+    });
+    if (children.length) {
+      out.push({ ...group, children });
+    }
+  }
+  return out;
 });
 
 let timer = null;
@@ -257,11 +299,22 @@ const categoryConstraint = (categoryKey) => {
   return formConstraints?.data?.categories?.[categoryKey] || { global_lock: "free", fields: {} };
 };
 
-watch(filteredMenuItems, (items) => {
-  if (!items.length) return;
-  const hasActive = items.some((item) => item.key === activeMenuKey.value);
+const flattenMenuKeys = (groups) => {
+  const keys = [];
+  for (const group of groups || []) {
+    for (const item of group.children || []) {
+      keys.push(item.key);
+    }
+  }
+  return keys;
+};
+
+watch(filteredMenuGroups, (groups) => {
+  const keys = flattenMenuKeys(groups);
+  if (!keys.length) return;
+  const hasActive = keys.includes(activeMenuKey.value);
   if (!hasActive) {
-    activeMenuKey.value = items[0].key;
+    activeMenuKey.value = keys[0];
   }
 });
 
