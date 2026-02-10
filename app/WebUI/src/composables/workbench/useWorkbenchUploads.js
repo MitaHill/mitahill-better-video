@@ -54,6 +54,8 @@ export const useWorkbenchUploads = ({
   enhanceForm,
   convertForm,
   convertMediaInfo,
+  transcribeForm,
+  transcribeMediaInfo,
   submitError,
   submitWarnings,
   parseJsonSafe,
@@ -129,9 +131,39 @@ export const useWorkbenchUploads = ({
     }
   };
 
+  const onTranscribeMediaChange = async (event) => {
+    submitError.value = "";
+    submitWarnings.value = "";
+    const files = Array.from(event.target.files || []);
+    if (files.length && !validateFiles(files)) {
+      submitError.value = "转录媒体文件名包含非法字符或过长。";
+      transcribeForm.mediaFiles = [];
+      transcribeMediaInfo.value = [];
+      event.target.value = "";
+      return;
+    }
+
+    transcribeForm.mediaFiles = files;
+    transcribeMediaInfo.value = [];
+    const probeErrors = [];
+    for (const file of files) {
+      try {
+        const info = await probeMedia(file, parseJsonSafe);
+        transcribeMediaInfo.value.push(info);
+      } catch (error) {
+        probeErrors.push(`${file.name}: ${error.message}`);
+      }
+    }
+    if (probeErrors.length) {
+      submitWarnings.value = `以下转录文件探测失败：${probeErrors.join("；")}`;
+    }
+    event.target.value = "";
+  };
+
   return {
     onEnhanceFileChange,
     onConvertMediaChange,
+    onTranscribeMediaChange,
     onWatermarkImagesChange,
     onWatermarkLuaFileChange,
   };

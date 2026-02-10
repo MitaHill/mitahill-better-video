@@ -22,6 +22,22 @@ export const buildParamRows = (status) => {
       { label: "作者", value: params.meta_author || "-" },
     ];
   }
+  if (params.task_category === "transcribe") {
+    return [
+      { label: "任务类别", value: "视频转录" },
+      { label: "转录类型", value: params.transcribe_mode || "-" },
+      { label: "字幕格式", value: (params.subtitle_format || "-").toUpperCase() },
+      { label: "Whisper 模型", value: params.whisper_model || "-" },
+      { label: "语言", value: params.language || "auto" },
+      { label: "温度", value: params.temperature ?? "-" },
+      { label: "Beam Size", value: params.beam_size ?? "-" },
+      { label: "Best Of", value: params.best_of ?? "-" },
+      { label: "时间戳文本", value: formatBool(params.prepend_timestamps) },
+      { label: "最大行宽", value: params.max_line_chars ?? "-" },
+      { label: "视频输出编码", value: (params.output_video_codec || "-").toUpperCase() },
+      { label: "音频码率", value: params.output_audio_bitrate_k ? `${params.output_audio_bitrate_k}k` : "-" },
+    ];
+  }
 
   return [
     { label: "任务类别", value: "视频增强" },

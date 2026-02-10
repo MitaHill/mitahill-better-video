@@ -14,11 +14,14 @@
           :enhance-form="enhanceForm"
           :convert-form="convertForm"
           :convert-media-info="convertMediaInfo"
+          :transcribe-form="transcribeForm"
+          :transcribe-media-info="transcribeMediaInfo"
           :loading-submit="loading.submit"
           :submit-error="submitError"
           :submit-warnings="submitWarnings"
           :on-enhance-file-change="onEnhanceFileChange"
           :on-convert-media-change="onConvertMediaChange"
+          :on-transcribe-media-change="onTranscribeMediaChange"
           :on-watermark-images-change="onWatermarkImagesChange"
           :on-watermark-lua-file-change="onWatermarkLuaFileChange"
           :add-watermark-segment="addWatermarkSegment"
@@ -34,7 +37,7 @@
           :resolution="resolution"
           :task-ids="taskIds"
           :preview="preview"
-          :is-conversion-task="isConversionTask"
+          :is-preview-supported="isPreviewSupported"
           :param-rows="paramRows"
           :status-error="statusError"
           :fetch-status="fetchStatus"
@@ -65,6 +68,8 @@ const {
   enhanceForm,
   convertForm,
   convertMediaInfo,
+  transcribeForm,
+  transcribeMediaInfo,
   taskIds,
   submitError,
   submitWarnings,
@@ -73,13 +78,14 @@ const {
   statusError,
   loading,
   preview,
-  isConversionTask,
+  isPreviewSupported,
   resolution,
   paramRows,
   statusClass,
   progressDetails,
   onEnhanceFileChange,
   onConvertMediaChange,
+  onTranscribeMediaChange,
   onWatermarkImagesChange,
   onWatermarkLuaFileChange,
   addWatermarkSegment,

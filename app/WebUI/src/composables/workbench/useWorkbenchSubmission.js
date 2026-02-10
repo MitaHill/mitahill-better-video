@@ -1,4 +1,4 @@
-import { buildConvertTaskFormData, buildEnhanceTaskFormData } from "./submitPayloadBuilders";
+import { buildConvertTaskFormData, buildEnhanceTaskFormData, buildTranscriptionTaskFormData } from "./submitPayloadBuilders";
 
 export const useWorkbenchSubmission = ({
   activeCategory,
@@ -7,6 +7,7 @@ export const useWorkbenchSubmission = ({
   submitWarnings,
   enhanceForm,
   convertForm,
+  transcribeForm,
   taskIds,
   setStatusQuery,
   fetchStatus,
@@ -75,6 +76,30 @@ export const useWorkbenchSubmission = ({
     await fetchStatus();
   };
 
+  const submitTranscribeTask = async () => {
+    if (!transcribeForm.mediaFiles || transcribeForm.mediaFiles.length === 0) {
+      throw new Error("请至少上传一个要转录的音频或视频文件。");
+    }
+
+    const data = buildTranscriptionTaskFormData(transcribeForm);
+    const res = await fetch("/api/transcriptions", { method: "POST", body: data });
+
+    if (!res.ok) {
+      const err = await parseJsonSafe(res);
+      if (err.task_id) {
+        taskIds.value = [err.task_id];
+        setStatusQuery(err.task_id);
+      }
+      throw new Error(err.error || "提交转录任务失败。");
+    }
+
+    const payload = await parseJsonSafe(res);
+    taskIds.value = [payload.task_id];
+    setStatusQuery(payload.task_id);
+    joinRoom();
+    await fetchStatus();
+  };
+
   const submitTask = async () => {
     submitError.value = "";
     submitWarnings.value = "";
@@ -82,6 +107,8 @@ export const useWorkbenchSubmission = ({
     try {
       if (activeCategory.value === "convert") {
         await submitConvertTask();
+      } else if (activeCategory.value === "transcribe") {
+        await submitTranscribeTask();
       } else {
         await submitEnhanceTask();
       }

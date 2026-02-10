@@ -31,7 +31,10 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   let socket = null;
   let pollTimer = null;
 
-  const isConversionTask = computed(() => (status.value?.task_params?.task_category || "") === "convert");
+  const isPreviewSupported = computed(() => {
+    const category = status.value?.task_params?.task_category || "";
+    return category !== "convert" && category !== "transcribe";
+  });
 
   const resolution = computed(() => {
     if (!status.value?.video_info) return "?";
@@ -101,7 +104,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
 
       joinRoom();
 
-      if (!isConversionTask.value) {
+      if (isPreviewSupported.value) {
         const ts = Date.now();
         swapPreview("original", `/api/tasks/${statusQuery.value}/preview/original?ts=${ts}`);
         swapPreview("upscaled", `/api/tasks/${statusQuery.value}/preview/upscaled?ts=${ts}`);
@@ -145,7 +148,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
       }
     }
 
-    if (payload.preview_frame && !isConversionTask.value) {
+    if (payload.preview_frame && isPreviewSupported.value) {
       const nextFrame = Number(payload.preview_frame) || 0;
       const shouldReset = payload.preview_reset === true;
       if (shouldReset || nextFrame >= lastPreviewFrame.value) {
@@ -175,7 +178,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     status,
     statusError,
     preview,
-    isConversionTask,
+    isPreviewSupported,
     resolution,
     paramRows,
     statusClass,

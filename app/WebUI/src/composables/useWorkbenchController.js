@@ -16,7 +16,15 @@ export const useWorkbenchController = () => {
   const { themeMode, activeTheme, onThemeModeChange, initTheme, disposeTheme } = useWorkbenchTheme();
   const { activeCategory, switchCategory, initCategoryRouting, disposeCategoryRouting } = useWorkbenchCategory();
 
-  const { enhanceForm, convertForm, convertMediaInfo, addWatermarkSegment, removeWatermarkSegment } = useWorkbenchFormsState();
+  const {
+    enhanceForm,
+    convertForm,
+    convertMediaInfo,
+    transcribeForm,
+    transcribeMediaInfo,
+    addWatermarkSegment,
+    removeWatermarkSegment,
+  } = useWorkbenchFormsState();
 
   const {
     taskIds,
@@ -24,7 +32,7 @@ export const useWorkbenchController = () => {
     status,
     statusError,
     preview,
-    isConversionTask,
+    isPreviewSupported,
     resolution,
     paramRows,
     statusClass,
@@ -37,10 +45,12 @@ export const useWorkbenchController = () => {
     disposeRealtime,
   } = useWorkbenchStatus({ parseJsonSafe });
 
-  const { onEnhanceFileChange, onConvertMediaChange, onWatermarkImagesChange, onWatermarkLuaFileChange } = useWorkbenchUploads({
+  const { onEnhanceFileChange, onConvertMediaChange, onTranscribeMediaChange, onWatermarkImagesChange, onWatermarkLuaFileChange } = useWorkbenchUploads({
     enhanceForm,
     convertForm,
     convertMediaInfo,
+    transcribeForm,
+    transcribeMediaInfo,
     submitError,
     submitWarnings,
     parseJsonSafe,
@@ -53,6 +63,7 @@ export const useWorkbenchController = () => {
     submitWarnings,
     enhanceForm,
     convertForm,
+    transcribeForm,
     taskIds,
     setStatusQuery,
     fetchStatus,
@@ -85,6 +96,8 @@ export const useWorkbenchController = () => {
     enhanceForm,
     convertForm,
     convertMediaInfo,
+    transcribeForm,
+    transcribeMediaInfo,
     taskIds,
     submitError,
     submitWarnings,
@@ -93,13 +106,14 @@ export const useWorkbenchController = () => {
     statusError,
     loading,
     preview,
-    isConversionTask,
+    isPreviewSupported,
     resolution,
     paramRows,
     statusClass,
     progressDetails,
     onEnhanceFileChange,
     onConvertMediaChange,
+    onTranscribeMediaChange,
     onWatermarkImagesChange,
     onWatermarkLuaFileChange,
     addWatermarkSegment,

@@ -1,6 +1,6 @@
 <template>
   <div class="panel">
-    <h2>{{ activeCategory === 'enhance' ? '创建增强任务' : '创建转换任务' }}</h2>
+    <h2>{{ panelTitle }}</h2>
 
     <EnhanceTaskForm
       v-if="activeCategory === 'enhance'"
@@ -9,7 +9,7 @@
     />
 
     <ConvertTaskForm
-      v-else
+      v-else-if="activeCategory === 'convert'"
       :convert-form="convertForm"
       :convert-media-info="convertMediaInfo"
       :on-convert-media-change="onConvertMediaChange"
@@ -18,10 +18,16 @@
       :add-watermark-segment="addWatermarkSegment"
       :remove-watermark-segment="removeWatermarkSegment"
     />
+    <TranscribeTaskForm
+      v-else
+      :transcribe-form="transcribeForm"
+      :transcribe-media-info="transcribeMediaInfo"
+      :on-transcribe-media-change="onTranscribeMediaChange"
+    />
 
     <div class="action-row">
       <button @click="submitTask" :disabled="loadingSubmit">
-        {{ loadingSubmit ? '提交中...' : (activeCategory === 'convert' ? '转换任务开始' : '增强任务开始') }}
+        {{ loadingSubmit ? '提交中...' : submitText }}
       </button>
     </div>
 
@@ -33,8 +39,10 @@
 <script setup>
 import ConvertTaskForm from "./ConvertTaskForm.vue";
 import EnhanceTaskForm from "./EnhanceTaskForm.vue";
+import TranscribeTaskForm from "./TranscribeTaskForm.vue";
+import { computed } from "vue";
 
-defineProps({
+const props = defineProps({
   activeCategory: {
     type: String,
     required: true,
@@ -48,6 +56,14 @@ defineProps({
     required: true,
   },
   convertMediaInfo: {
+    type: Array,
+    required: true,
+  },
+  transcribeForm: {
+    type: Object,
+    required: true,
+  },
+  transcribeMediaInfo: {
     type: Array,
     required: true,
   },
@@ -71,6 +87,10 @@ defineProps({
     type: Function,
     required: true,
   },
+  onTranscribeMediaChange: {
+    type: Function,
+    required: true,
+  },
   onWatermarkImagesChange: {
     type: Function,
     required: true,
@@ -91,5 +111,17 @@ defineProps({
     type: Function,
     required: true,
   },
+});
+
+const panelTitle = computed(() => {
+  if (props.activeCategory === "convert") return "创建转换任务";
+  if (props.activeCategory === "transcribe") return "创建转录任务";
+  return "创建增强任务";
+});
+
+const submitText = computed(() => {
+  if (props.activeCategory === "convert") return "转换任务开始";
+  if (props.activeCategory === "transcribe") return "转录任务开始";
+  return "增强任务开始";
 });
 </script>

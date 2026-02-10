@@ -15,7 +15,7 @@
     <div v-if="status" style="margin-top: 16px;">
       <StatusProgressSummary :status="status" :progress-details="progressDetails" :resolution="resolution" />
 
-      <StatusPreviewGrid v-if="!isConversionTask && status.status !== 'PENDING'" :preview="preview" />
+      <StatusPreviewGrid v-if="isPreviewSupported && status.status !== 'PENDING'" :preview="preview" />
 
       <StatusParamTable v-if="status.task_params" :param-rows="paramRows" />
     </div>
@@ -59,7 +59,7 @@ defineProps({
     type: Object,
     required: true,
   },
-  isConversionTask: {
+  isPreviewSupported: {
     type: Boolean,
     required: true,
   },

@@ -85,6 +85,21 @@ export const useWorkbenchFormsState = () => {
   });
 
   const convertMediaInfo = ref([]);
+  const transcribeForm = reactive({
+    transcribeMode: "subtitle_zip",
+    subtitleFormat: "srt",
+    whisperModel: "medium",
+    language: "auto",
+    prependTimestamps: false,
+    maxLineChars: 42,
+    temperature: 0,
+    beamSize: 5,
+    bestOf: 5,
+    outputVideoCodec: "h264",
+    outputAudioBitrateK: 192,
+    mediaFiles: [],
+  });
+  const transcribeMediaInfo = ref([]);
 
   const addWatermarkSegment = () => {
     const label = String.fromCharCode(65 + convertForm.watermarkTimeline.length);
@@ -99,6 +114,8 @@ export const useWorkbenchFormsState = () => {
     enhanceForm,
     convertForm,
     convertMediaInfo,
+    transcribeForm,
+    transcribeMediaInfo,
     addWatermarkSegment,
     removeWatermarkSegment,
   };
