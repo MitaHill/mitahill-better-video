@@ -28,6 +28,7 @@
 - `app/WebUI/src/components/workbench/enhance/*`: enhance section modules.
 - `app/WebUI/src/components/workbench/convert/*`: conversion section modules.
 - `app/WebUI/src/components/workbench/transcribe/*`: transcription section modules.
+- `app/src/Worker/pipelines/transcription/translation/*`: 转录翻译提供器与分段翻译子模块（Ollama/OpenAI兼容）。
 - `app/WebUI/src/components/workbench/TaskStatusPanel.vue`: status panel shell.
 - `app/WebUI/src/components/workbench/status/StatusQueryHeader.vue`: status query row + task list.
 - `app/WebUI/src/components/workbench/status/StatusProgressSummary.vue`: progress and file summary.

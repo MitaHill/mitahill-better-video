@@ -44,10 +44,19 @@ Response:
 
 Fields:
 - `media_files` (required, multiple; also兼容 `files` / `file`)
-- `transcribe_mode` (`subtitle_zip` | `subtitled_video`)
+- `transcribe_mode` (`subtitle_zip` | `subtitled_video` | `subtitle_and_video_zip`)
 - `subtitle_format` (`srt` | `vtt`)
 - `whisper_model` (e.g. `small` / `medium` / `large-v3` / `turbo`)
 - `language` (`auto` or language code like `zh`, `en`)
+- `translate_to` (optional, 目标语言；留空表示不翻译)
+- `translator_provider` (`none` | `ollama` | `openai_compatible`)
+- `translator_base_url` (optional)
+- `translator_model` (optional)
+- `translator_api_key` (optional)
+- `translator_prompt` (optional)
+- `translator_timeout_sec` (optional)
+- `generate_bilingual` (true | false)
+- `export_json` (true | false)
 - `prepend_timestamps` (true | false)
 - `max_line_chars`
 - `temperature`
