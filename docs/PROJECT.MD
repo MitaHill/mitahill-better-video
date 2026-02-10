@@ -14,6 +14,7 @@
 - **前端**：Vue 3 + Vite（静态资源由 Flask 提供）
 - **任务处理**：SQLite 任务队列 + Worker 轮询处理
 - **模型运行**：Real-ESRGAN (CUDA)
+- **日志与审计**：stdout + `logs/` 文件归档
 
 ## 3. 程序入口规范
 - **主入口**：`app/main.py`
@@ -49,6 +50,11 @@
 - **样式目标**：极简、清晰、高级质感
 - **视觉策略**：渐变背景 + 玻璃面板 + 有节奏动画
 - **交互体验**：实时轮询 + 任务 ID 一键复制 + 下载按钮
+- **模块约束**：页面文件仅负责装配，业务逻辑下沉到 `composables/`，大块 UI 下沉到 `components/`
+- **参考拆分**：`TaskCreatePanel -> EnhanceTaskForm + ConvertTaskForm + WatermarkTimelineEditor`
+- **状态拆分**：`TaskStatusPanel -> StatusQueryHeader + StatusProgressSummary + StatusPreviewGrid + StatusParamTable`
+- **深入拆分**：`EnhanceTaskForm/ConvertTaskForm` 再按参数区拆分到 `enhance/*`、`convert/*`
+- **逻辑拆分**：`useWorkbenchController` 仅编排，具体职责拆分到 `composables/workbench/*`
 
 ## 7. 目录结构
 ```
@@ -56,26 +62,41 @@ mitahill-better-video/
   app/
     main.py                # 主入口
     models/                # 模型目录 (video/audio)
-    src/
-    vendor/                # 上游依赖
-    Api/                 # Flask API
-    Audio/               # 音频增强/降噪
-    Config/              # 统一配置
-    Data/                # 模型校验数据
-    Database/            # SQLite 操作
-    Frontend/            # Vue UI
-    Media/               # 视频/图像处理
-    Notifications/       # 事件推送
-    Services/            # 进程服务
-    Utils/               # 通用工具
-    Worker/              # 任务处理
+    src/                  # Python source modules
+    WebUI/                # Vue UI
+      src/
+        pages/            # 页面壳层（仅装配）
+        components/       # 可复用界面组件
+          workbench/      # 工作台组件
+            enhance/      # 增强参数原子组件
+            convert/      # 转换参数原子组件
+            status/       # 状态展示原子组件
+        composables/      # 页面逻辑编排
+          workbench/      # 工作台逻辑原子模块
+        constants/        # 前端常量
+        styles/           # 拆分样式模块
+    vendor/               # 上游依赖
+    src/Api/              # Flask API
+    src/Audio/            # 音频增强/降噪
+    src/Config/           # 统一配置
+    src/Data/             # 模型校验数据
+    src/Database/         # SQLite 操作
+    src/Media/            # 视频/图像处理
+    src/Notifications/    # 事件推送
+    src/Services/         # 进程服务
+    src/Utils/            # 通用工具
+    src/Worker/           # 任务处理
   config/
     .env                 # 环境变量
   deploy/
     docker/              # Dockerfiles
     compose/             # Compose 文件
   docs/                  # 设计、规范、迁移文档
-  output/                # 结果与临时文件
+  storage/
+    output/              # 结果与临时文件
+    upload/              # 上传原始文件
+    data/                # SQLite 数据库
+    logs/                # 运行日志与 ffmpeg stderr
   app/vendor/Real-ESRGAN/    # 上游模型代码
 ```
 

@@ -1,0 +1,109 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Source+Serif+4:wght@400;600&display=swap");
+
+:root {
+  --bg: #1c1a17;
+  --bg-gradient: linear-gradient(180deg, #1c1a17 0%, #22201d 100%);
+  --surface: #2a2723;
+  --surface-strong: #36322d;
+  --text: #f4efe7;
+  --text-muted: #bcb3a6;
+  --text-strong: #fff8ef;
+  --accent: #d9a764;
+  --accent-2: #ef7b67;
+  --border: rgba(244, 239, 231, 0.18);
+  --thread-line: rgba(244, 239, 231, 0.36);
+  --input-bg: #312d29;
+  --input-text: #f4efe7;
+  --btn-text: #1c1a17;
+  --range-track-secondary: #7f6239;
+  --thumb-bg: #f4efe7;
+  --thumb-border: #1c1a17;
+  --status-pending-bg: rgba(255, 255, 255, 0.06);
+  --status-pending-text: var(--text-muted);
+  --status-pending-border: var(--border);
+  --status-processing-bg: rgba(217, 167, 100, 0.25);
+  --status-processing-text: #f0c98f;
+  --status-processing-border: rgba(217, 167, 100, 0.45);
+  --status-success-bg: rgba(92, 203, 149, 0.24);
+  --status-success-text: #7de5b4;
+  --status-success-border: rgba(92, 203, 149, 0.45);
+  --status-failed-bg: rgba(239, 123, 103, 0.22);
+  --status-failed-text: #ff9a88;
+  --status-failed-border: rgba(239, 123, 103, 0.45);
+  --wm-panel-bg: rgba(217, 167, 100, 0.08);
+  --wm-panel-border: rgba(217, 167, 100, 0.32);
+  --wm-segment-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(217, 167, 100, 0.08) 100%);
+  --wm-segment-border: rgba(244, 239, 231, 0.2);
+  --wm-segment-accent: rgba(217, 167, 100, 0.65);
+  --wm-label-bg: rgba(217, 167, 100, 0.22);
+  --wm-label-text: #f6d4a4;
+  --wm-segment-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  --tab-slider-bg: linear-gradient(135deg, rgba(217, 167, 100, 0.95) 0%, rgba(239, 123, 103, 0.9) 100%);
+  --tab-slider-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
+  --tab-text: #d2c8ba;
+  --tab-text-active: #1c1a17;
+  --tab-text-glow: rgba(255, 247, 232, 0.34);
+}
+
+[data-theme="light"] {
+  --bg: #f6f4f0;
+  --bg-gradient: linear-gradient(180deg, #f6f4f0 0%, #f1eee8 100%);
+  --surface: #ffffff;
+  --surface-strong: #f0eeea;
+  --text: #1c1c1c;
+  --text-muted: #6c6a66;
+  --text-strong: #1c1c1c;
+  --accent: #d39b00;
+  --accent-2: #d9534f;
+  --border: rgba(28, 28, 28, 0.12);
+  --thread-line: rgba(28, 28, 28, 0.32);
+  --input-bg: #ffffff;
+  --input-text: #1b1b1b;
+  --btn-text: #1b1b1b;
+  --range-track-secondary: #ffd769;
+  --thumb-bg: #1b1b1b;
+  --thumb-border: #ffffff;
+  --status-pending-bg: rgba(28, 28, 28, 0.04);
+  --status-pending-text: var(--text-muted);
+  --status-pending-border: var(--border);
+  --status-processing-bg: rgba(211, 155, 0, 0.16);
+  --status-processing-text: var(--accent);
+  --status-processing-border: rgba(211, 155, 0, 0.35);
+  --status-success-bg: rgba(46, 204, 113, 0.18);
+  --status-success-text: #2c8a55;
+  --status-success-border: rgba(46, 204, 113, 0.32);
+  --status-failed-bg: rgba(217, 83, 79, 0.18);
+  --status-failed-text: var(--accent-2);
+  --status-failed-border: rgba(217, 83, 79, 0.32);
+  --wm-panel-bg: rgba(211, 155, 0, 0.08);
+  --wm-panel-border: rgba(211, 155, 0, 0.26);
+  --wm-segment-bg: linear-gradient(180deg, #ffffff 0%, rgba(211, 155, 0, 0.06) 100%);
+  --wm-segment-border: rgba(28, 28, 28, 0.12);
+  --wm-segment-accent: rgba(211, 155, 0, 0.58);
+  --wm-label-bg: rgba(211, 155, 0, 0.16);
+  --wm-label-text: #8f6800;
+  --wm-segment-shadow: 0 8px 20px rgba(28, 28, 28, 0.08);
+  --tab-slider-bg: linear-gradient(135deg, rgba(211, 155, 0, 0.86) 0%, rgba(217, 83, 79, 0.8) 100%);
+  --tab-slider-shadow: 0 6px 14px rgba(28, 28, 28, 0.12);
+  --tab-text: #716c63;
+  --tab-text-active: #1b1b1b;
+  --tab-text-glow: rgba(255, 255, 255, 0.15);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Space Grotesk", sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+#app {
+  min-height: 100vh;
+}

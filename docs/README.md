@@ -18,7 +18,7 @@ A lightweight Flask + Vue UI around Real-ESRGAN for upscaling videos and images.
 - Performance: JPEG frame extraction, CUDA decode, FP16, tiling controls
 - Cancellation: Stop button halts ffmpeg and processing cleanly
 - Large uploads: configurable via `config/.env`
-- Persistent outputs under `/workspace/output`
+- Persistent outputs under `/workspace/storage/output`
 
 ## Quick Start
 
@@ -49,11 +49,12 @@ Prerequisites:
 - For images, a ZIP download is provided; for videos, an MP4 is produced.
 
 ## Outputs & Paths
-- Outputs are saved under `/workspace/output` inside the container:
-  - Video: `/workspace/output/sr_<original>.mp4`
-  - Images: `/workspace/output/sr_<original>.png`
-  - Multi-image ZIP: `/workspace/output/sr_images_<run_token>.zip`
-- Per-run scratch lives at `/workspace/output/run_<run_token>/` (frames, temp files).
+- Outputs are saved under `/workspace/storage/output` inside the container:
+  - Video: `/workspace/storage/output/sr_<original>.mp4`
+  - Images: `/workspace/storage/output/sr_<original>.png`
+  - Multi-image ZIP: `/workspace/storage/output/sr_images_<run_token>.zip`
+- Per-run scratch lives at `/workspace/storage/output/run_<run_token>/` (frames, temp files).
+- Uploads live at `/workspace/storage/upload/run_<run_token>/`.
 
 With `deploy/compose/docker-compose.dev.yml`, your project folder is mounted to `/workspace`, so outputs appear at `./output` on the host.
 
@@ -80,7 +81,14 @@ Audio models are packaged into the image and symlinked into `/root/.cache/voicef
 
 ## Project Structure
 - `app/src/Api/` — Flask API service
-- `app/src/Frontend/` — Vue UI (Vite)
+- `app/WebUI/` — Vue UI (Vite)
+  - `src/pages/WorkbenchPage.vue` — Page shell only
+  - `src/components/workbench/` — Workbench UI blocks (`TaskCreatePanel/EnhanceTaskForm/ConvertTaskForm/WatermarkTimelineEditor/TaskStatusPanel`)
+  - `src/components/workbench/enhance/` — Enhance atomic sections
+  - `src/components/workbench/convert/` — Conversion atomic sections
+  - `src/components/workbench/status/` — Status submodules (`StatusQueryHeader/StatusProgressSummary/StatusPreviewGrid/StatusParamTable`)
+  - `src/composables/useWorkbenchController.js` — Workbench orchestration logic
+  - `src/composables/workbench/` — Workbench atomic logic modules
 - `app/src/Worker/` — Worker pipeline core
 - `app/src/Config/`, `app/src/Database/`, `app/src/Media/` — Core modules
 - `app/models/` — Model weights (video/audio)
