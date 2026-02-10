@@ -150,3 +150,22 @@ def parse_conversion_task_params(form):
         "frame_export_format": (form.get("frame_export_format", "jpg") or "jpg").lower(),
     }
     return merge_unparsed_form_fields(form, parsed)
+
+
+def parse_transcription_task_params(form):
+    parsed = {
+        "task_category": "transcribe",
+        "transcribe_mode": (form.get("transcribe_mode", "subtitle_zip") or "subtitle_zip").lower(),
+        "subtitle_format": (form.get("subtitle_format", "srt") or "srt").lower(),
+        "whisper_model": (form.get("whisper_model", "medium") or "medium").lower(),
+        "language": (form.get("language", "auto") or "auto").strip(),
+        "translate_to": (form.get("translate_to", "") or "").strip(),
+        "prepend_timestamps": bool_from_form(form, "prepend_timestamps", False),
+        "max_line_chars": int_from_form(form, "max_line_chars", 42),
+        "temperature": float_from_form(form, "temperature", 0.0),
+        "beam_size": int_from_form(form, "beam_size", 5),
+        "best_of": int_from_form(form, "best_of", 5),
+        "output_video_codec": (form.get("output_video_codec", "h264") or "h264").lower(),
+        "output_audio_bitrate_k": int_from_form(form, "output_audio_bitrate_k", 192),
+    }
+    return merge_unparsed_form_fields(form, parsed)
