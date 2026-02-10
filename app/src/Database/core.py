@@ -76,6 +76,35 @@ def init_db():
                 user_agent TEXT)"""
         )
         c.execute("CREATE INDEX IF NOT EXISTS idx_admin_sessions_exp ON admin_sessions(expires_at)")
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS app_logs
+               (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at DATETIME,
+                level TEXT,
+                logger_name TEXT,
+                message TEXT,
+                extra_json TEXT)"""
+        )
+        c.execute("CREATE INDEX IF NOT EXISTS idx_app_logs_created ON app_logs(created_at)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_app_logs_level ON app_logs(level)")
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS model_download_jobs
+               (job_id TEXT PRIMARY KEY,
+                model_id TEXT,
+                backend TEXT,
+                status TEXT,
+                progress REAL,
+                downloaded_bytes INTEGER,
+                total_bytes INTEGER,
+                message TEXT,
+                result_json TEXT,
+                error TEXT,
+                request_json TEXT,
+                created_at DATETIME,
+                updated_at DATETIME)"""
+        )
+        c.execute("CREATE INDEX IF NOT EXISTS idx_model_download_jobs_status ON model_download_jobs(status)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_model_download_jobs_created ON model_download_jobs(created_at)")
         conn.commit()
         conn.close()
         logger.debug("Database initialized successfully.")

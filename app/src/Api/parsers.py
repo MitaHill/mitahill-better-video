@@ -2,6 +2,11 @@ import json
 
 from app.src.Config import settings as config
 
+try:
+    from app.src.Api.services.admin.transcription_config import get_parser_defaults
+except Exception:  # pragma: no cover - optional runtime import guard
+    get_parser_defaults = None
+
 
 def bool_from_form(form, key, default=False):
     value = form.get(key)
@@ -153,42 +158,53 @@ def parse_conversion_task_params(form):
 
 
 def parse_transcription_task_params(form):
+    defaults = {}
+    if get_parser_defaults:
+        try:
+            defaults = get_parser_defaults() or {}
+        except Exception:
+            defaults = {}
+
     parsed = {
         "task_category": "transcribe",
         "transcribe_mode": (form.get("transcribe_mode", "subtitle_zip") or "subtitle_zip").lower(),
         "subtitle_format": (form.get("subtitle_format", "srt") or "srt").lower(),
-        "whisper_model": (form.get("whisper_model", "medium") or "medium").lower(),
+        "whisper_model": (
+            form.get("whisper_model", defaults.get("whisper_model", "medium"))
+            or defaults.get("whisper_model", "medium")
+            or "medium"
+        ).lower(),
         "language": (form.get("language", "auto") or "auto").strip(),
         "translate_to": (form.get("translate_to", "") or "").strip(),
         "translator_provider": (
-            form.get("translator_provider", config.TRANSCRIPTION_TRANSLATOR_PROVIDER)
-            or config.TRANSCRIPTION_TRANSLATOR_PROVIDER
+            form.get("translator_provider", defaults.get("translator_provider", config.TRANSCRIPTION_TRANSLATOR_PROVIDER))
+            or defaults.get("translator_provider", config.TRANSCRIPTION_TRANSLATOR_PROVIDER)
             or "none"
         ).strip().lower(),
         "translator_base_url": (
-            form.get("translator_base_url", config.TRANSCRIPTION_TRANSLATOR_BASE_URL)
-            or config.TRANSCRIPTION_TRANSLATOR_BASE_URL
+            form.get("translator_base_url", defaults.get("translator_base_url", config.TRANSCRIPTION_TRANSLATOR_BASE_URL))
+            or defaults.get("translator_base_url", config.TRANSCRIPTION_TRANSLATOR_BASE_URL)
             or ""
         ).strip(),
         "translator_model": (
-            form.get("translator_model", config.TRANSCRIPTION_TRANSLATOR_MODEL)
-            or config.TRANSCRIPTION_TRANSLATOR_MODEL
+            form.get("translator_model", defaults.get("translator_model", config.TRANSCRIPTION_TRANSLATOR_MODEL))
+            or defaults.get("translator_model", config.TRANSCRIPTION_TRANSLATOR_MODEL)
             or ""
         ).strip(),
         "translator_api_key": (
-            form.get("translator_api_key", config.TRANSCRIPTION_TRANSLATOR_API_KEY)
-            or config.TRANSCRIPTION_TRANSLATOR_API_KEY
+            form.get("translator_api_key", defaults.get("translator_api_key", config.TRANSCRIPTION_TRANSLATOR_API_KEY))
+            or defaults.get("translator_api_key", config.TRANSCRIPTION_TRANSLATOR_API_KEY)
             or ""
         ).strip(),
         "translator_prompt": (
-            form.get("translator_prompt", config.TRANSCRIPTION_TRANSLATOR_PROMPT)
-            or config.TRANSCRIPTION_TRANSLATOR_PROMPT
+            form.get("translator_prompt", defaults.get("translator_prompt", config.TRANSCRIPTION_TRANSLATOR_PROMPT))
+            or defaults.get("translator_prompt", config.TRANSCRIPTION_TRANSLATOR_PROMPT)
             or ""
         ).strip(),
         "translator_timeout_sec": float_from_form(
             form,
             "translator_timeout_sec",
-            config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS,
+            defaults.get("translator_timeout_sec", config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS),
         ),
         "generate_bilingual": bool_from_form(form, "generate_bilingual", True),
         "export_json": bool_from_form(form, "export_json", False),

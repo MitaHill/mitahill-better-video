@@ -1,0 +1,167 @@
+import copy
+from typing import Any, Dict
+
+from app.src.Config import settings as config
+from app.src.Database import transcription_admin as db_transcription
+
+
+_VALID_BACKENDS = {"whisper", "faster_whisper"}
+_VALID_TRANSLATORS = {"none", "ollama", "openai_compatible"}
+
+
+def default_transcription_config() -> Dict[str, Any]:
+    return {
+        "version": 1,
+        "transcription": {
+            "backend": "whisper",
+            "active_model": "medium",
+            "allowed_models": [
+                "tiny",
+                "tiny.en",
+                "base",
+                "base.en",
+                "small",
+                "small.en",
+                "medium",
+                "medium.en",
+                "large",
+                "large-v1",
+                "large-v2",
+                "large-v3",
+                "turbo",
+                "distil-large-v2",
+                "distil-large-v3",
+                "large-v3-turbo",
+            ],
+        },
+        "translation": {
+            "provider": config.TRANSCRIPTION_TRANSLATOR_PROVIDER or "none",
+            "base_url": config.TRANSCRIPTION_TRANSLATOR_BASE_URL,
+            "model": config.TRANSCRIPTION_TRANSLATOR_MODEL,
+            "api_key": config.TRANSCRIPTION_TRANSLATOR_API_KEY,
+            "timeout_sec": config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS,
+            "prompt": config.TRANSCRIPTION_TRANSLATOR_PROMPT,
+        },
+        "download": {
+            "aria2": {
+                "split": 16,
+                "max_connection_per_server": 16,
+                "proxy": "",
+                "max_tries": 10,
+                "retry_wait": 2,
+                "connect_timeout_sec": 10,
+                "timeout_sec": 120,
+            }
+        },
+    }
+
+
+def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    out = copy.deepcopy(base)
+    for key, value in (override or {}).items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _deep_merge(out[key], value)
+        else:
+            out[key] = value
+    return out
+
+
+def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
+    merged = _deep_merge(default_transcription_config(), raw or {})
+
+    backend = str(merged["transcription"].get("backend") or "whisper").strip().lower()
+    if backend not in _VALID_BACKENDS:
+        backend = "whisper"
+    merged["transcription"]["backend"] = backend
+    merged["transcription"]["active_model"] = str(
+        merged["transcription"].get("active_model") or "medium"
+    ).strip().lower()
+
+    allowed = merged["transcription"].get("allowed_models") or []
+    if not isinstance(allowed, list):
+        allowed = []
+    merged["transcription"]["allowed_models"] = [
+        str(item).strip().lower() for item in allowed if str(item).strip()
+    ]
+
+    provider = str(merged["translation"].get("provider") or "none").strip().lower()
+    if provider not in _VALID_TRANSLATORS:
+        provider = "none"
+    merged["translation"]["provider"] = provider
+    merged["translation"]["base_url"] = str(merged["translation"].get("base_url") or "").strip()
+    merged["translation"]["model"] = str(merged["translation"].get("model") or "").strip()
+    merged["translation"]["api_key"] = str(merged["translation"].get("api_key") or "").strip()
+    merged["translation"]["prompt"] = str(merged["translation"].get("prompt") or "").strip()
+    try:
+        timeout_sec = float(merged["translation"].get("timeout_sec") or 120.0)
+    except (TypeError, ValueError):
+        timeout_sec = 120.0
+    merged["translation"]["timeout_sec"] = max(1.0, min(timeout_sec, 1200.0))
+
+    aria2 = merged["download"].get("aria2") or {}
+    try:
+        split = int(aria2.get("split") or 16)
+    except (TypeError, ValueError):
+        split = 16
+    try:
+        max_conn = int(aria2.get("max_connection_per_server") or 16)
+    except (TypeError, ValueError):
+        max_conn = 16
+    try:
+        max_tries = int(aria2.get("max_tries") or 10)
+    except (TypeError, ValueError):
+        max_tries = 10
+    try:
+        retry_wait = int(aria2.get("retry_wait") or 2)
+    except (TypeError, ValueError):
+        retry_wait = 2
+    try:
+        connect_timeout_sec = int(aria2.get("connect_timeout_sec") or 10)
+    except (TypeError, ValueError):
+        connect_timeout_sec = 10
+    try:
+        timeout_sec = int(aria2.get("timeout_sec") or 120)
+    except (TypeError, ValueError):
+        timeout_sec = 120
+
+    merged["download"]["aria2"] = {
+        "split": max(1, min(split, 64)),
+        "max_connection_per_server": max(1, min(max_conn, 64)),
+        "proxy": str(aria2.get("proxy") or "").strip(),
+        "max_tries": max(1, min(max_tries, 100)),
+        "retry_wait": max(1, min(retry_wait, 30)),
+        "connect_timeout_sec": max(3, min(connect_timeout_sec, 120)),
+        "timeout_sec": max(10, min(timeout_sec, 600)),
+    }
+
+    return merged
+
+
+def get_transcription_config() -> Dict[str, Any]:
+    current = db_transcription.get_transcription_config(default_transcription_config)
+    normalized = _normalize_config(current)
+    if normalized != current:
+        db_transcription.set_transcription_config(normalized)
+    return normalized
+
+
+def update_transcription_config(payload: Dict[str, Any]) -> Dict[str, Any]:
+    merged = _deep_merge(get_transcription_config(), payload or {})
+    normalized = _normalize_config(merged)
+    db_transcription.set_transcription_config(normalized)
+    return normalized
+
+
+def get_parser_defaults() -> Dict[str, Any]:
+    current = get_transcription_config()
+    transcription = current.get("transcription") or {}
+    translation = current.get("translation") or {}
+    return {
+        "whisper_model": str(transcription.get("active_model") or "medium").strip().lower(),
+        "translator_provider": str(translation.get("provider") or "none").strip().lower(),
+        "translator_base_url": str(translation.get("base_url") or "").strip(),
+        "translator_model": str(translation.get("model") or "").strip(),
+        "translator_api_key": str(translation.get("api_key") or "").strip(),
+        "translator_prompt": str(translation.get("prompt") or "").strip(),
+        "translator_timeout_sec": float(translation.get("timeout_sec") or 120.0),
+    }
