@@ -3,6 +3,7 @@ import json
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.src.Database import admin as db_admin
+from app.src.Data.transcription_languages import TRANSCRIPTION_LANGUAGE_CODES
 
 _SETTINGS_FORM_CONSTRAINTS = "admin_form_constraints_v1"
 _VALID_LOCKS = {"free", "fixed", "range"}
@@ -594,11 +595,11 @@ def _default_constraints() -> Dict[str, Any]:
                     },
                     "language": {
                         "label": "输入语言",
-                        "kind": "string",
+                        "kind": "enum",
                         "lock": "free",
                         "default_value": "auto",
                         "fixed_value": "auto",
-                        "allowed_values": [],
+                        "allowed_values": TRANSCRIPTION_LANGUAGE_CODES,
                     },
                     "translate_to": {
                         "label": "翻译目标语言",

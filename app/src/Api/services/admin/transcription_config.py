@@ -2,6 +2,7 @@ import copy
 from typing import Any, Dict
 
 from app.src.Config import settings as config
+from app.src.Data.transcription_languages import TRANSCRIPTION_LANGUAGE_CODES
 from app.src.Database import transcription_admin as db_transcription
 
 
@@ -142,6 +143,7 @@ def get_transcription_config() -> Dict[str, Any]:
     normalized = _normalize_config(current)
     if normalized != current:
         db_transcription.set_transcription_config(normalized)
+    _sync_transcription_constraints(normalized)
     return normalized
 
 
@@ -183,6 +185,7 @@ def _sync_transcription_constraints(current: Dict[str, Any]):
     transcribe = categories.get("transcribe") or {}
     fields = copy.deepcopy(transcribe.get("fields") or {})
     whisper_field = fields.get("whisper_model") or {}
+    language_field = fields.get("language") or {}
 
     transcription = current.get("transcription") or {}
     allowed = [
@@ -199,6 +202,18 @@ def _sync_transcription_constraints(current: Dict[str, Any]):
     if whisper_field.get("lock") == "fixed":
         whisper_field["fixed_value"] = active_model or whisper_field.get("fixed_value", "medium")
     fields["whisper_model"] = whisper_field
+    language_allowed_set = {str(item).strip().lower() for item in TRANSCRIPTION_LANGUAGE_CODES}
+    language_field["kind"] = "enum"
+    language_field["allowed_values"] = list(TRANSCRIPTION_LANGUAGE_CODES)
+    default_language = str(language_field.get("default_value") or "auto").strip().lower()
+    if default_language not in language_allowed_set:
+        default_language = "auto"
+    language_field["default_value"] = default_language
+    fixed_language = str(language_field.get("fixed_value") or default_language).strip().lower()
+    if fixed_language not in language_allowed_set:
+        fixed_language = default_language
+    language_field["fixed_value"] = fixed_language
+    fields["language"] = language_field
 
     update_form_constraints_config(
         {

@@ -40,10 +40,9 @@
       </div>
       <div class="field compact">
         <label>语言</label>
-        <select v-if="languageOptions.length" v-model="transcribeForm.language" :disabled="isDisabled('language')">
-          <option v-for="item in languageOptions" :key="item" :value="item">{{ item }}</option>
+        <select v-model="transcribeForm.language" :disabled="isDisabled('language')">
+          <option v-for="item in languageOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
         </select>
-        <input v-else v-model="transcribeForm.language" placeholder="auto / zh / en ..." :disabled="isDisabled('language')" />
       </div>
     </div>
 
@@ -60,6 +59,7 @@
 
 <script setup>
 import { computed } from "vue";
+import { TRANSCRIPTION_LANGUAGE_CODES, TRANSCRIPTION_LANGUAGE_OPTIONS } from "../../../constants/transcriptionLanguages";
 
 const props = defineProps({
   transcribeForm: {
@@ -112,6 +112,22 @@ const whisperModelOptions = computed(() =>
   allowed("whisperModel", ["small", "medium", "large-v3", "turbo"])
 );
 
-const languageOptions = computed(() => allowed("language", []));
+const languageOptions = computed(() => {
+  const constrained = allowed("language", TRANSCRIPTION_LANGUAGE_CODES);
+  const constrainedSet = new Set(
+    constrained.map((item) => String(item || "").trim().toLowerCase()).filter((item) => item.length > 0)
+  );
+
+  const base = TRANSCRIPTION_LANGUAGE_OPTIONS.filter((item) =>
+    constrainedSet.has(String(item.value || "").trim().toLowerCase())
+  );
+
+  const seen = new Set(base.map((item) => String(item.value || "").trim().toLowerCase()));
+  const extras = constrained
+    .map((value) => String(value || "").trim())
+    .filter((value) => value.length > 0 && !seen.has(value.toLowerCase()))
+    .map((value) => ({ value, label: `${value} (${value})` }));
+  return [...base, ...extras];
+});
 const translateTargetOptions = computed(() => allowed("translateTo", []));
 </script>

@@ -174,7 +174,7 @@ def parse_transcription_task_params(form):
             or defaults.get("whisper_model", "medium")
             or "medium"
         ).lower(),
-        "language": (form.get("language", "auto") or "auto").strip(),
+        "language": (form.get("language", "auto") or "auto").strip().lower(),
         "translate_to": (form.get("translate_to", "") or "").strip(),
         "translator_provider": (
             form.get("translator_provider", defaults.get("translator_provider", config.TRANSCRIPTION_TRANSLATOR_PROVIDER))
