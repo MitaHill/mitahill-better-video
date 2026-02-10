@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   better_video:
-    image: mitahill-better-video:20260210-204617
+    image: mitahill-better-video:20260210-205006
     container_name: better_video
     runtime: nvidia
     environment:
