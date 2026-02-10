@@ -3,6 +3,7 @@ from app.src.Config import settings as config
 VALID_TRANSCRIBE_MODES = {"subtitle_zip", "subtitled_video", "subtitle_and_video_zip"}
 VALID_SUBTITLE_FORMATS = {"srt", "vtt"}
 VALID_TRANSLATOR_PROVIDERS = {"none", "ollama", "openai_compatible"}
+VALID_TRANSLATOR_FALLBACK_MODES = {"model_full_text", "source_text"}
 
 
 def _to_bool(value, default=False):
@@ -55,6 +56,9 @@ def normalize_transcription_options(raw):
     provider = (options.get("translator_provider") or config.TRANSCRIPTION_TRANSLATOR_PROVIDER or "none").strip().lower()
     if provider not in VALID_TRANSLATOR_PROVIDERS:
         provider = "none"
+    fallback_mode = (options.get("translator_fallback_mode") or "model_full_text").strip().lower()
+    if fallback_mode not in VALID_TRANSLATOR_FALLBACK_MODES:
+        fallback_mode = "model_full_text"
 
     normalized = {
         "transcribe_mode": mode,
@@ -90,6 +94,7 @@ def normalize_transcription_options(raw):
             or config.TRANSCRIPTION_TRANSLATOR_PROMPT
             or ""
         ).strip(),
+        "translator_fallback_mode": fallback_mode,
         "translator_timeout_sec": _to_float(
             options.get("translator_timeout_sec"),
             config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS,

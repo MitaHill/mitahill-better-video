@@ -19,6 +19,17 @@
     </div>
 
     <div class="field compact">
+      <label>极端情况回退策略</label>
+      <select v-model="local.fallbackMode" :disabled="loading">
+        <option value="model_full_text">模型返回全文</option>
+        <option value="source_text">原始待翻译文本</option>
+      </select>
+      <p class="notice" style="margin-top: 6px;">
+        当无法提取代码块时生效：可回退到“模型返回全文”或“原始待翻译文本”。
+      </p>
+    </div>
+
+    <div class="field compact">
       <label>服务地址</label>
       <input v-model="local.baseUrl" :disabled="loading" placeholder="例如: http://127.0.0.1:11434 或 https://api.openai.com/v1" />
     </div>
@@ -80,6 +91,7 @@ const local = reactive({
   apiKey: "",
   timeoutSec: 120,
   prompt: "",
+  fallbackMode: "model_full_text",
 });
 
 const applyFromProps = () => {
@@ -91,6 +103,7 @@ const applyFromProps = () => {
   local.apiKey = translation.api_key || "";
   local.timeoutSec = Number(translation.timeout_sec ?? 120);
   local.prompt = translation.prompt || "";
+  local.fallbackMode = translation.fallback_mode || "model_full_text";
 };
 
 watch(
@@ -110,6 +123,7 @@ const save = async () => {
       api_key: String(local.apiKey || "").trim(),
       timeout_sec: Number(local.timeoutSec || 120),
       prompt: String(local.prompt || "").trim(),
+      fallback_mode: String(local.fallbackMode || "model_full_text").trim().toLowerCase(),
     },
   });
 };

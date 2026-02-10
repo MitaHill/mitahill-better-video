@@ -201,6 +201,11 @@ def parse_transcription_task_params(form):
             or defaults.get("translator_prompt", config.TRANSCRIPTION_TRANSLATOR_PROMPT)
             or ""
         ).strip(),
+        "translator_fallback_mode": (
+            form.get("translator_fallback_mode", defaults.get("translator_fallback_mode", "model_full_text"))
+            or defaults.get("translator_fallback_mode", "model_full_text")
+            or "model_full_text"
+        ).strip().lower(),
         "translator_timeout_sec": float_from_form(
             form,
             "translator_timeout_sec",

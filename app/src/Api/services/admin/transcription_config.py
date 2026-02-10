@@ -11,6 +11,7 @@ from app.src.Database import transcription_admin as db_transcription
 
 _VALID_BACKENDS = {"whisper", "faster_whisper"}
 _VALID_TRANSLATORS = {"none", "ollama", "openai_compatible"}
+_VALID_TRANSLATION_FALLBACK_MODES = {"model_full_text", "source_text"}
 
 
 def default_transcription_config() -> Dict[str, Any]:
@@ -45,6 +46,7 @@ def default_transcription_config() -> Dict[str, Any]:
             "api_key": config.TRANSCRIPTION_TRANSLATOR_API_KEY,
             "timeout_sec": config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS,
             "prompt": config.TRANSCRIPTION_TRANSLATOR_PROMPT,
+            "fallback_mode": "model_full_text",
         },
         "download": {
             "aria2": {
@@ -96,6 +98,10 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     merged["translation"]["model"] = str(merged["translation"].get("model") or "").strip()
     merged["translation"]["api_key"] = str(merged["translation"].get("api_key") or "").strip()
     merged["translation"]["prompt"] = str(merged["translation"].get("prompt") or "").strip()
+    fallback_mode = str(merged["translation"].get("fallback_mode") or "model_full_text").strip().lower()
+    if fallback_mode not in _VALID_TRANSLATION_FALLBACK_MODES:
+        fallback_mode = "model_full_text"
+    merged["translation"]["fallback_mode"] = fallback_mode
     try:
         timeout_sec = float(merged["translation"].get("timeout_sec") or 120.0)
     except (TypeError, ValueError):
@@ -169,6 +175,7 @@ def get_parser_defaults() -> Dict[str, Any]:
         "translator_model": str(translation.get("model") or "").strip(),
         "translator_api_key": str(translation.get("api_key") or "").strip(),
         "translator_prompt": str(translation.get("prompt") or "").strip(),
+        "translator_fallback_mode": str(translation.get("fallback_mode") or "model_full_text").strip().lower(),
         "translator_timeout_sec": float(translation.get("timeout_sec") or 120.0),
     }
 
