@@ -1,7 +1,7 @@
 import io
 import json
 
-from flask import Blueprint, jsonify, request, send_file
+from flask import Blueprint, current_app, jsonify, request, send_file
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from app.src.Config import settings as config
@@ -39,7 +39,7 @@ def create_task():
         UPLOAD_ROOT,
         config.MAX_VIDEO_SIZE_MB,
         config.MAX_IMAGE_SIZE_MB,
-        bp.logger,
+        current_app.logger,
     )
     if err:
         return jsonify({"error": err, "task_id": task_id}), 400
@@ -59,6 +59,7 @@ def create_tasks_batch():
 
     task_ids = []
     errors = []
+    logger = current_app.logger
     for upload in uploads:
         task_id, err = create_enhance_task(
             upload,
@@ -68,7 +69,7 @@ def create_tasks_batch():
             UPLOAD_ROOT,
             config.MAX_VIDEO_SIZE_MB,
             config.MAX_IMAGE_SIZE_MB,
-            bp.logger,
+            logger,
         )
         if task_id:
             task_ids.append(task_id)
