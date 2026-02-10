@@ -109,6 +109,16 @@
             :message="formConstraints.message"
             :on-save="updateFormConstraintsCategory"
           />
+
+          <div v-if="activeMenuKey === 'debug_model'" class="panel admin-card">
+            <h2>调试：测试转录模型</h2>
+            <p class="notice">当前入口已恢复，测试按钮与后端联调功能将在下一步接入。</p>
+          </div>
+
+          <div v-if="activeMenuKey === 'debug_translate'" class="panel admin-card">
+            <h2>调试：测试翻译源</h2>
+            <p class="notice">当前入口已恢复，翻译源连通性/超时/鉴权诊断将在下一步接入。</p>
+          </div>
         </div>
       </div>
     </template>
@@ -185,6 +195,15 @@ const menuGroups = Object.freeze([
       { key: "constraints_enhance", label: "增强参数约束", keywords: "enhance constraints 参数 约束 锁 范围" },
       { key: "constraints_convert", label: "转换参数约束", keywords: "convert constraints 参数 约束 锁 范围" },
       { key: "constraints_transcribe", label: "转录参数约束", keywords: "transcribe constraints 参数 约束 锁 范围 whisper subtitle" },
+    ]),
+  },
+  {
+    key: "debug",
+    label: "调试工具",
+    keywords: "debug test transcription translator 调试 测试",
+    children: Object.freeze([
+      { key: "debug_model", label: "测试转录模型", keywords: "debug transcribe model whisper 调试 转录 模型" },
+      { key: "debug_translate", label: "测试翻译源", keywords: "debug translate provider 调试 翻译 源" },
     ]),
   },
   {

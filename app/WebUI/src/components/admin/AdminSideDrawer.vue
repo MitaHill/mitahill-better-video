@@ -12,8 +12,11 @@
 
     <div class="admin-sidebar-list">
       <div v-for="group in filteredGroups" :key="group.key" class="admin-nav-group">
-        <div class="admin-nav-group-title">{{ group.label }}</div>
-        <div class="admin-nav-sub-list">
+        <button class="admin-nav-group-toggle" type="button" @click="toggleGroup(group.key)">
+          <span class="admin-nav-group-title">{{ group.label }}</span>
+          <span class="admin-nav-group-chevron" :class="{ 'is-open': isGroupOpen(group.key) }">▾</span>
+        </button>
+        <div v-show="isGroupOpen(group.key)" class="admin-nav-sub-list">
           <button
             v-for="item in group.children"
             :key="item.key"
@@ -32,7 +35,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { reactive, watch } from "vue";
+
+const props = defineProps({
   open: {
     type: Boolean,
     required: true,
@@ -52,8 +57,33 @@ defineProps({
 });
 
 const emit = defineEmits(["update:query", "select", "close"]);
+const openGroups = reactive({});
 
 const onSearch = (event) => {
   emit("update:query", event.target.value);
 };
+
+const isGroupOpen = (key) => {
+  if (Object.prototype.hasOwnProperty.call(openGroups, key)) return Boolean(openGroups[key]);
+  return true;
+};
+
+const toggleGroup = (key) => {
+  openGroups[key] = !isGroupOpen(key);
+};
+
+watch(
+  () => props.filteredGroups,
+  (groups) => {
+    for (const group of groups || []) {
+      if (!Object.prototype.hasOwnProperty.call(openGroups, group.key)) {
+        openGroups[group.key] = true;
+      }
+      if (props.query.trim()) {
+        openGroups[group.key] = true;
+      }
+    }
+  },
+  { immediate: true, deep: true }
+);
 </script>

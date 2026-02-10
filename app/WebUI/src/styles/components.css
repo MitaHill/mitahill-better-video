@@ -550,6 +550,7 @@ button:hover {
 
 .admin-shell.sidebar-collapsed {
   --sidebar-width: 0px;
+  gap: 0;
 }
 
 .admin-content {
@@ -623,11 +624,32 @@ button:hover {
   background: var(--surface-strong);
 }
 
+.admin-nav-group-toggle {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  padding: 6px 8px;
+}
+
 .admin-nav-group-title {
   font-size: 0.82rem;
   font-weight: 700;
   color: var(--text-muted);
   letter-spacing: 0.3px;
+}
+
+.admin-nav-group-chevron {
+  font-size: 0.82rem;
+  transition: transform 200ms ease;
+}
+
+.admin-nav-group-chevron.is-open {
+  transform: rotate(180deg);
 }
 
 .admin-nav-sub-list {
