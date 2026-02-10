@@ -50,6 +50,7 @@
 
 ## Admin & Real IP
 - 管理入口通过顶部菜单 `后端管理` 访问，采用密码登录，密码哈希保存在 SQLite `app_settings`。
+- 后端管理页采用侧拉菜单结构，内置模糊搜索菜单项，方便后续扩展更多管理模块。
 - 支持会话令牌（`admin_sessions`），接口使用 `Authorization: Bearer <token>`。
 - 客户端IP解析由 `app/src/Utils/client_ip.py` 统一处理，支持 IPv4/IPv6、`Forwarded`、`X-Forwarded-For`、`X-Real-IP`。
-- 通过 `REAL_IP_TRUSTED_PROXIES`（CIDR 列表）处理代理链，适配 Nginx / FRP 转发场景。
+- 通过“管理页可编辑配置 + 环境变量默认值”组合管理受信代理 CIDR，动态处理代理链，适配 Nginx / FRP 转发场景。

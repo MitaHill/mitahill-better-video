@@ -5,6 +5,7 @@
   align-items: center;
   padding: 4px;
   border: 1px solid var(--border);
+  border-radius: 5%;
   background: var(--surface);
   overflow: hidden;
   isolation: isolate;
@@ -17,6 +18,7 @@
   width: calc((100% - 8px) / var(--tab-count));
   height: calc(100% - 8px);
   background: var(--tab-slider-bg);
+  border-radius: 5%;
   box-shadow: var(--tab-slider-shadow);
   transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1), background-color 260ms ease;
   z-index: 0;

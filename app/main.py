@@ -30,6 +30,7 @@ def main():
     init_info = config.initialize_context()
     db.init_db()
     db_admin.ensure_admin_password(config.ADMIN_INITIAL_PASSWORD)
+    db_admin.ensure_real_ip_trusted_proxies(config.REAL_IP_TRUSTED_PROXIES_RAW)
     logger.info("Init recommendations: %s", init_info)
 
     worker_service = _build_worker_service()

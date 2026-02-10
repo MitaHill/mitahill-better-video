@@ -110,3 +110,25 @@ Response includes:
 - `tasks` (task_id, category, status, progress, client_ip...)
 - `ip_stats` (IPv4/IPv6 with scope classification)
 - `real_ip_config` (trusted proxy config and resolved request IP)
+
+### GET /api/admin/config/real-ip
+Header:
+- `Authorization: Bearer <token>`
+
+Response:
+```json
+{
+  "trusted_proxies": "127.0.0.1/32,::1/128,...",
+  "resolved_client_ip": "x.x.x.x",
+  "from_env_default": "..."
+}
+```
+
+### PUT /api/admin/config/real-ip
+Header:
+- `Authorization: Bearer <token>`
+
+Request:
+```json
+{ "trusted_proxies": "127.0.0.1/32,::1/128,10.0.0.0/8,..." }
+```

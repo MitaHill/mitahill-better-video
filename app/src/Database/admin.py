@@ -12,6 +12,7 @@ from .core import get_connection
 
 
 _SETTINGS_ADMIN_PASSWORD_HASH = "admin_password_hash"
+_SETTINGS_REAL_IP_TRUSTED_PROXIES = "real_ip_trusted_proxies"
 
 
 def _now():
@@ -60,6 +61,24 @@ def verify_admin_password(password: str) -> bool:
 
 def update_admin_password(new_password: str):
     set_setting(_SETTINGS_ADMIN_PASSWORD_HASH, generate_password_hash(new_password))
+
+
+def ensure_real_ip_trusted_proxies(default_value: str):
+    current = get_setting(_SETTINGS_REAL_IP_TRUSTED_PROXIES)
+    if current is not None and str(current).strip() != "":
+        return
+    set_setting(_SETTINGS_REAL_IP_TRUSTED_PROXIES, (default_value or "").strip())
+
+
+def get_real_ip_trusted_proxies(default_value: str = "") -> str:
+    current = get_setting(_SETTINGS_REAL_IP_TRUSTED_PROXIES)
+    if current is None or str(current).strip() == "":
+        return (default_value or "").strip()
+    return str(current).strip()
+
+
+def update_real_ip_trusted_proxies(value: str):
+    set_setting(_SETTINGS_REAL_IP_TRUSTED_PROXIES, (value or "").strip())
 
 
 def _hash_token(token: str) -> str:

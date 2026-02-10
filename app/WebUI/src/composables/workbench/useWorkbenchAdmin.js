@@ -38,6 +38,15 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     message: "",
   });
 
+  const proxyConfig = reactive({
+    trustedProxies: "",
+    loading: false,
+    error: "",
+    message: "",
+    fromEnvDefault: "",
+    resolvedClientIp: "",
+  });
+
   const _saveToken = (token) => {
     auth.token = String(token || "").trim();
     try {
@@ -148,10 +157,65 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       overview.tasks = payload.tasks || [];
       overview.ipStats = payload.ip_stats || [];
       overview.realIpConfig = payload.real_ip_config || null;
+      if (overview.realIpConfig) {
+        proxyConfig.trustedProxies = overview.realIpConfig.trusted_proxies || "";
+        proxyConfig.resolvedClientIp = overview.realIpConfig.resolved_client_ip || "";
+      }
     } catch (error) {
       overview.error = error.message;
     } finally {
       overview.loading = false;
+    }
+  };
+
+  const fetchRealIpConfig = async () => {
+    if (!auth.token) return;
+    proxyConfig.error = "";
+    proxyConfig.message = "";
+    proxyConfig.loading = true;
+    try {
+      const res = await fetch("/api/admin/config/real-ip", { headers: _authHeaders() });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        throw new Error(payload.error || "读取代理配置失败");
+      }
+      proxyConfig.trustedProxies = payload.trusted_proxies || "";
+      proxyConfig.fromEnvDefault = payload.from_env_default || "";
+      proxyConfig.resolvedClientIp = payload.resolved_client_ip || "";
+    } catch (error) {
+      proxyConfig.error = error.message;
+    } finally {
+      proxyConfig.loading = false;
+    }
+  };
+
+  const updateRealIpConfig = async () => {
+    if (!auth.token) return;
+    proxyConfig.error = "";
+    proxyConfig.message = "";
+    proxyConfig.loading = true;
+    try {
+      const res = await fetch("/api/admin/config/real-ip", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ..._authHeaders(),
+        },
+        body: JSON.stringify({
+          trusted_proxies: proxyConfig.trustedProxies || "",
+        }),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        throw new Error(payload.error || "保存代理配置失败");
+      }
+      proxyConfig.trustedProxies = payload.trusted_proxies || proxyConfig.trustedProxies;
+      proxyConfig.message = "受信代理配置已更新";
+      await fetchOverview();
+    } catch (error) {
+      proxyConfig.error = error.message;
+    } finally {
+      proxyConfig.loading = false;
     }
   };
 
@@ -191,10 +255,13 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     auth,
     overview,
     passwordForm,
+    proxyConfig,
     initAdminAuth,
     loginAdmin,
     logoutAdmin,
     fetchOverview,
+    fetchRealIpConfig,
+    updateRealIpConfig,
     changeAdminPassword,
   };
 };

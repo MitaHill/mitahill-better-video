@@ -2,7 +2,6 @@ from flask import Blueprint, jsonify, request
 
 from app.src.Config import settings as config
 from app.src.Database import admin as db_admin
-from app.src.Utils.client_ip import resolve_client_ip
 
 from ..services.admin_auth import (
     change_password,
@@ -11,12 +10,13 @@ from ..services.admin_auth import (
     parse_admin_token,
 )
 from ..services.admin_stats import build_overview
+from ..services.real_ip import (
+    get_trusted_proxies_raw,
+    resolve_request_client_ip,
+    update_trusted_proxies_raw,
+)
 
 bp = Blueprint("api_admin", __name__)
-
-
-def _resolve_client_ip(req):
-    return resolve_client_ip(req, config.REAL_IP_TRUSTED_PROXIES)
 
 
 @bp.post("/api/admin/login")
@@ -25,7 +25,7 @@ def admin_login():
     password = payload.get("password", "")
     if not password:
         return jsonify({"error": "password is required"}), 400
-    client_ip = _resolve_client_ip(request)
+    client_ip = resolve_request_client_ip(request)
     user_agent = request.headers.get("User-Agent", "")
     session, err = login(password, client_ip, user_agent)
     if err:
@@ -89,7 +89,35 @@ def admin_overview():
     status = request.args.get("status", type=str) or ""
     payload = build_overview(limit=limit, offset=offset, status=status)
     payload["real_ip_config"] = {
-        "trusted_proxies": config.REAL_IP_TRUSTED_PROXIES_RAW,
-        "resolved_client_ip": _resolve_client_ip(request),
+        "trusted_proxies": get_trusted_proxies_raw(),
+        "resolved_client_ip": resolve_request_client_ip(request),
     }
     return jsonify(payload)
+
+
+@bp.get("/api/admin/config/real-ip")
+def admin_get_real_ip_config():
+    _session, err = get_admin_session(request)
+    if err:
+        return jsonify({"error": err}), 401
+    return jsonify(
+        {
+            "trusted_proxies": get_trusted_proxies_raw(),
+            "resolved_client_ip": resolve_request_client_ip(request),
+            "from_env_default": config.REAL_IP_TRUSTED_PROXIES_RAW,
+        }
+    )
+
+
+@bp.put("/api/admin/config/real-ip")
+def admin_update_real_ip_config():
+    _session, err = get_admin_session(request)
+    if err:
+        return jsonify({"error": err}), 401
+    payload = request.get_json(silent=True) or {}
+    trusted_proxies = payload.get("trusted_proxies", "")
+    try:
+        saved = update_trusted_proxies_raw(trusted_proxies)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, "trusted_proxies": saved})

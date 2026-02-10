@@ -2,10 +2,10 @@ from flask import Blueprint, jsonify, request
 
 from app.src.Config import settings as config
 from app.src.Database import core as db
-from app.src.Utils.client_ip import resolve_client_ip
 
 from ..constants import OUTPUT_ROOT, UPLOAD_ROOT
 from ..parsers import parse_conversion_task_params
+from ..services.real_ip import resolve_request_client_ip
 from ..services import create_conversion_task, probe_uploaded_media
 
 bp = Blueprint("api_conversions", __name__)
@@ -13,7 +13,7 @@ bp = Blueprint("api_conversions", __name__)
 
 @bp.post("/api/conversions")
 def create_conversion():
-    client_ip = resolve_client_ip(request, config.REAL_IP_TRUSTED_PROXIES)
+    client_ip = resolve_request_client_ip(request)
     params = parse_conversion_task_params(request.form)
     task_id, err = create_conversion_task(
         request,

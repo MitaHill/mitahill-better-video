@@ -38,7 +38,7 @@
   --wm-label-bg: rgba(217, 167, 100, 0.22);
   --wm-label-text: #f6d4a4;
   --wm-segment-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
-  --tab-slider-bg: linear-gradient(135deg, rgba(217, 167, 100, 0.95) 0%, rgba(239, 123, 103, 0.9) 100%);
+  --tab-slider-bg: #d9a764;
   --tab-slider-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
   --tab-text: #d2c8ba;
   --tab-text-active: #1c1a17;
@@ -83,7 +83,7 @@
   --wm-label-bg: rgba(211, 155, 0, 0.16);
   --wm-label-text: #8f6800;
   --wm-segment-shadow: 0 8px 20px rgba(28, 28, 28, 0.08);
-  --tab-slider-bg: linear-gradient(135deg, rgba(211, 155, 0, 0.86) 0%, rgba(217, 83, 79, 0.8) 100%);
+  --tab-slider-bg: #d39b00;
   --tab-slider-shadow: 0 6px 14px rgba(28, 28, 28, 0.12);
   --tab-text: #716c63;
   --tab-text-active: #1b1b1b;

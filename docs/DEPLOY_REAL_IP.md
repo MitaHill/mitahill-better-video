@@ -18,6 +18,10 @@ REAL_IP_TRUSTED_PROXIES=127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.
 EVENTS_SHARED_TOKEN=replace_with_random_token
 ```
 
+说明：
+- `REAL_IP_TRUSTED_PROXIES` 是默认值，启动后会写入数据库。
+- 你可以在“后端管理 -> 受信代理配置”中在线修改，修改后立即生效。
+
 ## 2. Nginx standard reverse proxy
 
 ```nginx
