@@ -107,3 +107,9 @@ TRANSCRIPTION_LANGUAGE_CODES = [
     "yue",
     "zh",
 ]
+
+# Target translation language options:
+# first value "" means "no translation"
+TRANSCRIPTION_TARGET_LANGUAGE_CODES = [""] + [
+    item for item in TRANSCRIPTION_LANGUAGE_CODES if item != "auto"
+]

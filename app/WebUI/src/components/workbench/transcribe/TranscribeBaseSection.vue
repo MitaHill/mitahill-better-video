@@ -48,18 +48,22 @@
 
     <div class="field compact">
       <label>翻译目标语言（留空=不翻译）</label>
-      <select v-if="translateTargetOptions.length" v-model="transcribeForm.translateTo" :disabled="isDisabled('translateTo')">
+      <select v-model="transcribeForm.translateTo" :disabled="isDisabled('translateTo')">
         <option value="">不翻译</option>
-        <option v-for="item in translateTargetOptions" :key="item" :value="item">{{ item }}</option>
+        <option v-for="item in translateTargetOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
       </select>
-      <input v-else v-model="transcribeForm.translateTo" placeholder="例如：中文 / English / 日本語" :disabled="isDisabled('translateTo')" />
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue";
-import { TRANSCRIPTION_LANGUAGE_CODES, TRANSCRIPTION_LANGUAGE_OPTIONS } from "../../../constants/transcriptionLanguages";
+import {
+  TRANSCRIPTION_LANGUAGE_CODES,
+  TRANSCRIPTION_LANGUAGE_OPTIONS,
+  TRANSCRIPTION_TARGET_LANGUAGE_CODES,
+  TRANSCRIPTION_TARGET_LANGUAGE_OPTIONS,
+} from "../../../constants/transcriptionLanguages";
 
 const props = defineProps({
   transcribeForm: {
@@ -129,5 +133,23 @@ const languageOptions = computed(() => {
     .map((value) => ({ value, label: `${value} (${value})` }));
   return [...base, ...extras];
 });
-const translateTargetOptions = computed(() => allowed("translateTo", []));
+
+const translateTargetOptions = computed(() => {
+  const constrained = allowed("translateTo", TRANSCRIPTION_TARGET_LANGUAGE_CODES);
+  const constrainedSet = new Set(
+    constrained.map((item) => String(item || "").trim().toLowerCase()).filter((item) => item.length > 0)
+  );
+
+  const base = TRANSCRIPTION_TARGET_LANGUAGE_OPTIONS.filter((item) =>
+    constrainedSet.has(String(item.value || "").trim().toLowerCase())
+  );
+
+  const seen = new Set(base.map((item) => String(item.value || "").trim().toLowerCase()));
+  const extras = constrained
+    .map((value) => String(value || "").trim())
+    .filter((value) => value.length > 0 && !seen.has(value.toLowerCase()))
+    .map((value) => ({ value, label: `${value} (${value})` }));
+
+  return [...base, ...extras];
+});
 </script>

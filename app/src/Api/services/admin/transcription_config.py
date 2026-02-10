@@ -2,7 +2,10 @@ import copy
 from typing import Any, Dict
 
 from app.src.Config import settings as config
-from app.src.Data.transcription_languages import TRANSCRIPTION_LANGUAGE_CODES
+from app.src.Data.transcription_languages import (
+    TRANSCRIPTION_LANGUAGE_CODES,
+    TRANSCRIPTION_TARGET_LANGUAGE_CODES,
+)
 from app.src.Database import transcription_admin as db_transcription
 
 
@@ -186,6 +189,7 @@ def _sync_transcription_constraints(current: Dict[str, Any]):
     fields = copy.deepcopy(transcribe.get("fields") or {})
     whisper_field = fields.get("whisper_model") or {}
     language_field = fields.get("language") or {}
+    translate_to_field = fields.get("translate_to") or {}
 
     transcription = current.get("transcription") or {}
     allowed = [
@@ -214,6 +218,19 @@ def _sync_transcription_constraints(current: Dict[str, Any]):
         fixed_language = default_language
     language_field["fixed_value"] = fixed_language
     fields["language"] = language_field
+
+    target_allowed_set = {str(item).strip().lower() for item in TRANSCRIPTION_TARGET_LANGUAGE_CODES}
+    translate_to_field["kind"] = "enum"
+    translate_to_field["allowed_values"] = list(TRANSCRIPTION_TARGET_LANGUAGE_CODES)
+    default_target = str(translate_to_field.get("default_value") or "").strip().lower()
+    if default_target not in target_allowed_set:
+        default_target = ""
+    translate_to_field["default_value"] = default_target
+    fixed_target = str(translate_to_field.get("fixed_value") or default_target).strip().lower()
+    if fixed_target not in target_allowed_set:
+        fixed_target = default_target
+    translate_to_field["fixed_value"] = fixed_target
+    fields["translate_to"] = translate_to_field
 
     update_form_constraints_config(
         {

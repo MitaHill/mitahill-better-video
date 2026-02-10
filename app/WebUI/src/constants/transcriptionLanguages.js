@@ -105,3 +105,11 @@ export const TRANSCRIPTION_LANGUAGE_OPTIONS = Object.freeze([
 export const TRANSCRIPTION_LANGUAGE_CODES = Object.freeze(
   TRANSCRIPTION_LANGUAGE_OPTIONS.map((item) => item.value)
 );
+
+export const TRANSCRIPTION_TARGET_LANGUAGE_OPTIONS = Object.freeze(
+  TRANSCRIPTION_LANGUAGE_OPTIONS.filter((item) => item.value !== "auto")
+);
+
+export const TRANSCRIPTION_TARGET_LANGUAGE_CODES = Object.freeze(
+  TRANSCRIPTION_TARGET_LANGUAGE_OPTIONS.map((item) => item.value)
+);
