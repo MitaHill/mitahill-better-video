@@ -8,7 +8,7 @@ COPY app/WebUI/src ./src
 RUN npm install
 RUN npm run build
 
-FROM realesrgan-base:20260108-1353
+FROM realesrgan-base:20260210-2330
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -30,7 +30,6 @@ RUN pip install --no-cache-dir \
     gunicorn==21.2.0 \
     flask-socketio==5.3.6 \
     eventlet==0.36.1 \
-    openai-whisper==20231117 \
     voicefixer \
     deepfilternet \
     python-dotenv==1.0.1 \

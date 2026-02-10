@@ -22,6 +22,8 @@ RUN python -m pip install --upgrade pip setuptools wheel "numpy<2" && \
     python -m pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu116 \
         torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1+cu116 && \
     python -m pip install --no-cache-dir \
+        openai-whisper==20231117 \
+        requests==2.31.0 \
         basicsr==1.4.2 \
         facexlib==0.2.5 \
         gfpgan==1.3.5 \
