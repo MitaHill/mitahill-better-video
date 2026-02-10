@@ -110,15 +110,60 @@
             :on-save="updateFormConstraintsCategory"
           />
 
-          <div v-if="activeMenuKey === 'debug_model'" class="panel admin-card">
-            <h2>调试：测试转录模型</h2>
-            <p class="notice">当前入口已恢复，测试按钮与后端联调功能将在下一步接入。</p>
-          </div>
+          <AdminTranscriptionModelSettingsForm
+            v-if="activeMenuKey === 'transcribe_cfg_model'"
+            :config-data="transcriptionConfig.data || {}"
+            :loading="transcriptionConfig.loading"
+            :error="transcriptionConfig.error"
+            :message="transcriptionConfig.message"
+            :on-save="saveTranscriptionModelConfig"
+          />
 
-          <div v-if="activeMenuKey === 'debug_translate'" class="panel admin-card">
-            <h2>调试：测试翻译源</h2>
-            <p class="notice">当前入口已恢复，翻译源连通性/超时/鉴权诊断将在下一步接入。</p>
-          </div>
+          <AdminTranslationSettingsForm
+            v-if="activeMenuKey === 'transcribe_cfg_translation'"
+            :config-data="transcriptionConfig.data || {}"
+            :loading="transcriptionConfig.loading"
+            :error="transcriptionConfig.error"
+            :message="transcriptionConfig.message"
+            :on-save="saveTranslationConfig"
+          />
+
+          <AdminTranscriptionModelPanel
+            v-if="activeMenuKey === 'transcribe_cfg_catalog'"
+            :models="transcriptionModels.items"
+            :jobs="transcriptionModels.jobs"
+            :loading="transcriptionModels.loading"
+            :error="transcriptionModels.error"
+            :message="transcriptionModels.message"
+            :on-refresh="refreshTranscriptionCatalog"
+            :on-download="startTranscriptionModelDownload"
+          />
+
+          <AdminDebugToolsPanel
+            v-if="activeMenuKey === 'debug_model' || activeMenuKey === 'debug_translate'"
+            :loading-model="debugTools.loadingModelTest"
+            :model-error="debugTools.modelTestError"
+            :model-result="debugTools.modelTestResult"
+            :loading-translation="debugTools.loadingTranslationTest"
+            :translation-error="debugTools.translationTestError"
+            :translation-result="debugTools.translationTestResult"
+            :on-test-model="testTranscriptionModel"
+            :on-test-translation="testTranslationProvider"
+          />
+
+          <AdminLogsPanel
+            v-if="activeMenuKey === 'logs_warn'"
+            :logs="logsView.logs"
+            :loading="logsView.loading"
+            :error="logsView.error"
+            :min-level="logsView.minLevel"
+            :keyword="logsView.keyword"
+            :logger-name="logsView.loggerName"
+            :on-refresh="fetchAdminLogs"
+            @update:min-level="onLogsMinLevelChange"
+            @update:keyword="onLogsKeywordChange"
+            @update:logger-name="onLogsLoggerChange"
+          />
         </div>
       </div>
     </template>
@@ -130,14 +175,19 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 
 import { useWorkbenchAdmin } from "../../composables/workbench/useWorkbenchAdmin";
 import { parseJsonSafe } from "../../composables/workbench/utils";
+import AdminConstraintEditor from "./AdminConstraintEditor.vue";
+import AdminDebugToolsPanel from "./AdminDebugToolsPanel.vue";
 import AdminIpTable from "./AdminIpTable.vue";
 import AdminLoginCard from "./AdminLoginCard.vue";
+import AdminLogsPanel from "./AdminLogsPanel.vue";
 import AdminOverviewCards from "./AdminOverviewCards.vue";
 import AdminPasswordForm from "./AdminPasswordForm.vue";
 import AdminProxyConfigForm from "./AdminProxyConfigForm.vue";
 import AdminSideDrawer from "./AdminSideDrawer.vue";
 import AdminTaskTable from "./AdminTaskTable.vue";
-import AdminConstraintEditor from "./AdminConstraintEditor.vue";
+import AdminTranscriptionModelPanel from "./AdminTranscriptionModelPanel.vue";
+import AdminTranscriptionModelSettingsForm from "./AdminTranscriptionModelSettingsForm.vue";
+import AdminTranslationSettingsForm from "./AdminTranslationSettingsForm.vue";
 
 const props = defineProps({
   active: {
@@ -153,6 +203,10 @@ const {
   passwordForm,
   proxyConfig,
   formConstraints,
+  transcriptionConfig,
+  transcriptionModels,
+  debugTools,
+  logsView,
   initAdminAuth,
   loginAdmin,
   logoutAdmin,
@@ -162,6 +216,14 @@ const {
   changeAdminPassword,
   fetchFormConstraintsConfig,
   updateFormConstraintsCategory,
+  fetchTranscriptionConfig,
+  updateTranscriptionConfig,
+  fetchTranscriptionModels,
+  fetchModelDownloadJobs,
+  startModelDownload,
+  testTranscriptionModel,
+  testTranslationProvider,
+  fetchAdminLogs,
 } = useWorkbenchAdmin({ parseJsonSafe });
 
 const sidebarOpen = ref(true);
@@ -188,6 +250,16 @@ const menuGroups = Object.freeze([
     ]),
   },
   {
+    key: "transcribe_sources",
+    label: "转录源设置",
+    keywords: "transcribe whisper faster translator model download 转录 模型 翻译",
+    children: Object.freeze([
+      { key: "transcribe_cfg_model", label: "转录模型设置", keywords: "transcribe whisper faster 模型 设置" },
+      { key: "transcribe_cfg_translation", label: "翻译源设置", keywords: "translate ollama openai 翻译 源" },
+      { key: "transcribe_cfg_catalog", label: "模型目录与下载", keywords: "model catalog aria2 hash warmup 下载 校验 热身" },
+    ]),
+  },
+  {
     key: "constraints",
     label: "参数约束",
     keywords: "constraints policy lock 参数 约束 锁 范围",
@@ -204,6 +276,14 @@ const menuGroups = Object.freeze([
     children: Object.freeze([
       { key: "debug_model", label: "测试转录模型", keywords: "debug transcribe model whisper 调试 转录 模型" },
       { key: "debug_translate", label: "测试翻译源", keywords: "debug translate provider 调试 翻译 源" },
+    ]),
+  },
+  {
+    key: "logs",
+    label: "日志",
+    keywords: "log warn error warning 日志",
+    children: Object.freeze([
+      { key: "logs_warn", label: "系统日志", keywords: "log warn error warning 系统 日志" },
     ]),
   },
   {
@@ -260,9 +340,9 @@ const stopTimer = () => {
   timer = null;
 };
 
-const needOverviewRefresh = () => {
-  return ["overview", "tasks", "ips"].includes(activeMenuKey.value);
-};
+const needOverviewRefresh = () => ["overview", "tasks", "ips"].includes(activeMenuKey.value);
+const needModelDownloadRefresh = () => activeMenuKey.value === "transcribe_cfg_catalog";
+const needLogsRefresh = () => activeMenuKey.value === "logs_warn";
 
 const startTimer = () => {
   stopTimer();
@@ -270,6 +350,12 @@ const startTimer = () => {
   timer = setInterval(() => {
     if (needOverviewRefresh()) {
       fetchOverview();
+    }
+    if (needModelDownloadRefresh()) {
+      fetchModelDownloadJobs();
+    }
+    if (needLogsRefresh()) {
+      fetchAdminLogs();
     }
   }, 5000);
 };
@@ -303,15 +389,69 @@ const onMenuSearchChange = (value) => {
   menuSearch.value = value;
 };
 
-const onMenuSelect = async (value) => {
-  activeMenuKey.value = value;
+const saveTranscriptionModelConfig = async (payload) => {
+  await updateTranscriptionConfig(payload, "转录模型配置已保存");
+  await fetchTranscriptionConfig();
+};
+
+const saveTranslationConfig = async (payload) => {
+  await updateTranscriptionConfig(payload, "翻译源配置已保存");
+  await fetchTranscriptionConfig();
+};
+
+const refreshTranscriptionCatalog = async () => {
+  await fetchTranscriptionModels();
+  await fetchModelDownloadJobs();
+};
+
+const startTranscriptionModelDownload = async (backend, modelId) => {
+  await startModelDownload(backend, modelId);
+  await fetchModelDownloadJobs();
+};
+
+const onLogsMinLevelChange = (value) => {
+  logsView.minLevel = value;
+  fetchAdminLogs();
+};
+
+const onLogsKeywordChange = (value) => {
+  logsView.keyword = value;
+  fetchAdminLogs();
+};
+
+const onLogsLoggerChange = (value) => {
+  logsView.loggerName = value;
+  fetchAdminLogs();
+};
+
+const loadByMenuKey = async (value) => {
   if (value === "proxy") {
     await fetchRealIpConfig();
-  } else if (String(value).startsWith("constraints_")) {
+    return;
+  }
+  if (String(value).startsWith("constraints_")) {
     await fetchFormConstraintsConfig();
-  } else if (needOverviewRefresh()) {
+    return;
+  }
+  if (value === "transcribe_cfg_model" || value === "transcribe_cfg_translation") {
+    await fetchTranscriptionConfig();
+    return;
+  }
+  if (value === "transcribe_cfg_catalog") {
+    await refreshTranscriptionCatalog();
+    return;
+  }
+  if (value === "logs_warn") {
+    await fetchAdminLogs();
+    return;
+  }
+  if (needOverviewRefresh()) {
     await fetchOverview();
   }
+};
+
+const onMenuSelect = async (value) => {
+  activeMenuKey.value = value;
 };
 
 const categoryConstraint = (categoryKey) => {
@@ -345,13 +485,7 @@ watch(
       return;
     }
     if (auth.token) {
-      if (activeMenuKey.value === "proxy") {
-        await fetchRealIpConfig();
-      } else if (String(activeMenuKey.value).startsWith("constraints_")) {
-        await fetchFormConstraintsConfig();
-      } else {
-        await fetchOverview();
-      }
+      await loadByMenuKey(activeMenuKey.value);
     }
     startTimer();
   }
@@ -361,7 +495,7 @@ watch(
   () => auth.token,
   async (token) => {
     if (token && props.active) {
-      await fetchOverview();
+      await loadByMenuKey(activeMenuKey.value);
     }
     startTimer();
   }
@@ -369,23 +503,13 @@ watch(
 
 watch(activeMenuKey, async (nextKey) => {
   if (!auth.token || !props.active) return;
-  if (nextKey === "proxy") {
-    await fetchRealIpConfig();
-    return;
-  }
-  if (String(nextKey).startsWith("constraints_")) {
-    await fetchFormConstraintsConfig();
-    return;
-  }
-  if (needOverviewRefresh()) {
-    await fetchOverview();
-  }
+  await loadByMenuKey(nextKey);
 });
 
 onMounted(async () => {
   await initAdminAuth();
   if (props.active && auth.token) {
-    await fetchOverview();
+    await loadByMenuKey(activeMenuKey.value);
   }
   startTimer();
 });

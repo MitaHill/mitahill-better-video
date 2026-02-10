@@ -54,6 +54,40 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     data: null,
   });
 
+  const transcriptionConfig = reactive({
+    loading: false,
+    error: "",
+    message: "",
+    data: null,
+  });
+
+  const transcriptionModels = reactive({
+    loading: false,
+    error: "",
+    message: "",
+    items: [],
+    jobs: [],
+    activeJobId: "",
+  });
+
+  const debugTools = reactive({
+    loadingModelTest: false,
+    modelTestError: "",
+    modelTestResult: null,
+    loadingTranslationTest: false,
+    translationTestError: "",
+    translationTestResult: null,
+  });
+
+  const logsView = reactive({
+    loading: false,
+    error: "",
+    logs: [],
+    minLevel: "WARNING",
+    keyword: "",
+    loggerName: "",
+  });
+
   const _saveToken = (token) => {
     auth.token = String(token || "").trim();
     try {
@@ -76,6 +110,12 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     _saveToken("");
     auth.sessionId = "";
     auth.expiresAt = "";
+  };
+
+  const _handleAuthedError = (res) => {
+    if (res && res.status === 401) {
+      _clearAuth();
+    }
   };
 
   const initAdminAuth = async () => {
@@ -126,6 +166,10 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       adminPassword.value = "";
       await fetchOverview();
       await fetchFormConstraintsConfig();
+      await fetchTranscriptionConfig();
+      await fetchTranscriptionModels();
+      await fetchModelDownloadJobs();
+      await fetchAdminLogs();
     } catch (error) {
       auth.error = error.message;
       _clearAuth();
@@ -156,9 +200,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       const res = await fetch(`/api/admin/overview?${query.toString()}`, { headers: _authHeaders() });
       const payload = await parseJsonSafe(res);
       if (!res.ok) {
-        if (res.status === 401) {
-          _clearAuth();
-        }
+        _handleAuthedError(res);
         throw new Error(payload.error || "拉取管理数据失败");
       }
       overview.counts = payload.counts || overview.counts;
@@ -185,6 +227,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       const res = await fetch("/api/admin/config/real-ip", { headers: _authHeaders() });
       const payload = await parseJsonSafe(res);
       if (!res.ok) {
+        _handleAuthedError(res);
         throw new Error(payload.error || "读取代理配置失败");
       }
       proxyConfig.trustedProxies = payload.trusted_proxies || "";
@@ -215,6 +258,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       });
       const payload = await parseJsonSafe(res);
       if (!res.ok) {
+        _handleAuthedError(res);
         throw new Error(payload.error || "保存代理配置失败");
       }
       proxyConfig.trustedProxies = payload.trusted_proxies || proxyConfig.trustedProxies;
@@ -245,6 +289,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       });
       const payload = await parseJsonSafe(res);
       if (!res.ok) {
+        _handleAuthedError(res);
         throw new Error(payload.error || "修改密码失败");
       }
       passwordForm.message = payload.message || "密码已更新，请重新登录";
@@ -267,6 +312,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       const res = await fetch("/api/admin/config/form-constraints", { headers: _authHeaders() });
       const payload = await parseJsonSafe(res);
       if (!res.ok) {
+        _handleAuthedError(res);
         throw new Error(payload.error || "读取参数约束失败");
       }
       formConstraints.data = payload || null;
@@ -297,6 +343,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       });
       const payload = await parseJsonSafe(res);
       if (!res.ok) {
+        _handleAuthedError(res);
         throw new Error(payload.error || "保存参数约束失败");
       }
       formConstraints.data = payload.config || formConstraints.data;
@@ -308,6 +355,197 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     }
   };
 
+  const fetchTranscriptionConfig = async () => {
+    if (!auth.token) return;
+    transcriptionConfig.loading = true;
+    transcriptionConfig.error = "";
+    transcriptionConfig.message = "";
+    try {
+      const res = await fetch("/api/admin/config/transcription-sources", { headers: _authHeaders() });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "读取转录源配置失败");
+      }
+      transcriptionConfig.data = payload || null;
+    } catch (error) {
+      transcriptionConfig.error = error.message;
+    } finally {
+      transcriptionConfig.loading = false;
+    }
+  };
+
+  const updateTranscriptionConfig = async (patchPayload, messageText = "配置已保存") => {
+    if (!auth.token) return;
+    transcriptionConfig.loading = true;
+    transcriptionConfig.error = "";
+    transcriptionConfig.message = "";
+    try {
+      const res = await fetch("/api/admin/config/transcription-sources", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ..._authHeaders(),
+        },
+        body: JSON.stringify(patchPayload || {}),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "保存转录源配置失败");
+      }
+      transcriptionConfig.data = payload.config || transcriptionConfig.data;
+      transcriptionConfig.message = messageText;
+    } catch (error) {
+      transcriptionConfig.error = error.message;
+    } finally {
+      transcriptionConfig.loading = false;
+    }
+  };
+
+  const fetchTranscriptionModels = async () => {
+    if (!auth.token) return;
+    transcriptionModels.loading = true;
+    transcriptionModels.error = "";
+    try {
+      const res = await fetch("/api/admin/transcription/models", { headers: _authHeaders() });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "读取模型目录失败");
+      }
+      transcriptionModels.items = payload.models || [];
+    } catch (error) {
+      transcriptionModels.error = error.message;
+    } finally {
+      transcriptionModels.loading = false;
+    }
+  };
+
+  const fetchModelDownloadJobs = async () => {
+    if (!auth.token) return;
+    try {
+      const res = await fetch("/api/admin/transcription/models/downloads?limit=80", { headers: _authHeaders() });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "读取下载任务失败");
+      }
+      transcriptionModels.jobs = payload.jobs || [];
+    } catch (error) {
+      transcriptionModels.error = error.message;
+    }
+  };
+
+  const fetchModelDownloadJob = async (jobId) => {
+    if (!auth.token || !jobId) return null;
+    const res = await fetch(`/api/admin/transcription/models/downloads/${encodeURIComponent(jobId)}`, {
+      headers: _authHeaders(),
+    });
+    const payload = await parseJsonSafe(res);
+    if (!res.ok) {
+      _handleAuthedError(res);
+      throw new Error(payload.error || "读取下载任务状态失败");
+    }
+    return payload.job || null;
+  };
+
+  const startModelDownload = async (backend, modelId) => {
+    if (!auth.token) return;
+    transcriptionModels.error = "";
+    transcriptionModels.message = "";
+    try {
+      const res = await fetch("/api/admin/transcription/models/download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ..._authHeaders(),
+        },
+        body: JSON.stringify({ backend, model_id: modelId }),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "启动下载失败");
+      }
+      const job = payload.job || {};
+      transcriptionModels.activeJobId = job.job_id || "";
+      transcriptionModels.message = `已启动下载任务: ${job.job_id || "-"}`;
+      await fetchModelDownloadJobs();
+    } catch (error) {
+      transcriptionModels.error = error.message;
+    }
+  };
+
+  const testTranscriptionModel = async () => {
+    if (!auth.token) return;
+    debugTools.loadingModelTest = true;
+    debugTools.modelTestError = "";
+    debugTools.modelTestResult = null;
+    try {
+      const res = await fetch("/api/admin/debug/test-transcription-model", {
+        method: "POST",
+        headers: _authHeaders(),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        throw new Error(payload.error || "转录模型测试失败");
+      }
+      debugTools.modelTestResult = payload;
+    } catch (error) {
+      debugTools.modelTestError = error.message;
+    } finally {
+      debugTools.loadingModelTest = false;
+    }
+  };
+
+  const testTranslationProvider = async () => {
+    if (!auth.token) return;
+    debugTools.loadingTranslationTest = true;
+    debugTools.translationTestError = "";
+    debugTools.translationTestResult = null;
+    try {
+      const res = await fetch("/api/admin/debug/test-translation-provider", {
+        method: "POST",
+        headers: _authHeaders(),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        throw new Error(payload.error || "翻译源测试失败");
+      }
+      debugTools.translationTestResult = payload;
+    } catch (error) {
+      debugTools.translationTestError = error.message;
+    } finally {
+      debugTools.loadingTranslationTest = false;
+    }
+  };
+
+  const fetchAdminLogs = async () => {
+    if (!auth.token) return;
+    logsView.loading = true;
+    logsView.error = "";
+    try {
+      const query = new URLSearchParams();
+      query.set("limit", "200");
+      query.set("min_level", logsView.minLevel || "WARNING");
+      if (logsView.keyword) query.set("q", logsView.keyword);
+      if (logsView.loggerName) query.set("logger", logsView.loggerName);
+
+      const res = await fetch(`/api/admin/logs?${query.toString()}`, { headers: _authHeaders() });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "读取日志失败");
+      }
+      logsView.logs = payload.logs || [];
+    } catch (error) {
+      logsView.error = error.message;
+    } finally {
+      logsView.loading = false;
+    }
+  };
+
   return {
     adminPassword,
     auth,
@@ -315,6 +553,10 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     passwordForm,
     proxyConfig,
     formConstraints,
+    transcriptionConfig,
+    transcriptionModels,
+    debugTools,
+    logsView,
     initAdminAuth,
     loginAdmin,
     logoutAdmin,
@@ -324,5 +566,14 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     changeAdminPassword,
     fetchFormConstraintsConfig,
     updateFormConstraintsCategory,
+    fetchTranscriptionConfig,
+    updateTranscriptionConfig,
+    fetchTranscriptionModels,
+    fetchModelDownloadJobs,
+    fetchModelDownloadJob,
+    startModelDownload,
+    testTranscriptionModel,
+    testTranslationProvider,
+    fetchAdminLogs,
   };
 };
