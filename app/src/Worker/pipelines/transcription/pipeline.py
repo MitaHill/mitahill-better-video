@@ -228,6 +228,8 @@ def process_transcription_task(task):
     translator = None
     if (options.get("translate_to") or "").strip():
         translator = create_translator(options)
+        if translator is None:
+            raise RuntimeError("translation requested but translator provider is disabled (translator_provider=none).")
         logger.info("Task %s translation enabled, provider=%s", task_id, getattr(translator, "label", "-"))
 
     all_outputs = []
