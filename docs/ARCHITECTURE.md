@@ -23,9 +23,11 @@
 - `app/WebUI/src/components/workbench/TaskCreatePanel.vue`: task creation panel shell.
 - `app/WebUI/src/components/workbench/EnhanceTaskForm.vue`: enhance form module.
 - `app/WebUI/src/components/workbench/ConvertTaskForm.vue`: conversion form module.
+- `app/WebUI/src/components/workbench/TranscribeTaskForm.vue`: transcription form module.
 - `app/WebUI/src/components/workbench/WatermarkTimelineEditor.vue`: watermark timeline editor module.
 - `app/WebUI/src/components/workbench/enhance/*`: enhance section modules.
 - `app/WebUI/src/components/workbench/convert/*`: conversion section modules.
+- `app/WebUI/src/components/workbench/transcribe/*`: transcription section modules.
 - `app/WebUI/src/components/workbench/TaskStatusPanel.vue`: status panel shell.
 - `app/WebUI/src/components/workbench/status/StatusQueryHeader.vue`: status query row + task list.
 - `app/WebUI/src/components/workbench/status/StatusProgressSummary.vue`: progress and file summary.
@@ -47,6 +49,7 @@
 - Outputs: `/workspace/storage/output/sr_*`
 - Run scratch: `/workspace/storage/output/run_<task_id>/`
 - Uploads: `/workspace/storage/upload/run_<task_id>/`
+- Task categories in unified queue: `enhance` / `convert` / `transcribe`
 
 ## Admin & Real IP
 - 管理入口通过顶部菜单 `后端管理` 访问，采用密码登录，密码哈希保存在 SQLite `app_settings`。

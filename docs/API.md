@@ -39,6 +39,28 @@ Response:
 { "task_ids": ["<uuid>", "..."], "errors": [{ "filename": "...", "error": "...", "task_id": "<uuid>" }] }
 ```
 
+## POST /api/transcriptions
+**Content-Type**: multipart/form-data
+
+Fields:
+- `media_files` (required, multiple; also兼容 `files` / `file`)
+- `transcribe_mode` (`subtitle_zip` | `subtitled_video`)
+- `subtitle_format` (`srt` | `vtt`)
+- `whisper_model` (e.g. `small` / `medium` / `large-v3` / `turbo`)
+- `language` (`auto` or language code like `zh`, `en`)
+- `prepend_timestamps` (true | false)
+- `max_line_chars`
+- `temperature`
+- `beam_size`
+- `best_of`
+- `output_video_codec` (`h264` | `h265`)
+- `output_audio_bitrate_k`
+
+Response:
+```
+{ "task_id": "<uuid>" }
+```
+
 ## GET /api/tasks/<task_id>
 Response includes:
 - `status` (PENDING/PROCESSING/COMPLETED/FAILED)
@@ -46,6 +68,7 @@ Response includes:
 - `message`
 - `task_params`
 - `video_info`
+- `task_params.task_category` (`enhance` | `convert` | `transcribe`)
 
 ## GET /api/tasks/<task_id>/preview/original
 Returns JPEG preview if available.

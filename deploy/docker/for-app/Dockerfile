@@ -30,6 +30,7 @@ RUN pip install --no-cache-dir \
     gunicorn==21.2.0 \
     flask-socketio==5.3.6 \
     eventlet==0.36.1 \
+    openai-whisper==20231117 \
     voicefixer \
     deepfilternet \
     python-dotenv==1.0.1 \
