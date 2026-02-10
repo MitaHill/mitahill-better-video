@@ -3,10 +3,9 @@ from pathlib import Path
 from PIL import Image
 import numpy as np
 import torch
-from realesrgan import RealESRGANer
-from realesrgan.archs.srvgg_arch import SRVGGNetCompact
 from basicsr.archs.rrdbnet_arch import RRDBNet
-from gfpgan import GFPGANer
+
+from .realesrgan_runtime import RealESRGANer, SRVGGNetCompact
 
 logger = logging.getLogger("UPSCALER")
 
