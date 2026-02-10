@@ -544,6 +544,8 @@ button:hover {
   gap: 14px;
   align-items: start;
   transition: grid-template-columns 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  width: 100%;
+  max-width: 100%;
 }
 
 .admin-shell.sidebar-collapsed {
@@ -553,6 +555,15 @@ button:hover {
 .admin-content {
   display: grid;
   gap: 14px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.admin-content > .panel {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .admin-toolbar {
@@ -656,14 +667,23 @@ button:hover {
 
 .admin-table-wrap {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable both-edges;
   border: 1px solid var(--border);
 }
 
 .admin-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
-  min-width: 900px;
+  table-layout: auto;
+}
+
+.admin-table td.mono {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .admin-table th,
@@ -673,6 +693,8 @@ button:hover {
   border-bottom: 1px solid var(--border);
   font-size: 0.86rem;
   vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .admin-table th {

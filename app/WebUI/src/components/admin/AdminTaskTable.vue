@@ -35,8 +35,8 @@
             <td>{{ statusText(task.status) }}</td>
             <td>{{ task.progress ?? 0 }}%</td>
             <td class="mono">{{ task.client_ip || "unknown" }}</td>
-            <td>{{ task.created_at || "-" }}</td>
-            <td>{{ task.updated_at || "-" }}</td>
+            <td>{{ formatDateTimeToSecond(task.created_at) }}</td>
+            <td>{{ formatDateTimeToSecond(task.updated_at) }}</td>
             <td>{{ task.message || "-" }}</td>
           </tr>
           <tr v-if="!tasks.length">
@@ -51,6 +51,8 @@
 </template>
 
 <script setup>
+import { formatDateTimeToSecond } from "./formatDateTime";
+
 defineProps({
   tasks: {
     type: Array,

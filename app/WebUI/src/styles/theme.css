@@ -104,6 +104,29 @@ body {
   transition: background 0.25s ease, color 0.25s ease;
 }
 
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: #1c1a17;
+  opacity: 0;
+}
+
+html[data-theme-transition="dark-to-light"] body::before {
+  animation: darkToLightAdapt 3s ease forwards;
+}
+
+@keyframes darkToLightAdapt {
+  0% {
+    opacity: 0.92;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 #app {
   min-height: 100vh;
 }

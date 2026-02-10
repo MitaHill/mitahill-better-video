@@ -26,7 +26,7 @@
             <td>{{ item.processing_count || 0 }}</td>
             <td>{{ item.completed_count || 0 }}</td>
             <td>{{ item.failed_count || 0 }}</td>
-            <td>{{ item.last_seen || "-" }}</td>
+            <td>{{ formatDateTimeToSecond(item.last_seen) }}</td>
           </tr>
           <tr v-if="!ipStats.length">
             <td colspan="9" class="notice">暂无IP数据</td>
@@ -38,6 +38,8 @@
 </template>
 
 <script setup>
+import { formatDateTimeToSecond } from "./formatDateTime";
+
 defineProps({
   ipStats: {
     type: Array,
