@@ -13,6 +13,7 @@ if str(ROOT_DIR) not in sys.path:
 from app.src.Config.logging_setup import configure_logging
 from app.src.Services.worker_service import WorkerService
 from flask_socketio import SocketIO, join_room
+from app.src.Api.services.form_constraints import ensure_form_constraints_config
 
 logger = logging.getLogger("MAIN")
 
@@ -31,6 +32,7 @@ def main():
     db.init_db()
     db_admin.ensure_admin_password(config.ADMIN_INITIAL_PASSWORD)
     db_admin.ensure_real_ip_trusted_proxies(config.REAL_IP_TRUSTED_PROXIES_RAW)
+    ensure_form_constraints_config()
     logger.info("Init recommendations: %s", init_info)
 
     worker_service = _build_worker_service()

@@ -4,10 +4,11 @@
       :convert-form="convertForm"
       :convert-media-info="convertMediaInfo"
       :on-convert-media-change="onConvertMediaChange"
+      :get-field-policy="getFieldPolicy"
     />
 
-    <ConvertVideoSection :convert-form="convertForm" />
-    <ConvertAudioSection :convert-form="convertForm" />
+    <ConvertVideoSection :convert-form="convertForm" :get-field-policy="getFieldPolicy" />
+    <ConvertAudioSection :convert-form="convertForm" :get-field-policy="getFieldPolicy" />
 
     <ConvertMetadataWatermarkSection
       :convert-form="convertForm"
@@ -15,9 +16,10 @@
       :on-watermark-lua-file-change="onWatermarkLuaFileChange"
       :add-watermark-segment="addWatermarkSegment"
       :remove-watermark-segment="removeWatermarkSegment"
+      :get-field-policy="getFieldPolicy"
     />
 
-    <ConvertExportFramesSection :convert-form="convertForm" />
+    <ConvertExportFramesSection :convert-form="convertForm" :get-field-policy="getFieldPolicy" />
   </div>
 </template>
 
@@ -54,6 +56,10 @@ defineProps({
     required: true,
   },
   removeWatermarkSegment: {
+    type: Function,
+    required: true,
+  },
+  getFieldPolicy: {
     type: Function,
     required: true,
   },

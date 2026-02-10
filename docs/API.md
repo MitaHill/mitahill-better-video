@@ -91,6 +91,31 @@ Returns output file if task is completed.
 ## GET /api/health
 Returns `{"status":"ok"}` when backend is alive.
 
+## GET /api/form-constraints
+公开读取任务创建参数约束（前端创建面板使用）。
+
+Response:
+```json
+{
+  "version": 1,
+  "categories": {
+    "enhance": {
+      "global_lock": "free",
+      "fields": {
+        "upscale": {
+          "kind": "number",
+          "lock": "range",
+          "default_value": 3,
+          "fixed_value": 3,
+          "min_value": 2,
+          "max_value": 4
+        }
+      }
+    }
+  }
+}
+```
+
 ## Admin APIs (Password Auth)
 
 ### POST /api/admin/login
@@ -163,4 +188,39 @@ Header:
 Request:
 ```json
 { "trusted_proxies": "127.0.0.1/32,::1/128,10.0.0.0/8,..." }
+```
+
+### GET /api/admin/config/form-constraints
+Header:
+- `Authorization: Bearer <token>`
+
+读取完整参数约束配置（含增强/转换/转录三类）。
+
+### PUT /api/admin/config/form-constraints
+Header:
+- `Authorization: Bearer <token>`
+
+按类别增量更新参数约束配置。
+
+Request (example):
+```json
+{
+  "categories": {
+    "transcribe": {
+      "global_lock": "free",
+      "fields": {
+        "temperature": {
+          "lock": "range",
+          "min_value": 0.0,
+          "max_value": 0.7,
+          "default_value": 0.2
+        },
+        "whisper_model": {
+          "lock": "fixed",
+          "fixed_value": "large-v3"
+        }
+      }
+    }
+  }
+}
 ```

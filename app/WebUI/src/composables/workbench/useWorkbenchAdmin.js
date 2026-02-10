@@ -47,6 +47,13 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     resolvedClientIp: "",
   });
 
+  const formConstraints = reactive({
+    loading: false,
+    error: "",
+    message: "",
+    data: null,
+  });
+
   const _saveToken = (token) => {
     auth.token = String(token || "").trim();
     try {
@@ -118,6 +125,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       auth.expiresAt = payload.expires_at || "";
       adminPassword.value = "";
       await fetchOverview();
+      await fetchFormConstraintsConfig();
     } catch (error) {
       auth.error = error.message;
       _clearAuth();
@@ -250,12 +258,63 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     }
   };
 
+  const fetchFormConstraintsConfig = async () => {
+    if (!auth.token) return;
+    formConstraints.loading = true;
+    formConstraints.error = "";
+    formConstraints.message = "";
+    try {
+      const res = await fetch("/api/admin/config/form-constraints", { headers: _authHeaders() });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        throw new Error(payload.error || "读取参数约束失败");
+      }
+      formConstraints.data = payload || null;
+    } catch (error) {
+      formConstraints.error = error.message;
+    } finally {
+      formConstraints.loading = false;
+    }
+  };
+
+  const updateFormConstraintsCategory = async (categoryKey, categoryPayload) => {
+    if (!auth.token) return;
+    formConstraints.loading = true;
+    formConstraints.error = "";
+    formConstraints.message = "";
+    try {
+      const res = await fetch("/api/admin/config/form-constraints", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ..._authHeaders(),
+        },
+        body: JSON.stringify({
+          categories: {
+            [categoryKey]: categoryPayload,
+          },
+        }),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        throw new Error(payload.error || "保存参数约束失败");
+      }
+      formConstraints.data = payload.config || formConstraints.data;
+      formConstraints.message = "参数约束已保存";
+    } catch (error) {
+      formConstraints.error = error.message;
+    } finally {
+      formConstraints.loading = false;
+    }
+  };
+
   return {
     adminPassword,
     auth,
     overview,
     passwordForm,
     proxyConfig,
+    formConstraints,
     initAdminAuth,
     loginAdmin,
     logoutAdmin,
@@ -263,5 +322,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     fetchRealIpConfig,
     updateRealIpConfig,
     changeAdminPassword,
+    fetchFormConstraintsConfig,
+    updateFormConstraintsCategory,
   };
 };

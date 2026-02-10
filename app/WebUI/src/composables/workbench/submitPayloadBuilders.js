@@ -89,6 +89,8 @@ export const buildConvertTaskFormData = (convertForm) => {
   );
   data.append("watermark_lua_script", convertForm.watermarkLuaEnabled ? convertForm.watermarkLuaScript || "" : "");
   data.append("frame_export_fps", String(convertForm.frameExportFps));
+  data.append("frame_export_fps_mode", String(convertForm.frameExportFpsMode || "manual"));
+  data.append("frame_export_format", String(convertForm.frameExportFormat || "jpg"));
 
   return data;
 };

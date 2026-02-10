@@ -19,6 +19,7 @@ const applyConversionDefaultsByProbe = (convertForm, info) => {
 
   if (hasVideo && info.fps && Number(info.fps) > 0) {
     convertForm.frameRate = Math.round(Number(info.fps));
+    convertForm.frameExportFps = Math.round(Number(info.fps));
   }
   if (hasVideo && info.video_bitrate && Number(info.video_bitrate) > 0) {
     convertForm.videoBitrateK = Math.max(1, Math.round(Number(info.video_bitrate) / 1000));
@@ -59,6 +60,7 @@ export const useWorkbenchUploads = ({
   submitError,
   submitWarnings,
   parseJsonSafe,
+  enforceCategory,
 }) => {
   const onEnhanceFileChange = (event) => {
     const files = Array.from(event.target.files || []);
@@ -69,6 +71,9 @@ export const useWorkbenchUploads = ({
       return;
     }
     enhanceForm.files = files;
+    if (typeof enforceCategory === "function") {
+      enforceCategory("enhance");
+    }
   };
 
   const onConvertMediaChange = async (event) => {
@@ -100,6 +105,9 @@ export const useWorkbenchUploads = ({
     if (probeErrors.length) {
       submitWarnings.value = `以下文件参数探测失败：${probeErrors.join("；")}`;
     }
+    if (typeof enforceCategory === "function") {
+      enforceCategory("convert");
+    }
     event.target.value = "";
   };
 
@@ -112,6 +120,9 @@ export const useWorkbenchUploads = ({
       return;
     }
     convertForm.watermarkImages = files;
+    if (typeof enforceCategory === "function") {
+      enforceCategory("convert");
+    }
   };
 
   const onWatermarkLuaFileChange = async (event) => {
@@ -127,6 +138,9 @@ export const useWorkbenchUploads = ({
     } catch (_err) {
       submitError.value = "读取 Lua 脚本文件失败。";
     } finally {
+      if (typeof enforceCategory === "function") {
+        enforceCategory("convert");
+      }
       event.target.value = "";
     }
   };
@@ -156,6 +170,9 @@ export const useWorkbenchUploads = ({
     }
     if (probeErrors.length) {
       submitWarnings.value = `以下转录文件探测失败：${probeErrors.join("；")}`;
+    }
+    if (typeof enforceCategory === "function") {
+      enforceCategory("transcribe");
     }
     event.target.value = "";
   };

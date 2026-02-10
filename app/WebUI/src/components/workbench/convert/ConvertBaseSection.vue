@@ -3,10 +3,8 @@
     <div class="param-title">任务基础</div>
     <div class="field">
       <label>转换类型</label>
-      <select v-model="convertForm.convertMode">
-        <option value="transcode">视频转换</option>
-        <option value="export_frames">导出视频帧（批量 ZIP）</option>
-        <option value="demux_streams">分离画面流和音频流（批量 ZIP）</option>
+      <select v-model="convertForm.convertMode" :disabled="isDisabled('convertMode')">
+        <option v-for="item in convertModeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
       </select>
     </div>
     <div class="field">
@@ -27,7 +25,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from "vue";
+
+const props = defineProps({
   convertForm: {
     type: Object,
     required: true,
@@ -40,5 +40,30 @@ defineProps({
     type: Function,
     required: true,
   },
+  getFieldPolicy: {
+    type: Function,
+    required: true,
+  },
 });
+
+const readPolicy = (fieldKey) => props.getFieldPolicy("convert", fieldKey) || null;
+const isDisabled = (fieldKey) => Boolean(readPolicy(fieldKey)?.disabled);
+const allowed = (fieldKey, fallback = []) => {
+  const values = readPolicy(fieldKey)?.allowedValues;
+  return Array.isArray(values) && values.length ? values : fallback;
+};
+
+const convertModeOptions = computed(() =>
+  allowed("convertMode", ["transcode", "export_frames", "demux_streams"]).map((value) => ({
+    value,
+    label:
+      value === "transcode"
+        ? "视频转换"
+        : value === "export_frames"
+          ? "导出视频帧（批量 ZIP）"
+          : value === "demux_streams"
+            ? "分离画面流和音频流（批量 ZIP）"
+            : value,
+  }))
+);
 </script>

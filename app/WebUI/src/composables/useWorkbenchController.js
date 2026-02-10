@@ -2,6 +2,7 @@ import { onMounted, onUnmounted, reactive, ref } from "vue";
 import { useWorkbenchCategory } from "./workbench/useWorkbenchCategory";
 import { useWorkbenchFormsState } from "./workbench/useWorkbenchFormsState";
 import { useWorkbenchRecommendations } from "./workbench/useWorkbenchRecommendations";
+import { useWorkbenchFormConstraints } from "./workbench/useWorkbenchFormConstraints";
 import { useWorkbenchStatus } from "./workbench/useWorkbenchStatus";
 import { useWorkbenchSubmission } from "./workbench/useWorkbenchSubmission";
 import { useWorkbenchTheme } from "./workbench/useWorkbenchTheme";
@@ -25,6 +26,19 @@ export const useWorkbenchController = () => {
     addWatermarkSegment,
     removeWatermarkSegment,
   } = useWorkbenchFormsState();
+
+  const {
+    constraints,
+    status: constraintsStatus,
+    fetchConstraints,
+    getFieldPolicy,
+    enforceCategory,
+  } = useWorkbenchFormConstraints({
+    parseJsonSafe,
+    enhanceForm,
+    convertForm,
+    transcribeForm,
+  });
 
   const {
     taskIds,
@@ -54,6 +68,7 @@ export const useWorkbenchController = () => {
     submitError,
     submitWarnings,
     parseJsonSafe,
+    enforceCategory,
   });
 
   const { submitTask } = useWorkbenchSubmission({
@@ -69,6 +84,7 @@ export const useWorkbenchController = () => {
     fetchStatus,
     joinRoom,
     parseJsonSafe,
+    enforceCategory,
   });
 
   const { fetchRecommendations } = useWorkbenchRecommendations({ enhanceForm });
@@ -80,6 +96,7 @@ export const useWorkbenchController = () => {
     if (!convertForm.watermarkTimeline.length) {
       addWatermarkSegment();
     }
+    fetchConstraints();
     initRealtime();
   });
 
@@ -124,5 +141,8 @@ export const useWorkbenchController = () => {
     onThemeModeChange,
     switchCategory,
     setStatusQuery,
+    constraints,
+    constraintsStatus,
+    getFieldPolicy,
   };
 };

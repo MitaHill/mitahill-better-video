@@ -26,6 +26,7 @@
           :on-watermark-lua-file-change="onWatermarkLuaFileChange"
           :add-watermark-segment="addWatermarkSegment"
           :remove-watermark-segment="removeWatermarkSegment"
+          :get-field-policy="getFieldPolicy"
           :submit-task="submitTask"
         />
 
@@ -90,6 +91,7 @@ const {
   onWatermarkLuaFileChange,
   addWatermarkSegment,
   removeWatermarkSegment,
+  getFieldPolicy,
   submitTask,
   fetchStatus,
   downloadResult,

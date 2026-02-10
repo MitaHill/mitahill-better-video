@@ -19,17 +19,14 @@
     <div class="inline-grid two">
       <div class="field compact">
         <label>转录类型</label>
-        <select v-model="transcribeForm.transcribeMode">
-          <option value="subtitle_zip">字幕与文本（ZIP）</option>
-          <option value="subtitled_video">生成带字幕视频</option>
-          <option value="subtitle_and_video_zip">字幕与视频（ZIP）</option>
+        <select v-model="transcribeForm.transcribeMode" :disabled="isDisabled('transcribeMode')">
+          <option v-for="item in transcribeModeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
         </select>
       </div>
       <div class="field compact">
         <label>字幕格式</label>
-        <select v-model="transcribeForm.subtitleFormat">
-          <option value="srt">SRT</option>
-          <option value="vtt">VTT</option>
+        <select v-model="transcribeForm.subtitleFormat" :disabled="isDisabled('subtitleFormat')">
+          <option v-for="item in subtitleFormatOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
         </select>
       </div>
     </div>
@@ -37,28 +34,34 @@
     <div class="inline-grid two">
       <div class="field compact">
         <label>Whisper 模型</label>
-        <select v-model="transcribeForm.whisperModel">
-          <option value="small">small</option>
-          <option value="medium">medium</option>
-          <option value="large-v3">large-v3</option>
-          <option value="turbo">turbo</option>
+        <select v-model="transcribeForm.whisperModel" :disabled="isDisabled('whisperModel')">
+          <option v-for="model in whisperModelOptions" :key="model" :value="model">{{ model }}</option>
         </select>
       </div>
       <div class="field compact">
         <label>语言</label>
-        <input v-model="transcribeForm.language" placeholder="auto / zh / en ..." />
+        <select v-if="languageOptions.length" v-model="transcribeForm.language" :disabled="isDisabled('language')">
+          <option v-for="item in languageOptions" :key="item" :value="item">{{ item }}</option>
+        </select>
+        <input v-else v-model="transcribeForm.language" placeholder="auto / zh / en ..." :disabled="isDisabled('language')" />
       </div>
     </div>
 
     <div class="field compact">
       <label>翻译目标语言（留空=不翻译）</label>
-      <input v-model="transcribeForm.translateTo" placeholder="例如：中文 / English / 日本語" />
+      <select v-if="translateTargetOptions.length" v-model="transcribeForm.translateTo" :disabled="isDisabled('translateTo')">
+        <option value="">不翻译</option>
+        <option v-for="item in translateTargetOptions" :key="item" :value="item">{{ item }}</option>
+      </select>
+      <input v-else v-model="transcribeForm.translateTo" placeholder="例如：中文 / English / 日本語" :disabled="isDisabled('translateTo')" />
     </div>
   </div>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from "vue";
+
+const props = defineProps({
   transcribeForm: {
     type: Object,
     required: true,
@@ -71,5 +74,44 @@ defineProps({
     type: Function,
     required: true,
   },
+  getFieldPolicy: {
+    type: Function,
+    required: true,
+  },
 });
+
+const readPolicy = (fieldKey) => props.getFieldPolicy("transcribe", fieldKey) || null;
+const isDisabled = (fieldKey) => Boolean(readPolicy(fieldKey)?.disabled);
+const allowed = (fieldKey, fallback = []) => {
+  const values = readPolicy(fieldKey)?.allowedValues;
+  return Array.isArray(values) && values.length ? values : fallback;
+};
+
+const transcribeModeOptions = computed(() =>
+  allowed("transcribeMode", ["subtitle_zip", "subtitled_video", "subtitle_and_video_zip"]).map((value) => ({
+    value,
+    label:
+      value === "subtitle_zip"
+        ? "字幕与文本（ZIP）"
+        : value === "subtitled_video"
+          ? "生成带字幕视频"
+          : value === "subtitle_and_video_zip"
+            ? "字幕与视频（ZIP）"
+            : value,
+  }))
+);
+
+const subtitleFormatOptions = computed(() =>
+  allowed("subtitleFormat", ["srt", "vtt"]).map((value) => ({
+    value,
+    label: String(value || "").toUpperCase(),
+  }))
+);
+
+const whisperModelOptions = computed(() =>
+  allowed("whisperModel", ["small", "medium", "large-v3", "turbo"])
+);
+
+const languageOptions = computed(() => allowed("language", []));
+const translateTargetOptions = computed(() => allowed("translateTo", []));
 </script>

@@ -77,6 +77,39 @@
             @update:old-password="onOldPasswordInput"
             @update:new-password="onNewPasswordInput"
           />
+
+          <AdminConstraintEditor
+            v-if="activeMenuKey === 'constraints_enhance'"
+            category-key="enhance"
+            category-label="视频增强"
+            :category-config="categoryConstraint('enhance')"
+            :loading="formConstraints.loading"
+            :error="formConstraints.error"
+            :message="formConstraints.message"
+            :on-save="updateFormConstraintsCategory"
+          />
+
+          <AdminConstraintEditor
+            v-if="activeMenuKey === 'constraints_convert'"
+            category-key="convert"
+            category-label="视频转换"
+            :category-config="categoryConstraint('convert')"
+            :loading="formConstraints.loading"
+            :error="formConstraints.error"
+            :message="formConstraints.message"
+            :on-save="updateFormConstraintsCategory"
+          />
+
+          <AdminConstraintEditor
+            v-if="activeMenuKey === 'constraints_transcribe'"
+            category-key="transcribe"
+            category-label="视频转录"
+            :category-config="categoryConstraint('transcribe')"
+            :loading="formConstraints.loading"
+            :error="formConstraints.error"
+            :message="formConstraints.message"
+            :on-save="updateFormConstraintsCategory"
+          />
         </div>
       </div>
     </template>
@@ -95,6 +128,7 @@ import AdminPasswordForm from "./AdminPasswordForm.vue";
 import AdminProxyConfigForm from "./AdminProxyConfigForm.vue";
 import AdminSideDrawer from "./AdminSideDrawer.vue";
 import AdminTaskTable from "./AdminTaskTable.vue";
+import AdminConstraintEditor from "./AdminConstraintEditor.vue";
 
 const props = defineProps({
   active: {
@@ -109,6 +143,7 @@ const {
   overview,
   passwordForm,
   proxyConfig,
+  formConstraints,
   initAdminAuth,
   loginAdmin,
   logoutAdmin,
@@ -116,6 +151,8 @@ const {
   fetchRealIpConfig,
   updateRealIpConfig,
   changeAdminPassword,
+  fetchFormConstraintsConfig,
+  updateFormConstraintsCategory,
 } = useWorkbenchAdmin({ parseJsonSafe });
 
 const sidebarOpen = ref(true);
@@ -127,6 +164,9 @@ const menuItems = Object.freeze([
   { key: "tasks", label: "任务状态浏览", keywords: "task queue processing 任务 状态" },
   { key: "ips", label: "访问IP统计", keywords: "ip ipv6 stats 访问 统计" },
   { key: "proxy", label: "受信代理配置", keywords: "proxy trusted frp nginx 代理" },
+  { key: "constraints_enhance", label: "增强参数约束", keywords: "enhance constraints 参数 约束 锁 范围" },
+  { key: "constraints_convert", label: "转换参数约束", keywords: "convert constraints 参数 约束 锁 范围" },
+  { key: "constraints_transcribe", label: "转录参数约束", keywords: "transcribe constraints 参数 约束 锁 范围 whisper subtitle" },
   { key: "password", label: "修改管理密码", keywords: "password security 密码 安全" },
 ]);
 
@@ -206,9 +246,15 @@ const onMenuSelect = async (value) => {
   activeMenuKey.value = value;
   if (value === "proxy") {
     await fetchRealIpConfig();
+  } else if (String(value).startsWith("constraints_")) {
+    await fetchFormConstraintsConfig();
   } else if (needOverviewRefresh()) {
     await fetchOverview();
   }
+};
+
+const categoryConstraint = (categoryKey) => {
+  return formConstraints?.data?.categories?.[categoryKey] || { global_lock: "free", fields: {} };
 };
 
 watch(filteredMenuItems, (items) => {
@@ -229,6 +275,8 @@ watch(
     if (auth.token) {
       if (activeMenuKey.value === "proxy") {
         await fetchRealIpConfig();
+      } else if (String(activeMenuKey.value).startsWith("constraints_")) {
+        await fetchFormConstraintsConfig();
       } else {
         await fetchOverview();
       }
@@ -251,6 +299,10 @@ watch(activeMenuKey, async (nextKey) => {
   if (!auth.token || !props.active) return;
   if (nextKey === "proxy") {
     await fetchRealIpConfig();
+    return;
+  }
+  if (String(nextKey).startsWith("constraints_")) {
+    await fetchFormConstraintsConfig();
     return;
   }
   if (needOverviewRefresh()) {

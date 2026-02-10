@@ -15,6 +15,10 @@ from ..services.real_ip import (
     resolve_request_client_ip,
     update_trusted_proxies_raw,
 )
+from ..services.form_constraints import (
+    get_form_constraints_config,
+    update_form_constraints_config,
+)
 
 bp = Blueprint("api_admin", __name__)
 
@@ -121,3 +125,26 @@ def admin_update_real_ip_config():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify({"ok": True, "trusted_proxies": saved})
+
+
+@bp.get("/api/admin/config/form-constraints")
+def admin_get_form_constraints():
+    _session, err = get_admin_session(request)
+    if err:
+        return jsonify({"error": err}), 401
+    return jsonify(get_form_constraints_config())
+
+
+@bp.put("/api/admin/config/form-constraints")
+def admin_update_form_constraints():
+    _session, err = get_admin_session(request)
+    if err:
+        return jsonify({"error": err}), 401
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        return jsonify({"error": "invalid request payload"}), 400
+    try:
+        updated = update_form_constraints_config(payload)
+    except Exception as exc:
+        return jsonify({"error": f"failed to update form constraints: {exc}"}), 400
+    return jsonify({"ok": True, "config": updated})

@@ -13,8 +13,12 @@ export const useWorkbenchSubmission = ({
   fetchStatus,
   joinRoom,
   parseJsonSafe,
+  enforceCategory,
 }) => {
   const submitEnhanceTask = async () => {
+    if (typeof enforceCategory === "function") {
+      enforceCategory("enhance");
+    }
     if (!enhanceForm.files || enhanceForm.files.length === 0) {
       throw new Error("请先选择要上传的文件。");
     }
@@ -53,6 +57,9 @@ export const useWorkbenchSubmission = ({
   };
 
   const submitConvertTask = async () => {
+    if (typeof enforceCategory === "function") {
+      enforceCategory("convert");
+    }
     if (!convertForm.mediaFiles || convertForm.mediaFiles.length === 0) {
       throw new Error("请至少上传一个音频或视频文件。");
     }
@@ -77,6 +84,9 @@ export const useWorkbenchSubmission = ({
   };
 
   const submitTranscribeTask = async () => {
+    if (typeof enforceCategory === "function") {
+      enforceCategory("transcribe");
+    }
     if (!transcribeForm.mediaFiles || transcribeForm.mediaFiles.length === 0) {
       throw new Error("请至少上传一个要转录的音频或视频文件。");
     }

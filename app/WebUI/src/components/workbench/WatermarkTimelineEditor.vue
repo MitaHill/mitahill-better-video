@@ -65,5 +65,10 @@ defineProps({
     type: Function,
     required: true,
   },
+  getFieldPolicy: {
+    type: Function,
+    required: false,
+    default: null,
+  },
 });
 </script>

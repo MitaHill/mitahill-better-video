@@ -81,6 +81,8 @@ export const useWorkbenchFormsState = () => {
     watermarkLuaEnabled: false,
     watermarkLuaScript: "",
     frameExportFps: 0,
+    frameExportFpsMode: "manual",
+    frameExportFormat: "jpg",
     mediaFiles: [],
   });
 

@@ -6,6 +6,7 @@
       v-if="activeCategory === 'enhance'"
       :enhance-form="enhanceForm"
       :on-enhance-file-change="onEnhanceFileChange"
+      :get-field-policy="getFieldPolicy"
     />
 
     <ConvertTaskForm
@@ -17,12 +18,14 @@
       :on-watermark-lua-file-change="onWatermarkLuaFileChange"
       :add-watermark-segment="addWatermarkSegment"
       :remove-watermark-segment="removeWatermarkSegment"
+      :get-field-policy="getFieldPolicy"
     />
     <TranscribeTaskForm
       v-else
       :transcribe-form="transcribeForm"
       :transcribe-media-info="transcribeMediaInfo"
       :on-transcribe-media-change="onTranscribeMediaChange"
+      :get-field-policy="getFieldPolicy"
     />
 
     <div class="action-row">
@@ -104,6 +107,10 @@ const props = defineProps({
     required: true,
   },
   removeWatermarkSegment: {
+    type: Function,
+    required: true,
+  },
+  getFieldPolicy: {
     type: Function,
     required: true,
   },

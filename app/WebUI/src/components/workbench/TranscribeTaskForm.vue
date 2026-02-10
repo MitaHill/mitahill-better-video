@@ -4,8 +4,9 @@
       :transcribe-form="transcribeForm"
       :transcribe-media-info="transcribeMediaInfo"
       :on-transcribe-media-change="onTranscribeMediaChange"
+      :get-field-policy="getFieldPolicy"
     />
-    <TranscribeAdvancedSection :transcribe-form="transcribeForm" />
+    <TranscribeAdvancedSection :transcribe-form="transcribeForm" :get-field-policy="getFieldPolicy" />
   </div>
 </template>
 
@@ -23,6 +24,10 @@ defineProps({
     required: true,
   },
   onTranscribeMediaChange: {
+    type: Function,
+    required: true,
+  },
+  getFieldPolicy: {
     type: Function,
     required: true,
   },
