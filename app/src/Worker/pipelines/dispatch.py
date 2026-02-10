@@ -5,6 +5,7 @@ from app.src.Database import core as db
 
 from .conversion import process_conversion_task
 from .enhancement import process_enhancement_task
+from .transcription import process_transcription_task
 
 logger = logging.getLogger("PROCESSOR")
 
@@ -20,6 +21,10 @@ def process_task(task):
         if category == "convert":
             logger.info("Task %s routed to conversion pipeline.", task_id)
             process_conversion_task(task)
+            return
+        if category == "transcribe":
+            logger.info("Task %s routed to transcription pipeline.", task_id)
+            process_transcription_task(task)
             return
 
         process_enhancement_task(task)
