@@ -23,15 +23,24 @@ export const buildParamRows = (status) => {
     ];
   }
   if (params.task_category === "transcribe") {
+    const modeLabelMap = {
+      subtitle_zip: "字幕与文本（ZIP）",
+      subtitled_video: "带字幕视频",
+      subtitle_and_video_zip: "字幕与视频（ZIP）",
+    };
     return [
       { label: "任务类别", value: "视频转录" },
-      { label: "转录类型", value: params.transcribe_mode || "-" },
+      { label: "转录类型", value: modeLabelMap[params.transcribe_mode] || params.transcribe_mode || "-" },
       { label: "字幕格式", value: (params.subtitle_format || "-").toUpperCase() },
       { label: "Whisper 模型", value: params.whisper_model || "-" },
       { label: "语言", value: params.language || "auto" },
+      { label: "翻译目标", value: params.translate_to || "-" },
+      { label: "翻译提供器", value: params.translator_provider || "-" },
       { label: "温度", value: params.temperature ?? "-" },
       { label: "Beam Size", value: params.beam_size ?? "-" },
       { label: "Best Of", value: params.best_of ?? "-" },
+      { label: "双语字幕", value: formatBool(params.generate_bilingual) },
+      { label: "导出JSON", value: formatBool(params.export_json) },
       { label: "时间戳文本", value: formatBool(params.prepend_timestamps) },
       { label: "最大行宽", value: params.max_line_chars ?? "-" },
       { label: "视频输出编码", value: (params.output_video_codec || "-").toUpperCase() },

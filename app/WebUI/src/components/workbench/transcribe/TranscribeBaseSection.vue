@@ -22,6 +22,7 @@
         <select v-model="transcribeForm.transcribeMode">
           <option value="subtitle_zip">字幕与文本（ZIP）</option>
           <option value="subtitled_video">生成带字幕视频</option>
+          <option value="subtitle_and_video_zip">字幕与视频（ZIP）</option>
         </select>
       </div>
       <div class="field compact">
@@ -47,6 +48,11 @@
         <label>语言</label>
         <input v-model="transcribeForm.language" placeholder="auto / zh / en ..." />
       </div>
+    </div>
+
+    <div class="field compact">
+      <label>翻译目标语言（留空=不翻译）</label>
+      <input v-model="transcribeForm.translateTo" placeholder="例如：中文 / English / 日本語" />
     </div>
   </div>
 </template>

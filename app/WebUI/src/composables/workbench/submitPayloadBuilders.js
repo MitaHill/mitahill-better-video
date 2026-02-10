@@ -101,6 +101,15 @@ export const buildTranscriptionTaskFormData = (transcribeForm) => {
   data.append("subtitle_format", transcribeForm.subtitleFormat);
   data.append("whisper_model", transcribeForm.whisperModel);
   data.append("language", transcribeForm.language);
+  data.append("translate_to", transcribeForm.translateTo || "");
+  data.append("translator_provider", transcribeForm.translatorProvider || "none");
+  data.append("translator_base_url", transcribeForm.translatorBaseUrl || "");
+  data.append("translator_model", transcribeForm.translatorModel || "");
+  data.append("translator_api_key", transcribeForm.translatorApiKey || "");
+  data.append("translator_prompt", transcribeForm.translatorPrompt || "");
+  data.append("translator_timeout_sec", String(transcribeForm.translatorTimeoutSec || 120));
+  data.append("generate_bilingual", String(transcribeForm.generateBilingual));
+  data.append("export_json", String(transcribeForm.exportJson));
   data.append("prepend_timestamps", String(transcribeForm.prependTimestamps));
   data.append("max_line_chars", String(transcribeForm.maxLineChars));
   data.append("temperature", String(transcribeForm.temperature));
