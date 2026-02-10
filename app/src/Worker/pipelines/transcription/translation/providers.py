@@ -55,8 +55,7 @@ class BaseTranslator:
     def _resolve_fallback_text(self, *, model_raw_text: str, source_text: str) -> str:
         if self.fallback_mode == "source_text":
             return str(source_text or "")
-        model_text = self._sanitize_model_text(model_raw_text)
-        return model_text or str(source_text or "")
+        return self._sanitize_model_text(model_raw_text)
 
     @staticmethod
     def _message_prompt(target_language: str) -> str:
