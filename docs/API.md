@@ -224,3 +224,97 @@ Request (example):
   }
 }
 ```
+
+### GET /api/admin/config/transcription-sources
+Header:
+- `Authorization: Bearer <token>`
+
+读取“转录模型设置 + 翻译源设置 + aria2下载参数”。
+
+### PUT /api/admin/config/transcription-sources
+Header:
+- `Authorization: Bearer <token>`
+
+按需增量更新转录源配置。
+
+Request (example):
+```json
+{
+  "transcription": {
+    "backend": "whisper",
+    "active_model": "large-v3",
+    "allowed_models": ["small", "medium", "large-v3", "turbo"]
+  },
+  "translation": {
+    "provider": "ollama",
+    "base_url": "http://127.0.0.1:11434",
+    "model": "qwen2.5:7b",
+    "timeout_sec": 120
+  },
+  "download": {
+    "aria2": {
+      "split": 16,
+      "max_connection_per_server": 16,
+      "proxy": "socks5://127.0.0.1:1080"
+    }
+  }
+}
+```
+
+### GET /api/admin/transcription/models
+Header:
+- `Authorization: Bearer <token>`
+
+返回 whisper / faster-whisper 模型目录，以及本地安装状态。
+
+### POST /api/admin/transcription/models/download
+Header:
+- `Authorization: Bearer <token>`
+
+启动模型下载任务（aria2，支持断点续传）。
+
+Request:
+```json
+{ "backend": "whisper", "model_id": "large-v3" }
+```
+
+### GET /api/admin/transcription/models/downloads
+Header:
+- `Authorization: Bearer <token>`
+
+查看模型下载任务列表（状态、进度、错误信息）。
+
+### GET /api/admin/transcription/models/downloads/<job_id>
+Header:
+- `Authorization: Bearer <token>`
+
+查看单个模型下载任务详情。
+
+### POST /api/admin/debug/test-transcription-model
+Header:
+- `Authorization: Bearer <token>`
+
+执行转录模型测试：
+1. HASH 校验
+2. GPU 热身（5秒静音音频识别）
+
+### POST /api/admin/debug/test-translation-provider
+Header:
+- `Authorization: Bearer <token>`
+
+执行翻译源测试：
+- `ollama`: TCP-PING(3秒) -> 模型列表检查 -> 对话测速(60秒超时)
+- `openai_compatible`: Chat Completions 调用 + 常见错误分类
+
+### GET /api/admin/logs
+Header:
+- `Authorization: Bearer <token>`
+
+读取数据库中的系统日志（默认 WARN+）。
+
+Query:
+- `min_level` (`WARNING` | `ERROR` | `CRITICAL` | `INFO`)
+- `logger` (optional)
+- `q` (optional keyword)
+- `limit` (optional)
+- `offset` (optional)

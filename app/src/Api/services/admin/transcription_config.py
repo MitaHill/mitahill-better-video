@@ -149,6 +149,7 @@ def update_transcription_config(payload: Dict[str, Any]) -> Dict[str, Any]:
     merged = _deep_merge(get_transcription_config(), payload or {})
     normalized = _normalize_config(merged)
     db_transcription.set_transcription_config(normalized)
+    _sync_transcription_constraints(normalized)
     return normalized
 
 
@@ -165,3 +166,46 @@ def get_parser_defaults() -> Dict[str, Any]:
         "translator_prompt": str(translation.get("prompt") or "").strip(),
         "translator_timeout_sec": float(translation.get("timeout_sec") or 120.0),
     }
+
+
+def _sync_transcription_constraints(current: Dict[str, Any]):
+    """Keep transcribe form constraint options aligned with admin transcription config."""
+    try:
+        from app.src.Api.services.form_constraints import (
+            get_form_constraints_config,
+            update_form_constraints_config,
+        )
+    except Exception:
+        return
+
+    config = get_form_constraints_config()
+    categories = config.get("categories") or {}
+    transcribe = categories.get("transcribe") or {}
+    fields = copy.deepcopy(transcribe.get("fields") or {})
+    whisper_field = fields.get("whisper_model") or {}
+
+    transcription = current.get("transcription") or {}
+    allowed = [
+        str(item).strip().lower()
+        for item in (transcription.get("allowed_models") or [])
+        if str(item).strip()
+    ]
+    active_model = str(transcription.get("active_model") or "medium").strip().lower()
+    if active_model and active_model not in allowed:
+        allowed.append(active_model)
+    if allowed:
+        whisper_field["allowed_values"] = allowed
+    whisper_field["default_value"] = active_model or whisper_field.get("default_value", "medium")
+    if whisper_field.get("lock") == "fixed":
+        whisper_field["fixed_value"] = active_model or whisper_field.get("fixed_value", "medium")
+    fields["whisper_model"] = whisper_field
+
+    update_form_constraints_config(
+        {
+            "categories": {
+                "transcribe": {
+                    "fields": fields,
+                }
+            }
+        }
+    )

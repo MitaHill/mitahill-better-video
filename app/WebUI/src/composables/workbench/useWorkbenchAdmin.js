@@ -489,6 +489,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       });
       const payload = await parseJsonSafe(res);
       if (!res.ok) {
+        debugTools.modelTestResult = payload || null;
         throw new Error(payload.error || "转录模型测试失败");
       }
       debugTools.modelTestResult = payload;
@@ -511,6 +512,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       });
       const payload = await parseJsonSafe(res);
       if (!res.ok) {
+        debugTools.translationTestResult = payload || null;
         throw new Error(payload.error || "翻译源测试失败");
       }
       debugTools.translationTestResult = payload;
