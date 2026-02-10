@@ -18,15 +18,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /workspace
 
 # Python dependencies (heavy, rarely changes)
-RUN python -m pip install --upgrade pip setuptools wheel "numpy<2" && \
+RUN python -m pip install --upgrade pip "setuptools<70" wheel "numpy<2" && \
     python -m pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cu116 \
         torch==1.13.1+cu116 torchvision==0.14.1+cu116 torchaudio==0.13.1+cu116 && \
-    python -m pip install --no-cache-dir \
-        openai-whisper==20231117 \
-        requests==2.31.0 \
+    python -m pip install --no-cache-dir "setuptools<70" cython==0.29.36 && \
+    python -m pip install --no-cache-dir --no-build-isolation openai-whisper==20231117 && \
+    python -m pip install --no-cache-dir --no-build-isolation \
         basicsr==1.4.2 \
         facexlib==0.2.5 \
-        gfpgan==1.3.5 \
+        gfpgan==1.3.5 && \
+    python -m pip install --no-cache-dir \
+        requests==2.31.0 \
         numpy==1.24.4 \
         opencv-python==4.8.0.76 \
         Pillow==9.5.0 \
