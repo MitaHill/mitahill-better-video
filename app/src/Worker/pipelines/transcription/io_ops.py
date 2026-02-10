@@ -1,3 +1,4 @@
+import json
 import zipfile
 from pathlib import Path
 
@@ -33,30 +34,32 @@ def extract_transcribe_audio(input_path, run_dir):
     return audio_path, info, True
 
 
-def write_transcript_files(
-    output_dir,
-    stem,
-    segments,
-    *,
-    subtitle_format="srt",
-    prepend_timestamps=False,
-    max_line_chars=42,
-):
-    output_dir.mkdir(parents=True, exist_ok=True)
-    results = []
-    format_key = (subtitle_format or "srt").strip().lower()
-    if format_key == "vtt":
-        subtitle_path = output_dir / f"{stem}.vtt"
-        subtitle_path.write_text(segments_to_vtt(segments, max_line_chars=max_line_chars), encoding="utf-8")
+def write_subtitle_file(path, segments, subtitle_format="srt", max_line_chars=42):
+    file_path = Path(path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    fmt = (subtitle_format or "srt").strip().lower()
+    if fmt == "vtt":
+        file_path.write_text(segments_to_vtt(segments, max_line_chars=max_line_chars), encoding="utf-8")
     else:
-        subtitle_path = output_dir / f"{stem}.srt"
-        subtitle_path.write_text(segments_to_srt(segments, max_line_chars=max_line_chars), encoding="utf-8")
-    results.append(subtitle_path)
+        file_path.write_text(segments_to_srt(segments, max_line_chars=max_line_chars), encoding="utf-8")
+    return file_path
 
-    text_path = output_dir / f"{stem}.txt"
-    text_path.write_text(segments_to_text(segments, prepend_timestamps=prepend_timestamps), encoding="utf-8")
-    results.append(text_path)
-    return subtitle_path, results
+
+def write_text_file(path, segments, prepend_timestamps=False):
+    file_path = Path(path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(
+        segments_to_text(segments, prepend_timestamps=prepend_timestamps),
+        encoding="utf-8",
+    )
+    return file_path
+
+
+def write_json_file(path, payload):
+    file_path = Path(path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return file_path
 
 
 def _subtitle_filter_arg(subtitle_path):
@@ -107,10 +110,18 @@ def render_subtitled_video(video_path, subtitle_path, output_path, codec_key, au
 
 def zip_outputs(paths, destination):
     destination.parent.mkdir(parents=True, exist_ok=True)
+    arcname_counts = {}
     with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for path in paths:
             file_path = Path(path)
             if not file_path.exists() or not file_path.is_file():
                 continue
-            zf.write(file_path, arcname=file_path.name)
+            arcname = file_path.name
+            count = arcname_counts.get(arcname, 0)
+            if count > 0:
+                stem = Path(arcname).stem
+                suffix = Path(arcname).suffix
+                arcname = f"{stem}_{count}{suffix}"
+            arcname_counts[file_path.name] = count + 1
+            zf.write(file_path, arcname=arcname)
     return destination

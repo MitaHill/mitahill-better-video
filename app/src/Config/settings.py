@@ -168,6 +168,16 @@ try:
     )
     REAL_IP_TRUSTED_PROXIES = parse_trusted_proxies(REAL_IP_TRUSTED_PROXIES_RAW)
     EVENTS_SHARED_TOKEN = os.getenv("EVENTS_SHARED_TOKEN", "")
+    TRANSCRIPTION_TRANSLATOR_PROVIDER = os.getenv("TRANSCRIPTION_TRANSLATOR_PROVIDER", "none").strip().lower()
+    TRANSCRIPTION_TRANSLATOR_BASE_URL = os.getenv("TRANSCRIPTION_TRANSLATOR_BASE_URL", "").strip()
+    TRANSCRIPTION_TRANSLATOR_MODEL = os.getenv("TRANSCRIPTION_TRANSLATOR_MODEL", "").strip()
+    TRANSCRIPTION_TRANSLATOR_API_KEY = os.getenv("TRANSCRIPTION_TRANSLATOR_API_KEY", "").strip()
+    TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS = get_env_float("TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS", 120.0)
+    TRANSCRIPTION_TRANSLATOR_PROMPT = os.getenv(
+        "TRANSCRIPTION_TRANSLATOR_PROMPT",
+        "You are a translation engine. Translate the user text to the target language only. "
+        "Do not add explanations.",
+    ).strip()
 except Exception as e:
     logger.critical(f"[FAILED] Configuration error: {e}")
     sys.exit(1)

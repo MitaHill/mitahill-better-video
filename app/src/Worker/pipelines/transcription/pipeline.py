@@ -1,12 +1,24 @@
 import json
+import logging
 from pathlib import Path
 
 from app.src.Database import core as db
 from app.src.Notifications.events import send_event
 
-from .io_ops import extract_transcribe_audio, render_subtitled_video, write_transcript_files, zip_outputs
+from .io_ops import (
+    extract_transcribe_audio,
+    render_subtitled_video,
+    write_json_file,
+    write_subtitle_file,
+    write_text_file,
+    zip_outputs,
+)
+from .options import normalize_transcription_options
 from .progress import emit_progress
+from .translation import build_bilingual_segments, create_translator, translate_segments
 from .whisper_engine import ENGINE
+
+logger = logging.getLogger("TRANSCRIBE")
 
 
 def _extract_segments(transcript_result):
@@ -24,10 +36,22 @@ def _build_item_progress(index, total, inner):
     return int(5 + (base + clamped_inner / total_items) * 90)
 
 
-def _process_single_media(task_id, media_item, params, run_dir, index, total):
+def _safe_stem(index, media_path):
+    stem = media_path.stem.replace(" ", "_")
+    return f"{index:03d}_{stem}"
+
+
+def _subtitle_suffix(subtitle_format):
+    return "vtt" if (subtitle_format or "srt").lower() == "vtt" else "srt"
+
+
+def _process_single_media(task_id, media_item, options, run_dir, index, total, translator):
     media_path = Path(media_item.get("upload_path", ""))
     if not media_path.exists():
         raise RuntimeError(f"uploaded media missing: {media_item.get('filename')}")
+
+    stem = _safe_stem(index, media_path)
+    output_dir = run_dir / "results"
 
     emit_progress(
         task_id,
@@ -37,58 +61,149 @@ def _process_single_media(task_id, media_item, params, run_dir, index, total):
         file_count=total,
     )
     audio_path, info, created_temp_audio = extract_transcribe_audio(media_path, run_dir)
+
     try:
         emit_progress(
             task_id,
-            _build_item_progress(index, total, 0.35),
+            _build_item_progress(index, total, 0.25),
             f"转录文件 {index}/{total}: 语音识别中",
             file_index=index,
             file_count=total,
         )
         result = ENGINE.transcribe(
             audio_path,
-            model_name=params.get("whisper_model", "medium"),
-            language=params.get("language", "auto"),
-            temperature=params.get("temperature", 0.0),
-            beam_size=params.get("beam_size", 5),
-            best_of=params.get("best_of", 5),
+            model_name=options.get("whisper_model", "medium"),
+            language=options.get("language", "auto"),
+            temperature=options.get("temperature", 0.0),
+            beam_size=options.get("beam_size", 5),
+            best_of=options.get("best_of", 5),
         )
-        segments = _extract_segments(result)
-        if not segments:
+        source_segments = _extract_segments(result)
+        if not source_segments:
             raise RuntimeError(f"no transcript segments extracted from {media_item.get('filename')}")
+
+        subtitle_ext = _subtitle_suffix(options.get("subtitle_format", "srt"))
+        text_outputs = []
 
         emit_progress(
             task_id,
-            _build_item_progress(index, total, 0.65),
-            f"转录文件 {index}/{total}: 生成字幕",
+            _build_item_progress(index, total, 0.45),
+            f"转录文件 {index}/{total}: 写入原文字幕",
             file_index=index,
             file_count=total,
         )
-        output_dir = run_dir / "results"
-        subtitle_path, outputs = write_transcript_files(
-            output_dir,
-            media_path.stem,
-            segments,
-            subtitle_format=params.get("subtitle_format", "srt"),
-            prepend_timestamps=bool(params.get("prepend_timestamps", False)),
-            max_line_chars=int(params.get("max_line_chars", 42) or 42),
+        original_subtitle = write_subtitle_file(
+            output_dir / f"{stem}_original.{subtitle_ext}",
+            source_segments,
+            subtitle_format=options.get("subtitle_format", "srt"),
+            max_line_chars=options.get("max_line_chars", 42),
         )
-
-        mode = (params.get("transcribe_mode") or "subtitle_zip").strip().lower()
-        if mode == "subtitled_video" and info.get("has_video"):
-            video_codec = params.get("output_video_codec", "h264")
-            audio_bitrate_k = params.get("output_audio_bitrate_k", 192)
-            subtitled = output_dir / f"{media_path.stem}_subtitled.mp4"
-            outputs.append(
-                render_subtitled_video(
-                    media_path,
-                    subtitle_path,
-                    subtitled,
-                    video_codec,
-                    audio_bitrate_k,
+        text_outputs.append(original_subtitle)
+        text_outputs.append(
+            write_text_file(
+                output_dir / f"{stem}_original.txt",
+                source_segments,
+                prepend_timestamps=options.get("prepend_timestamps", False),
+            )
+        )
+        if options.get("export_json"):
+            text_outputs.append(
+                write_json_file(
+                    output_dir / f"{stem}_original.json",
+                    {"media": media_item, "segments": source_segments},
                 )
             )
-        return outputs
+
+        translated_segments = None
+        translated_subtitle = None
+        if translator and (options.get("translate_to") or "").strip():
+            emit_progress(
+                task_id,
+                _build_item_progress(index, total, 0.58),
+                f"转录文件 {index}/{total}: 翻译中",
+                file_index=index,
+                file_count=total,
+            )
+
+            def _translation_progress(done, total_count):
+                if total_count <= 0:
+                    return
+                ratio = max(0.0, min(1.0, float(done) / float(total_count)))
+                emit_progress(
+                    task_id,
+                    _build_item_progress(index, total, 0.58 + ratio * 0.18),
+                    f"转录文件 {index}/{total}: 翻译中 {done}/{total_count}",
+                    file_index=index,
+                    file_count=total,
+                )
+
+            translated_segments = translate_segments(
+                source_segments,
+                translator,
+                options.get("translate_to", ""),
+                progress_callback=_translation_progress,
+            )
+
+            translated_subtitle = write_subtitle_file(
+                output_dir / f"{stem}_translated.{subtitle_ext}",
+                translated_segments,
+                subtitle_format=options.get("subtitle_format", "srt"),
+                max_line_chars=options.get("max_line_chars", 42),
+            )
+            text_outputs.append(translated_subtitle)
+            text_outputs.append(
+                write_text_file(
+                    output_dir / f"{stem}_translated.txt",
+                    translated_segments,
+                    prepend_timestamps=options.get("prepend_timestamps", False),
+                )
+            )
+            if options.get("generate_bilingual"):
+                bilingual_segments = build_bilingual_segments(source_segments, translated_segments)
+                text_outputs.append(
+                    write_subtitle_file(
+                        output_dir / f"{stem}_bilingual.{subtitle_ext}",
+                        bilingual_segments,
+                        subtitle_format=options.get("subtitle_format", "srt"),
+                        max_line_chars=options.get("max_line_chars", 42),
+                    )
+                )
+            if options.get("export_json"):
+                text_outputs.append(
+                    write_json_file(
+                        output_dir / f"{stem}_translated.json",
+                        {"media": media_item, "segments": translated_segments},
+                    )
+                )
+
+        mode = options.get("transcribe_mode", "subtitle_zip")
+        video_outputs = []
+        if mode in {"subtitled_video", "subtitle_and_video_zip"} and info.get("has_video"):
+            emit_progress(
+                task_id,
+                _build_item_progress(index, total, 0.86),
+                f"转录文件 {index}/{total}: 合成字幕视频",
+                file_index=index,
+                file_count=total,
+            )
+            subtitle_for_video = translated_subtitle or original_subtitle
+            video_outputs.append(
+                render_subtitled_video(
+                    media_path,
+                    subtitle_for_video,
+                    output_dir / f"{stem}_subtitled.mp4",
+                    options.get("output_video_codec", "h264"),
+                    options.get("output_audio_bitrate_k", 192),
+                )
+            )
+
+        if mode == "subtitled_video":
+            if video_outputs:
+                return video_outputs
+            return text_outputs
+        if mode == "subtitle_and_video_zip":
+            return text_outputs + video_outputs
+        return text_outputs
     finally:
         if created_temp_audio and audio_path.exists():
             try:
@@ -99,25 +214,37 @@ def _process_single_media(task_id, media_item, params, run_dir, index, total):
 
 def process_transcription_task(task):
     task_id = task["task_id"]
-    params = json.loads(task.get("task_params") or "{}")
+    raw_params = json.loads(task.get("task_params") or "{}")
+    options = normalize_transcription_options(raw_params)
     run_dir = Path("/workspace/storage/output") / f"run_{task_id}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    media_files = params.get("media_files") or []
+    media_files = raw_params.get("media_files") or []
     if not media_files:
         raise RuntimeError("No uploaded audio/video files for transcription.")
 
     emit_progress(task_id, 2, "转录任务初始化中...")
+
+    translator = None
+    if (options.get("translate_to") or "").strip():
+        translator = create_translator(options)
+        logger.info("Task %s translation enabled, provider=%s", task_id, getattr(translator, "label", "-"))
+
     all_outputs = []
     total = len(media_files)
     for idx, media_item in enumerate(media_files, start=1):
-        all_outputs.extend(_process_single_media(task_id, media_item, params, run_dir, idx, total))
+        outputs = _process_single_media(task_id, media_item, options, run_dir, idx, total, translator)
+        all_outputs.extend(outputs)
 
     if not all_outputs:
         raise RuntimeError("No output generated by transcription pipeline.")
 
-    force_zip = len(media_files) > 1 or (params.get("transcribe_mode") or "subtitle_zip").lower() == "subtitle_zip"
-    if force_zip:
+    mode = options.get("transcribe_mode", "subtitle_zip")
+    should_zip = len(media_files) > 1 or mode in {"subtitle_zip", "subtitle_and_video_zip"}
+    if mode == "subtitled_video" and not any(str(p).lower().endswith(".mp4") for p in all_outputs):
+        should_zip = True
+
+    if should_zip:
         result_path = run_dir / "results" / f"transcribe_{task_id}.zip"
         zip_outputs(all_outputs, result_path)
     else:

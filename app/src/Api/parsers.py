@@ -160,6 +160,38 @@ def parse_transcription_task_params(form):
         "whisper_model": (form.get("whisper_model", "medium") or "medium").lower(),
         "language": (form.get("language", "auto") or "auto").strip(),
         "translate_to": (form.get("translate_to", "") or "").strip(),
+        "translator_provider": (
+            form.get("translator_provider", config.TRANSCRIPTION_TRANSLATOR_PROVIDER)
+            or config.TRANSCRIPTION_TRANSLATOR_PROVIDER
+            or "none"
+        ).strip().lower(),
+        "translator_base_url": (
+            form.get("translator_base_url", config.TRANSCRIPTION_TRANSLATOR_BASE_URL)
+            or config.TRANSCRIPTION_TRANSLATOR_BASE_URL
+            or ""
+        ).strip(),
+        "translator_model": (
+            form.get("translator_model", config.TRANSCRIPTION_TRANSLATOR_MODEL)
+            or config.TRANSCRIPTION_TRANSLATOR_MODEL
+            or ""
+        ).strip(),
+        "translator_api_key": (
+            form.get("translator_api_key", config.TRANSCRIPTION_TRANSLATOR_API_KEY)
+            or config.TRANSCRIPTION_TRANSLATOR_API_KEY
+            or ""
+        ).strip(),
+        "translator_prompt": (
+            form.get("translator_prompt", config.TRANSCRIPTION_TRANSLATOR_PROMPT)
+            or config.TRANSCRIPTION_TRANSLATOR_PROMPT
+            or ""
+        ).strip(),
+        "translator_timeout_sec": float_from_form(
+            form,
+            "translator_timeout_sec",
+            config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS,
+        ),
+        "generate_bilingual": bool_from_form(form, "generate_bilingual", True),
+        "export_json": bool_from_form(form, "export_json", False),
         "prepend_timestamps": bool_from_form(form, "prepend_timestamps", False),
         "max_line_chars": int_from_form(form, "max_line_chars", 42),
         "temperature": float_from_form(form, "temperature", 0.0),
