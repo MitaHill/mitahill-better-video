@@ -9,7 +9,7 @@
           <option value="light">浅色</option>
         </select>
       </div>
-      <h1 class="app-title">better_video</h1>
+      <h1 class="app-title">更好的视频</h1>
     </div>
     <TopCategoryTabs :active-category="activeCategory" :tabs="CATEGORY_TABS" @switch="onSwitchCategory" />
   </div>

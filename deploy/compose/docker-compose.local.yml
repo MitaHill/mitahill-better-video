@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  app:
+  better_video:
     image: kindmitaishere/mitahill-better-video:260110-1140
-    container_name: realesrgan_app
+    container_name: better_video
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
