@@ -4,8 +4,8 @@ from typing import Optional
 import requests
 
 
-_CODE_BLOCK_RE = re.compile(r"```(?:[a-zA-Z]+)?\\s*([\\s\\S]*?)```", re.MULTILINE)
-_THINK_TAG_RE = re.compile(r"<think>[\\s\\S]*?</think>", re.IGNORECASE)
+_CODE_BLOCK_RE = re.compile(r"```(?:[a-zA-Z]+)?\s*([\s\S]*?)```", re.MULTILINE)
+_THINK_TAG_RE = re.compile(r"<think>[\s\S]*?</think>", re.IGNORECASE)
 
 
 class BaseTranslator:
@@ -23,11 +23,20 @@ class BaseTranslator:
 
     @staticmethod
     def _extract_content(raw_text: str) -> str:
-        cleaned = _THINK_TAG_RE.sub("", str(raw_text or "")).strip()
-        matches = _CODE_BLOCK_RE.findall(cleaned)
-        if matches:
-            return matches[0].strip()
-        return cleaned
+        full_text = str(raw_text or "").strip()
+        if not full_text:
+            return ""
+
+        # Prefer fenced code block content from model response.
+        matches = _CODE_BLOCK_RE.findall(full_text)
+        for item in matches:
+            candidate = str(item or "").strip()
+            if candidate:
+                return candidate
+
+        # If no code block can be extracted, return full model response text.
+        cleaned = _THINK_TAG_RE.sub("", full_text).strip()
+        return cleaned or full_text
 
     @staticmethod
     def _message_prompt(target_language: str) -> str:
@@ -56,7 +65,7 @@ class OllamaTranslator(BaseTranslator):
         data = response.json()
         content = ((data.get("message") or {}).get("content") or "").strip()
         parsed = self._extract_content(content)
-        return parsed or str(text or "")
+        return parsed or content or str(text or "")
 
 
 class OpenAICompatibleTranslator(BaseTranslator):
@@ -91,7 +100,7 @@ class OpenAICompatibleTranslator(BaseTranslator):
             return str(text or "")
         content = ((choices[0].get("message") or {}).get("content") or "").strip()
         parsed = self._extract_content(content)
-        return parsed or str(text or "")
+        return parsed or content or str(text or "")
 
 
 def create_translator(options) -> Optional[BaseTranslator]:
