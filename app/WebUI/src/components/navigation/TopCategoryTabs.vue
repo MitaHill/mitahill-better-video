@@ -18,6 +18,7 @@
 
 <script setup>
 import { computed } from "vue";
+import { computeActiveIndex, computeSliderStyle, resolveTabs } from "./topTabsLayout";
 
 const props = defineProps({
   activeCategory: {
@@ -32,28 +33,13 @@ const props = defineProps({
 
 const emit = defineEmits(["switch"]);
 
-const safeTabs = computed(() => {
-  if (Array.isArray(props.tabs) && props.tabs.length) return props.tabs;
-  return [
-    { key: "enhance", label: "增强" },
-    { key: "convert", label: "转换" },
-    { key: "transcribe", label: "转录" },
-    { key: "download", label: "下载" },
-    { key: "admin", label: "管理" },
-  ];
-});
+const safeTabs = computed(() => resolveTabs(props.tabs));
 
-const activeIndex = computed(() => {
-  const idx = safeTabs.value.findIndex((tab) => tab.key === props.activeCategory);
-  return idx >= 0 ? idx : 0;
-});
+const activeIndex = computed(() => computeActiveIndex(safeTabs.value, props.activeCategory));
 
 const tabVars = computed(() => ({
   "--tab-count": String(Math.max(1, safeTabs.value.length)),
 }));
 
-const sliderStyle = computed(() => ({
-  width: `calc((100% / ${Math.max(1, safeTabs.value.length)}) * 0.75)`,
-  left: `calc(${activeIndex.value} * (100% / ${Math.max(1, safeTabs.value.length)}) + ((100% / ${Math.max(1, safeTabs.value.length)}) * 0.125))`,
-}));
+const sliderStyle = computed(() => computeSliderStyle(activeIndex.value, safeTabs.value.length));
 </script>

@@ -798,6 +798,7 @@ button:hover {
   background: var(--surface-strong);
   position: relative;
   min-height: 300px;
+  padding-bottom: 22px;
 }
 
 .admin-gpu-chart {
@@ -827,6 +828,18 @@ button:hover {
   pointer-events: none;
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.admin-gpu-device-info {
+  position: absolute;
+  left: 8px;
+  bottom: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: calc(100% - 16px);
 }
 
 .admin-gpu-legend {
