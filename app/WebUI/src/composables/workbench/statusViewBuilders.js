@@ -47,6 +47,24 @@ export const buildParamRows = (status) => {
       { label: "音频码率", value: params.output_audio_bitrate_k ? `${params.output_audio_bitrate_k}k` : "-" },
     ];
   }
+  if (params.task_category === "download") {
+    const modeLabel = {
+      video: "视频",
+      audio: "仅音频",
+      subtitle_only: "仅字幕",
+    };
+    return [
+      { label: "任务类别", value: "视频下载" },
+      { label: "下载类型", value: modeLabel[params.download_mode] || params.download_mode || "-" },
+      { label: "源链接", value: params.source_url || "-" },
+      { label: "清晰度选择", value: params.quality_selector || "-" },
+      { label: "视频封装", value: (params.video_output_format || "-").toUpperCase() },
+      { label: "音频格式", value: (params.audio_output_format || "-").toUpperCase() },
+      { label: "字幕格式", value: (params.subtitle_output_format || "-").toUpperCase() },
+      { label: "字幕语言", value: Array.isArray(params.subtitle_languages) ? params.subtitle_languages.join(", ") || "-" : "-" },
+      { label: "包含自动字幕", value: formatBool(params.subtitle_include_auto) },
+    ];
+  }
 
   return [
     { label: "任务类别", value: "视频增强" },

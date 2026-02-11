@@ -27,7 +27,7 @@
       :on-transcribe-media-change="onTranscribeMediaChange"
       :get-field-policy="getFieldPolicy"
     />
-    <DownloadTaskForm v-else :download-form="downloadForm" />
+    <DownloadTaskForm v-else :download-form="downloadForm" :on-probe-source="onProbeDownloadSource" />
 
     <div class="action-row">
       <button @click="submitTask" :disabled="loadingSubmit">
@@ -105,6 +105,10 @@ const props = defineProps({
     required: true,
   },
   onWatermarkLuaFileChange: {
+    type: Function,
+    required: true,
+  },
+  onProbeDownloadSource: {
     type: Function,
     required: true,
   },

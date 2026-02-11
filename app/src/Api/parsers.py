@@ -227,3 +227,33 @@ def parse_transcription_task_params(form):
         "output_audio_bitrate_k": int_from_form(form, "output_audio_bitrate_k", 192),
     }
     return merge_unparsed_form_fields(form, parsed)
+
+
+def parse_download_task_params(form):
+    subtitle_languages = []
+    if hasattr(form, "getlist"):
+        subtitle_languages = form.getlist("subtitle_languages")
+    else:
+        raw = form.get("subtitle_languages", [])
+        if isinstance(raw, list):
+            subtitle_languages = raw
+        elif raw is not None:
+            subtitle_languages = [raw]
+    if not subtitle_languages:
+        raw_langs = (form.get("subtitle_languages") or "").strip()
+        if raw_langs:
+            subtitle_languages = [item.strip() for item in raw_langs.split(",") if item.strip()]
+    parsed = {
+        "task_category": "download",
+        "source_url": (form.get("source_url", "") or "").strip(),
+        "source_title": (form.get("source_title", "") or "").strip(),
+        "source_duration_sec": int_from_form(form, "source_duration_sec", 0),
+        "download_mode": (form.get("download_mode", "video") or "video").strip().lower(),
+        "quality_selector": (form.get("quality_selector", "bestvideo*+bestaudio/best") or "bestvideo*+bestaudio/best").strip(),
+        "video_output_format": (form.get("video_output_format", "mp4") or "mp4").strip().lower(),
+        "audio_output_format": (form.get("audio_output_format", "mp3") or "mp3").strip().lower(),
+        "subtitle_output_format": (form.get("subtitle_output_format", "srt") or "srt").strip().lower(),
+        "subtitle_include_auto": bool_from_form(form, "subtitle_include_auto", True),
+        "subtitle_languages": subtitle_languages,
+    }
+    return merge_unparsed_form_fields(form, parsed)

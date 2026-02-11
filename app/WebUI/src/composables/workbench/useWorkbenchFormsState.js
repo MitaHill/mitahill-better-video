@@ -112,9 +112,23 @@ export const useWorkbenchFormsState = () => {
   });
   const transcribeMediaInfo = ref([]);
   const downloadForm = reactive({
-    url: "",
-    outputFormat: "mp4",
-    audioOnly: false,
+    sourceUrl: "",
+    sourceTitle: "",
+    sourceDurationSec: 0,
+    downloadMode: "video",
+    qualitySelector: "bestvideo*+bestaudio/best",
+    qualityOptions: [],
+    maxQualityLabel: "",
+    videoOutputFormat: "mp4",
+    audioOutputFormat: "mp3",
+    subtitleOutputFormat: "srt",
+    subtitleLanguagesOptions: [],
+    subtitleLanguages: [],
+    subtitleIncludeAuto: true,
+    probeLoading: false,
+    probeReady: false,
+    probeError: "",
+    probeMessage: "",
   });
 
   const addWatermarkSegment = () => {

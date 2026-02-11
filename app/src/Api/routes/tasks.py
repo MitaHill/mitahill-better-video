@@ -1,7 +1,9 @@
 import io
 import json
+import shutil
+from pathlib import Path
 
-from flask import Blueprint, current_app, jsonify, request, send_file
+from flask import Blueprint, after_this_request, current_app, jsonify, request, send_file
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from app.src.Config import settings as config
@@ -126,4 +128,27 @@ def download_result(task_id):
     path = find_result_file(task, OUTPUT_ROOT)
     if not path:
         return jsonify({"error": "output missing"}), 404
-    return send_file(path, as_attachment=True)
+    category = str(task.get("task_category") or "").strip().lower()
+
+    if category == "download":
+        @after_this_request
+        def _cleanup_download_result(response):
+            try:
+                if path.exists():
+                    path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            try:
+                run_dir = OUTPUT_ROOT / f"run_{task_id}"
+                if run_dir.exists():
+                    shutil.rmtree(run_dir, ignore_errors=True)
+            except Exception:
+                pass
+            try:
+                db.update_task_result(task_id, "")
+                db.update_task_status(task_id, "COMPLETED", progress=100, message="已下载，临时文件已清理")
+            except Exception:
+                pass
+            return response
+
+    return send_file(path, as_attachment=True, download_name=Path(path).name)

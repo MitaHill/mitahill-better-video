@@ -4,6 +4,7 @@ import logging
 from app.src.Database import core as db
 
 from .conversion import process_conversion_task
+from .download import process_download_task
 from .enhancement import process_enhancement_task
 from .transcription import process_transcription_task
 
@@ -25,6 +26,10 @@ def process_task(task):
         if category == "transcribe":
             logger.info("Task %s routed to transcription pipeline.", task_id)
             process_transcription_task(task)
+            return
+        if category == "download":
+            logger.info("Task %s routed to download pipeline.", task_id)
+            process_download_task(task)
             return
 
         process_enhancement_task(task)

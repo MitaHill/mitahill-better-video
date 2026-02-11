@@ -33,7 +33,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
 
   const isPreviewSupported = computed(() => {
     const category = status.value?.task_params?.task_category || "";
-    return category !== "convert" && category !== "transcribe";
+    return category !== "convert" && category !== "transcribe" && category !== "download";
   });
 
   const resolution = computed(() => {

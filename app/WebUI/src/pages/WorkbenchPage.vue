@@ -25,6 +25,7 @@
           :on-transcribe-media-change="onTranscribeMediaChange"
           :on-watermark-images-change="onWatermarkImagesChange"
           :on-watermark-lua-file-change="onWatermarkLuaFileChange"
+          :on-probe-download-source="probeDownloadSource"
           :add-watermark-segment="addWatermarkSegment"
           :remove-watermark-segment="removeWatermarkSegment"
           :get-field-policy="getFieldPolicy"
@@ -91,6 +92,7 @@ const {
   onTranscribeMediaChange,
   onWatermarkImagesChange,
   onWatermarkLuaFileChange,
+  probeDownloadSource,
   addWatermarkSegment,
   removeWatermarkSegment,
   getFieldPolicy,

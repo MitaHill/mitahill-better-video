@@ -1,4 +1,9 @@
-import { buildConvertTaskFormData, buildEnhanceTaskFormData, buildTranscriptionTaskFormData } from "./submitPayloadBuilders";
+import {
+  buildConvertTaskFormData,
+  buildDownloadTaskFormData,
+  buildEnhanceTaskFormData,
+  buildTranscriptionTaskFormData,
+} from "./submitPayloadBuilders";
 
 export const useWorkbenchSubmission = ({
   activeCategory,
@@ -118,29 +123,30 @@ export const useWorkbenchSubmission = ({
   };
 
   const submitDownloadTask = async () => {
-    const rawUrl = String(downloadForm.url || "").trim();
+    if (typeof enforceCategory === "function") {
+      enforceCategory("download");
+    }
+    const rawUrl = String(downloadForm.sourceUrl || "").trim();
     if (!rawUrl) {
       throw new Error("请先输入要下载的视频链接。");
     }
-    const data = new FormData();
-    data.append("url", rawUrl);
-    data.append("output_format", String(downloadForm.outputFormat || "mp4"));
-    data.append("audio_only", String(Boolean(downloadForm.audioOnly)));
+    if (!downloadForm.probeReady) {
+      throw new Error("请先点击“解析清晰度与字幕”。");
+    }
+    if (downloadForm.downloadMode === "subtitle_only" && (!downloadForm.subtitleLanguages || !downloadForm.subtitleLanguages.length)) {
+      throw new Error("仅字幕模式请至少选择一种字幕语言。");
+    }
 
-    const res = await fetch("/api/downloads/direct", { method: "POST", body: data });
+    const data = buildDownloadTaskFormData(downloadForm);
+    const res = await fetch("/api/downloads/tasks", { method: "POST", body: data });
     const payload = await parseJsonSafe(res);
     if (!res.ok) {
       throw new Error(payload.error || "下载任务失败。");
     }
-
-    taskIds.value = [];
-    setStatusQuery("");
-    const files = Array.isArray(payload.files) ? payload.files : [];
-    if (files.length) {
-      submitWarnings.value = `下载完成，输出目录：${payload.output_dir}，文件：${files.map((f) => f.name).join("，")}`;
-    } else {
-      submitWarnings.value = `下载完成，输出目录：${payload.output_dir}`;
-    }
+    taskIds.value = [payload.task_id];
+    setStatusQuery(payload.task_id);
+    joinRoom();
+    await fetchStatus();
   };
 
   const submitTask = async () => {

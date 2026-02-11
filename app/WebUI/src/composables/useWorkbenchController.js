@@ -91,6 +91,50 @@ export const useWorkbenchController = () => {
 
   const { fetchRecommendations } = useWorkbenchRecommendations({ enhanceForm });
 
+  const probeDownloadSource = async () => {
+    downloadForm.probeError = "";
+    downloadForm.probeMessage = "";
+    downloadForm.probeLoading = true;
+    try {
+      const url = String(downloadForm.sourceUrl || "").trim();
+      if (!url) {
+        throw new Error("请先输入下载链接。");
+      }
+      const payload = new FormData();
+      payload.append("url", url);
+      const res = await fetch("/api/downloads/probe", { method: "POST", body: payload });
+      const data = await parseJsonSafe(res);
+      if (!res.ok) {
+        throw new Error(data.error || "解析失败");
+      }
+      downloadForm.probeReady = true;
+      downloadForm.sourceTitle = String(data.title || "");
+      downloadForm.sourceDurationSec = Number(data.duration_sec || 0);
+      downloadForm.maxQualityLabel = String(data.max_quality_label || "");
+      downloadForm.qualityOptions = Array.isArray(data.quality_options) ? data.quality_options : [];
+      const subtitleRows = Array.isArray(data.subtitle_languages) ? data.subtitle_languages : [];
+      downloadForm.subtitleLanguagesOptions = [
+        { code: "all", label: "all（全部可用语言）", has_manual: true, has_auto: true },
+        ...subtitleRows,
+      ];
+      if (!downloadForm.qualitySelector && downloadForm.qualityOptions.length) {
+        downloadForm.qualitySelector = String(downloadForm.qualityOptions[0].value || "bestvideo*+bestaudio/best");
+      }
+      if (downloadForm.qualityOptions.length && !downloadForm.qualityOptions.some((item) => item.value === downloadForm.qualitySelector)) {
+        downloadForm.qualitySelector = String(downloadForm.qualityOptions[0].value || "bestvideo*+bestaudio/best");
+      }
+      downloadForm.probeMessage = `解析完成：${downloadForm.sourceTitle || "未知标题"}`;
+      if (!downloadForm.subtitleLanguages.length && downloadForm.subtitleLanguagesOptions.length) {
+        downloadForm.subtitleLanguages = ["all"];
+      }
+    } catch (error) {
+      downloadForm.probeError = error.message;
+      downloadForm.probeReady = false;
+    } finally {
+      downloadForm.probeLoading = false;
+    }
+  };
+
   onMounted(() => {
     initTheme();
     initCategoryRouting();
@@ -136,6 +180,7 @@ export const useWorkbenchController = () => {
     onTranscribeMediaChange,
     onWatermarkImagesChange,
     onWatermarkLuaFileChange,
+    probeDownloadSource,
     addWatermarkSegment,
     removeWatermarkSegment,
     submitTask,
