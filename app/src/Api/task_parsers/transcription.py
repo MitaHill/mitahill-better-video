@@ -60,9 +60,9 @@ def parse_transcription_task_params(form):
             or ""
         ).strip(),
         "translator_fallback_mode": (
-            form.get("translator_fallback_mode", defaults.get("translator_fallback_mode", "model_full_text"))
-            or defaults.get("translator_fallback_mode", "model_full_text")
-            or "model_full_text"
+            form.get("translator_fallback_mode", defaults.get("translator_fallback_mode", "source_text"))
+            or defaults.get("translator_fallback_mode", "source_text")
+            or "source_text"
         ).strip().lower(),
         "transcribe_runtime_mode": (
             defaults.get("transcribe_runtime_mode", "parallel")

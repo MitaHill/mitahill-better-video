@@ -8,6 +8,7 @@ from pathlib import Path
 
 from app.src.Database import core as db
 from app.src.Notifications.events import send_event
+from app.src.Utils.http import ffprobe_info
 
 logger = logging.getLogger("DOWNLOAD")
 
@@ -243,6 +244,40 @@ def process_download_task(task):
     if _is_cancelled(task_id):
         raise RuntimeError("任务已取消")
 
+    result_file = Path(result_path)
+    previous_info = {}
+    try:
+        previous_info = json.loads(task.get("video_info") or "{}")
+    except Exception:
+        previous_info = {}
+
+    probe = ffprobe_info(result_file)
+    size_mb = round((result_file.stat().st_size / (1024 * 1024)), 2)
+    resolved_duration = float(probe.get("duration") or 0)
+    if resolved_duration <= 0:
+        resolved_duration = float(previous_info.get("duration") or 0)
+
+    merged_info = {
+        **previous_info,
+        "filename": result_file.name,
+        "upload_path": source_url,
+        "result_path": str(result_file),
+        "size_mb": size_mb,
+        "duration": round(resolved_duration, 2),
+        "fps": float(probe.get("fps") or 0),
+        "width": int(probe.get("width") or 0),
+        "height": int(probe.get("height") or 0),
+        "video_codec": probe.get("video_codec"),
+        "audio_codec": probe.get("audio_codec"),
+        "video_bitrate": int(probe.get("video_bitrate") or 0),
+        "audio_bitrate": int(probe.get("audio_bitrate") or 0),
+        "audio_sample_rate": int(probe.get("audio_sample_rate") or 0),
+        "audio_channels": int(probe.get("audio_channels") or 0),
+        "has_video": bool(probe.get("has_video")),
+        "has_audio": bool(probe.get("has_audio")),
+        "stream_types": probe.get("stream_types") or [],
+    }
+    db.update_task_video_info(task_id, merged_info)
     db.update_task_result(task_id, result_path)
     db.update_task_status(task_id, "COMPLETED", 100, f"Completed: {Path(result_path).name}")
     send_event({"task_id": task_id, "progress": 100, "message": "下载任务已完成"})

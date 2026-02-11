@@ -15,7 +15,7 @@
   position: absolute;
   left: 0;
   top: 0;
-  width: calc((100% / var(--tab-count)) * 0.62);
+  width: calc(100% / var(--tab-count));
   height: 100%;
   background: var(--tab-slider-bg);
   border-radius: 0;

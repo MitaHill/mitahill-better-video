@@ -24,6 +24,7 @@
       v-else-if="activeCategory === 'transcribe'"
       :transcribe-form="transcribeForm"
       :transcribe-media-info="transcribeMediaInfo"
+      :transcribe-runtime="transcribeRuntime"
       :on-transcribe-media-change="onTranscribeMediaChange"
       :get-field-policy="getFieldPolicy"
     />
@@ -70,6 +71,10 @@ const props = defineProps({
   },
   transcribeMediaInfo: {
     type: Array,
+    required: true,
+  },
+  transcribeRuntime: {
+    type: Object,
     required: true,
   },
   downloadForm: {

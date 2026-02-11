@@ -7,7 +7,6 @@ import requests
 
 _CODE_BLOCK_RE = re.compile(r"```(?:[a-zA-Z]+)?\s*([\s\S]*?)```", re.MULTILINE)
 _THINK_TAG_RE = re.compile(r"<think>[\s\S]*?</think>", re.IGNORECASE)
-_SEG_LINE_RE = re.compile(r"^\s*(?:[-*]\s*)?(?:\[\s*)?(SEG_\d+)(?:\s*\])?\s*[:：\-]\s*(.*)\s*$", re.IGNORECASE)
 _LANGUAGE_NAME_MAP = {
     "zh": "Chinese",
     "en": "English",
@@ -61,7 +60,7 @@ class BaseTranslator:
         api_key: str,
         prompt: str,
         timeout_sec: float,
-        fallback_mode: str = "model_full_text",
+        fallback_mode: str = "source_text",
         runtime_mode: str = "parallel",
         context_window_size: int = 6,
         batch_window_size: int = 10,
@@ -72,8 +71,8 @@ class BaseTranslator:
         self.api_key = (api_key or "").strip()
         self.prompt = (prompt or "").strip()
         self.timeout_sec = float(timeout_sec or 120.0)
-        mode = str(fallback_mode or "model_full_text").strip().lower()
-        self.fallback_mode = mode if mode in {"model_full_text", "source_text"} else "model_full_text"
+        mode = str(fallback_mode or "source_text").strip().lower()
+        self.fallback_mode = mode if mode in {"model_full_text", "source_text"} else "source_text"
         safe_runtime_mode = str(runtime_mode or "parallel").strip().lower()
         self.runtime_mode = safe_runtime_mode if safe_runtime_mode in {"parallel", "memory_saving"} else "parallel"
         self.context_window_size = max(1, min(int(context_window_size or 6), 50))
@@ -153,7 +152,8 @@ class BaseTranslator:
         strict_rules = (
             "You are a professional translation engine for transcription segments.\n"
             f"{target_line}\n"
-            "Return translated text only, with no explanations.\n"
+            "Never output reasoning, explanations, comments, markdown, or code fences.\n"
+            "Return translated text only.\n"
             "Preserve original line breaks and text structure.\n"
             "Keep numbers, punctuation, URLs, emails, and IDs unchanged unless translation is required.\n"
             "Do not translate placeholders or markup, such as {name}, [MASK], <tag>, %s, ${VAR}.\n"
@@ -198,12 +198,13 @@ class BaseTranslator:
         _code, _name, display = self._resolve_target_language(target_language)
         return (
             f"Translate all segments into {display}.\n"
-            "Return JSON array only with exact schema: [{\"id\":\"SEG_1\",\"text\":\"...\"}].\n"
+            "Output must be valid JSON array only with exact schema: [{\"id\":\"SEG_1\",\"text\":\"...\"}].\n"
             "Rules:\n"
             "1) Keep all ids unchanged.\n"
             "2) Output one item for each input id.\n"
-            "3) Do not add extra fields/comments.\n"
-            "4) Do not wrap JSON with explanations.\n"
+            "3) Do not add or remove ids.\n"
+            "4) Do not add extra fields/comments.\n"
+            "5) Do not output markdown/code fences/thinking text/explanations.\n"
             "Input JSON:\n"
             f"```json\n{payload_json}\n```"
         )
@@ -242,28 +243,37 @@ class BaseTranslator:
             rows = self._extract_translation_rows(decoded)
             if not rows:
                 continue
+            if not isinstance(rows, list):
+                continue
             mapped: Dict[str, str] = {}
+            invalid_rows = 0
+            unknown_ids = 0
+            duplicate_ids = 0
             for row in rows:
                 if not isinstance(row, dict):
+                    invalid_rows += 1
                     continue
                 row_id = str(row.get("id") or "").strip()
-                if not row_id or row_id not in expected_set:
+                if not row_id:
+                    invalid_rows += 1
                     continue
-                mapped[row_id] = " ".join(str(row.get("text") or "").split())
-            if all(key in mapped for key in expected):
+                if row_id not in expected_set:
+                    unknown_ids += 1
+                    continue
+                if row_id in mapped:
+                    duplicate_ids += 1
+                    continue
+                value = row.get("text")
+                if value is None:
+                    value = ""
+                if isinstance(value, (dict, list)):
+                    invalid_rows += 1
+                    continue
+                mapped[row_id] = str(value).strip()
+            if invalid_rows or unknown_ids or duplicate_ids:
+                continue
+            if set(mapped.keys()) == expected_set and len(mapped) == len(expected):
                 return mapped
-
-        mapped_line: Dict[str, str] = {}
-        for line in sanitized.splitlines():
-            match = _SEG_LINE_RE.match(str(line or ""))
-            if not match:
-                continue
-            seg_id = str(match.group(1) or "").strip().upper()
-            if seg_id not in expected_set:
-                continue
-            mapped_line[seg_id] = " ".join(str(match.group(2) or "").split())
-        if all(key in mapped_line for key in expected):
-            return mapped_line
 
         raise ValueError("failed to parse batch translation response")
 
@@ -274,9 +284,13 @@ class OllamaTranslator(BaseTranslator):
     def _keep_alive_value(self):
         if self.runtime_mode == "parallel":
             return -1
-        return "2m"
+        # Aggressive memory-saving mode: unload model after each request.
+        return 0
 
     def prepare_for_task(self):
+        if self.runtime_mode == "memory_saving":
+            # Skip warmup in memory-saving mode to avoid preloading model into VRAM.
+            return None
         if not self.base_url or not self.model:
             return None
         try:
@@ -562,7 +576,7 @@ def create_translator(options) -> Optional[BaseTranslator]:
         "model": options.get("translator_model", ""),
         "api_key": options.get("translator_api_key", ""),
         "prompt": options.get("translator_prompt", ""),
-        "fallback_mode": options.get("translator_fallback_mode", "model_full_text"),
+        "fallback_mode": options.get("translator_fallback_mode", "source_text"),
         "timeout_sec": options.get("translator_timeout_sec", 120.0),
         "runtime_mode": options.get("transcribe_runtime_mode", "parallel"),
         "context_window_size": options.get("translator_context_window_size", 6),

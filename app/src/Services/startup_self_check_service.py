@@ -238,7 +238,8 @@ class StartupSelfCheckService:
             model_name,
             segment_count,
         )
-        ENGINE.finalize_task(runtime_mode=runtime_mode_for_selfcheck)
+        # Self-check may run with "parallel" for speed, but we still must release GPU residency.
+        ENGINE.finalize_task(runtime_mode="memory_saving")
         self._cleanup_memory()
 
     def cleanup_workspace(self):

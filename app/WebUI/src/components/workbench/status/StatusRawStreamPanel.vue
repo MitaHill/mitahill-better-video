@@ -7,7 +7,12 @@
     <p class="notice stream-note">
       展示转录句子与翻译模型原始输出（包含 think 标签与原始文本流，不做清洗）。
     </p>
-    <div ref="viewportRef" class="stream-viewport">
+    <div
+      ref="viewportRef"
+      :class="['stream-viewport', { 'stream-viewport-near-scrollbar': showScrollbar }]"
+      @mousemove="onViewportMouseMove"
+      @mouseleave="onViewportMouseLeave"
+    >
       <p v-if="!lines.length" class="notice">暂无信息流。</p>
       <div
         v-for="(line, idx) in lines"
@@ -33,6 +38,8 @@ const props = defineProps({
 
 const detailsRef = ref(null);
 const viewportRef = ref(null);
+const showScrollbar = ref(false);
+const SCROLLBAR_REVEAL_EDGE_PX = 22;
 
 const prefixFor = (line) => {
   const channel = String(line?.channel || "general").trim().toLowerCase();
@@ -42,6 +49,9 @@ const prefixFor = (line) => {
   }
   if (channel === "translation_raw") {
     return segmentIndex > 0 ? `翻译源 ${segmentIndex}` : "翻译源";
+  }
+  if (channel === "translation_progress") {
+    return "翻译进度";
   }
   return "信息";
 };
@@ -61,13 +71,27 @@ const onToggle = () => {
   }
 };
 
-watch(
-  () => props.lines.length,
-  async (nextLen, prevLen) => {
-    if (!detailsRef.value?.open) return;
-    if (nextLen <= prevLen) return;
-    await nextTick();
-    scrollToBottom(true);
+const onViewportMouseMove = (event) => {
+  const target = viewportRef.value;
+  if (!target) {
+    showScrollbar.value = false;
+    return;
   }
+  const rect = target.getBoundingClientRect();
+  showScrollbar.value = rect.right - event.clientX <= SCROLLBAR_REVEAL_EDGE_PX;
+};
+
+const onViewportMouseLeave = () => {
+  showScrollbar.value = false;
+};
+
+watch(
+  () => props.lines,
+  async () => {
+    if (!detailsRef.value?.open) return;
+    await nextTick();
+    scrollToBottom(false);
+  },
+  { deep: true }
 );
 </script>

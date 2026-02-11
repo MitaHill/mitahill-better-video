@@ -259,16 +259,61 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                     file_count=total,
                 )
 
+            _translation_progress_state = {"last_done": -1}
+            _translation_status_state = {"last_emit_ts": 0.0, "last_text": ""}
+
             def _translation_progress(done, total_count):
                 if total_count <= 0:
                     return
+                safe_done = max(0, int(done or 0))
+                safe_total = max(1, int(total_count or 0))
                 ratio = max(0.0, min(1.0, float(done) / float(total_count)))
                 emit_progress(
                     task_id,
                     _build_item_progress(index, total, 0.58 + ratio * 0.18),
-                    f"转录文件 {index}/{total}: 翻译中 {done}/{total_count}",
+                    f"转录文件 {index}/{total}: 翻译中 {safe_done}/{safe_total}",
                     file_index=index,
                     file_count=total,
+                )
+                if safe_done != int(_translation_progress_state["last_done"]):
+                    _translation_progress_state["last_done"] = safe_done
+                    emit_stream_event(
+                        task_id,
+                        channel="translation_progress",
+                        mode="line",
+                        text=f"翻译进度 {safe_done}/{safe_total}",
+                        file_index=index,
+                        file_count=total,
+                        segment_index=safe_done,
+                        line_key=f"translation_progress:{index}",
+                    )
+
+            def _translation_status(status_text):
+                safe_text = str(status_text or "").strip()
+                if not safe_text:
+                    return
+                now = time.time()
+                last_emit_ts = float(_translation_status_state.get("last_emit_ts") or 0.0)
+                last_text = str(_translation_status_state.get("last_text") or "")
+                if safe_text == last_text and (now - last_emit_ts) < 1.0:
+                    return
+                _translation_status_state["last_emit_ts"] = now
+                _translation_status_state["last_text"] = safe_text
+                emit_progress(
+                    task_id,
+                    _build_item_progress(index, total, 0.58),
+                    f"转录文件 {index}/{total}: {safe_text}",
+                    file_index=index,
+                    file_count=total,
+                )
+                emit_stream_event(
+                    task_id,
+                    channel="translation_progress",
+                    mode="line",
+                    text=safe_text,
+                    file_index=index,
+                    file_count=total,
+                    line_key=f"translation_status:{index}",
                 )
 
             def _translation_checkpoint(seg_idx, source_text, translated_text, status, message):
@@ -329,6 +374,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 translator,
                 options.get("translate_to", ""),
                 progress_callback=_translation_progress,
+                status_callback=_translation_status,
                 cached_text_map=cached_translation_map,
                 checkpoint_callback=_translation_checkpoint,
                 should_cancel=lambda: db.is_task_cancel_requested(task_id),

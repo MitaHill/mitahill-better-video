@@ -73,7 +73,7 @@ def default_transcription_config() -> Dict[str, Any]:
             "api_key": config.TRANSCRIPTION_TRANSLATOR_API_KEY,
             "timeout_sec": config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS,
             "prompt": config.TRANSCRIPTION_TRANSLATOR_PROMPT,
-            "fallback_mode": "model_full_text",
+            "fallback_mode": "source_text",
             "context_window_size": 6,
             "batch_window_size": 10,
             "batch_max_chars": 2500,
@@ -155,9 +155,9 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     merged["translation"]["model"] = str(merged["translation"].get("model") or "").strip()
     merged["translation"]["api_key"] = str(merged["translation"].get("api_key") or "").strip()
     merged["translation"]["prompt"] = str(merged["translation"].get("prompt") or "").strip()
-    fallback_mode = str(merged["translation"].get("fallback_mode") or "model_full_text").strip().lower()
+    fallback_mode = str(merged["translation"].get("fallback_mode") or "source_text").strip().lower()
     if fallback_mode not in _VALID_TRANSLATION_FALLBACK_MODES:
-        fallback_mode = "model_full_text"
+        fallback_mode = "source_text"
     merged["translation"]["fallback_mode"] = fallback_mode
     try:
         timeout_sec = float(merged["translation"].get("timeout_sec") or 120.0)
@@ -255,7 +255,7 @@ def get_parser_defaults() -> Dict[str, Any]:
         "translator_model": str(translation.get("model") or "").strip(),
         "translator_api_key": str(translation.get("api_key") or "").strip(),
         "translator_prompt": str(translation.get("prompt") or "").strip(),
-        "translator_fallback_mode": str(translation.get("fallback_mode") or "model_full_text").strip().lower(),
+        "translator_fallback_mode": str(translation.get("fallback_mode") or "source_text").strip().lower(),
         "translator_timeout_sec": float(translation.get("timeout_sec") or 120.0),
         "translator_context_window_size": _to_int(translation.get("context_window_size"), 6),
         "translator_batch_window_size": _to_int(translation.get("batch_window_size"), 10),

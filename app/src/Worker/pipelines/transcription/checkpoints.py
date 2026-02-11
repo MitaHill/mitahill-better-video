@@ -55,7 +55,7 @@ def _translation_signature_payload(options: Dict) -> Dict:
         "base_url": str(options.get("translator_base_url") or "").strip(),
         "model": str(options.get("translator_model") or "").strip(),
         "prompt": str(options.get("translator_prompt") or "").strip(),
-        "fallback_mode": str(options.get("translator_fallback_mode") or "model_full_text").strip().lower(),
+        "fallback_mode": str(options.get("translator_fallback_mode") or "source_text").strip().lower(),
         "timeout_sec": float(options.get("translator_timeout_sec") or 120.0),
         "context_window_size": int(options.get("translator_context_window_size") or 6),
         "batch_window_size": int(options.get("translator_batch_window_size") or 10),
@@ -70,7 +70,7 @@ def _translation_signature_payload_legacy(options: Dict, *, include_thinking_fla
         "base_url": str(options.get("translator_base_url") or "").strip(),
         "model": str(options.get("translator_model") or "").strip(),
         "prompt": str(options.get("translator_prompt") or "").strip(),
-        "fallback_mode": str(options.get("translator_fallback_mode") or "model_full_text").strip().lower(),
+        "fallback_mode": str(options.get("translator_fallback_mode") or "source_text").strip().lower(),
         "timeout_sec": float(options.get("translator_timeout_sec") or 120.0),
     }
     if include_thinking_flag:

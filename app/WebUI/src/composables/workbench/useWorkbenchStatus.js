@@ -243,6 +243,13 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
 
     if (String(payload.event_type || "").trim().toLowerCase() === "task_stream") {
       appendStreamEvent(payload);
+      const streamChannel = String(payload.stream_channel || payload.channel || "").trim().toLowerCase();
+      if (streamChannel === "translation_progress" && status.value) {
+        const text = String(payload.stream_text || payload.text || "").trim();
+        if (text) {
+          status.value.message = text;
+        }
+      }
       return;
     }
 

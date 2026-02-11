@@ -65,9 +65,9 @@ def normalize_transcription_options(raw):
     provider = (options.get("translator_provider") or config.TRANSCRIPTION_TRANSLATOR_PROVIDER or "none").strip().lower()
     if provider not in VALID_TRANSLATOR_PROVIDERS:
         provider = "none"
-    fallback_mode = (options.get("translator_fallback_mode") or "model_full_text").strip().lower()
+    fallback_mode = (options.get("translator_fallback_mode") or "source_text").strip().lower()
     if fallback_mode not in VALID_TRANSLATOR_FALLBACK_MODES:
-        fallback_mode = "model_full_text"
+        fallback_mode = "source_text"
     runtime_mode = (options.get("transcribe_runtime_mode") or "parallel").strip().lower()
     if runtime_mode not in VALID_TRANSCRIBE_RUNTIME_MODES:
         runtime_mode = "parallel"

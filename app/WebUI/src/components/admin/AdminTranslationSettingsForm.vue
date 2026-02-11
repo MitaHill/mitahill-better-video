@@ -40,11 +40,11 @@
     <div class="field compact">
       <label>极端情况回退策略</label>
       <select v-model="local.fallbackMode" :disabled="loading">
-        <option value="model_full_text">模型返回全文</option>
         <option value="source_text">原始待翻译文本</option>
+        <option value="model_full_text">模型返回全文（可能混入解释）</option>
       </select>
       <p class="notice" style="margin-top: 6px;">
-        当无法提取代码块时生效：可回退到“模型返回全文”或“原始待翻译文本”。
+        当结构化解析失败时生效。推荐“原始待翻译文本”，可避免把模型解释文本写入字幕。
       </p>
     </div>
 
@@ -75,11 +75,11 @@
       </p>
       <p class="notice" style="margin-top: 6px;">
         程序执行顺序：变量替换 -> 自动追加系统严格规则 -> 发送给翻译模型。
-        系统严格规则会要求：仅输出译文、保留行结构、保留占位符/标记。
+        系统严格规则会要求：仅输出结构化结果、禁止解释文本、保留行结构与占位符/标记。
       </p>
       <p class="notice" style="margin-top: 6px;">
-        返回解析顺序：若模型输出包含代码块 <code>```...```</code>，优先提取代码块正文；
-        若没有代码块，则按“极端情况回退策略”决定使用“模型返回全文”或“原始待翻译文本”。
+        返回解析仅接受 JSON 结构化结果（可在代码块内或纯文本 JSON）。
+        一旦出现缺段、重复段、额外段或非结构化内容，则判定失败并自动缩窗重试。
       </p>
 
       <div class="status-row" style="gap: 8px; margin-top: 8px; flex-wrap: wrap;">
@@ -176,7 +176,7 @@ const local = reactive({
   batchWindowSize: 10,
   batchMaxChars: 2500,
   prompt: "",
-  fallbackMode: "model_full_text",
+  fallbackMode: "source_text",
   previewTargetLanguage: "zh",
 });
 
@@ -283,7 +283,7 @@ const applyFromProps = () => {
   local.batchWindowSize = Number(translation.batch_window_size ?? 10);
   local.batchMaxChars = Number(translation.batch_max_chars ?? 2500);
   local.prompt = translation.prompt || "";
-  local.fallbackMode = translation.fallback_mode || "model_full_text";
+  local.fallbackMode = translation.fallback_mode || "source_text";
 };
 
 watch(
@@ -312,7 +312,7 @@ const save = async () => {
       batch_window_size: Number(local.batchWindowSize || 10),
       batch_max_chars: Number(local.batchMaxChars || 2500),
       prompt: String(local.prompt || "").trim(),
-      fallback_mode: String(local.fallbackMode || "model_full_text").trim().toLowerCase(),
+      fallback_mode: String(local.fallbackMode || "source_text").trim().toLowerCase(),
     },
   });
 };
