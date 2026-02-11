@@ -71,6 +71,7 @@ _FASTER_MODELS = [
     {"id": "distil-large-v2", "repo": "Systran/faster-distil-whisper-large-v2"},
     {"id": "distil-large-v3", "repo": "Systran/faster-distil-whisper-large-v3"},
 ]
+_FASTER_MODEL_IDS = [item["id"] for item in _FASTER_MODELS]
 
 _FASTER_REQUIRED_FILES = [
     "config.json",
@@ -110,6 +111,43 @@ def get_storage_roots() -> Dict[str, Path]:
 
 def get_faster_required_files() -> List[str]:
     return list(_FASTER_REQUIRED_FILES)
+
+
+def get_models_for_backend(backend: str) -> List[str]:
+    safe_backend = str(backend or "").strip().lower()
+    if safe_backend == "whisper":
+        return list(_OPENAI_MODEL_IDS)
+    if safe_backend == "faster_whisper":
+        return list(_FASTER_MODEL_IDS)
+    return []
+
+
+def model_is_supported_by_backend(backend: str, model_id: str) -> bool:
+    safe_model_id = str(model_id or "").strip().lower()
+    if not safe_model_id:
+        return False
+    return safe_model_id in set(get_models_for_backend(backend))
+
+
+def get_installed_variants(model_id: str) -> List[Dict]:
+    safe_model_id = str(model_id or "").strip().lower()
+    out: List[Dict] = []
+    if not safe_model_id:
+        return out
+
+    for backend in ("whisper", "faster_whisper"):
+        entry = get_model_entry(backend, safe_model_id)
+        if not entry or not entry.get("installed"):
+            continue
+        out.append(
+            {
+                "backend": backend,
+                "model_id": safe_model_id,
+                "engine": str(entry.get("engine") or ""),
+                "local_path": str(entry.get("local_path") or ""),
+            }
+        )
+    return out
 
 
 def _fetch_openai_registry_remote() -> Dict[str, str]:

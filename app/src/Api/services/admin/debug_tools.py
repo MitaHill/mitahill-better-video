@@ -7,6 +7,11 @@ from .model_checks import (
     verify_model_hashes,
     warmup_transcription_model,
 )
+from .transcription_catalog import (
+    get_installed_variants,
+    get_models_for_backend,
+    model_is_supported_by_backend,
+)
 from .transcription_config import get_transcription_config
 
 logger = logging.getLogger("ADMIN_DEBUG")
@@ -21,6 +26,28 @@ def _pick_hash_error_message(hash_res: Dict) -> str:
         if message:
             return message
     return "HASH 校验失败"
+
+
+def _build_backend_mismatch_error(backend: str, model_id: str) -> str:
+    supported = get_models_for_backend(backend)
+    preview = ", ".join(supported[:10])
+    if len(supported) > 10:
+        preview += " ..."
+    return (
+        f"模型与后端不匹配: 当前后端={backend}, 当前模型={model_id}。"
+        f"该后端可用模型示例: {preview or '无'}"
+    )
+
+
+def _append_cross_backend_hint(message: str, backend: str, model_id: str) -> str:
+    variants = get_installed_variants(model_id)
+    others = [item for item in variants if str(item.get("backend") or "").strip().lower() != backend]
+    if not others:
+        return message
+    hint = "；检测到同名模型已安装在其它后端: " + ", ".join(
+        f"{item.get('backend')}/{item.get('model_id')} ({item.get('local_path')})" for item in others
+    )
+    return f"{message}{hint}。请切换后端或下载当前后端对应模型。"
 
 
 def run_transcription_model_test(mode: str = "full") -> Dict:
@@ -40,6 +67,53 @@ def run_transcription_model_test(mode: str = "full") -> Dict:
         "mode": safe_mode,
         "steps": [],
     }
+    installed_variants = get_installed_variants(model_id)
+
+    result["steps"].append(
+        {
+            "name": "resolve",
+            "ok": True,
+            "checks": [
+                {
+                    "name": "target",
+                    "status": "passed",
+                    "message": f"当前测试目标: {backend}/{model_id}",
+                },
+                {
+                    "name": "installed_variants",
+                    "status": "passed",
+                    "message": (
+                        "已安装变体: "
+                        + (
+                            ", ".join(
+                                f"{item.get('backend')}/{item.get('model_id')}" for item in installed_variants
+                            )
+                            if installed_variants
+                            else "无"
+                        )
+                    ),
+                },
+            ],
+        }
+    )
+
+    if not model_is_supported_by_backend(backend, model_id):
+        result["steps"].append(
+            {
+                "name": "hash",
+                "ok": False,
+                "checks": [
+                    {
+                        "name": "hash",
+                        "status": "failed",
+                        "message": _build_backend_mismatch_error(backend, model_id),
+                    }
+                ],
+            }
+        )
+        result["error"] = _build_backend_mismatch_error(backend, model_id)
+        logger.error("Model/backend mismatch: %s/%s", backend, model_id)
+        return result
 
     try:
         model_entry = resolve_model_entry(backend, model_id)
@@ -51,7 +125,7 @@ def run_transcription_model_test(mode: str = "full") -> Dict:
     hash_res = verify_model_hashes(model_entry)
     result["steps"].append({"name": "hash", **hash_res})
     if not hash_res.get("ok"):
-        result["error"] = _pick_hash_error_message(hash_res)
+        result["error"] = _append_cross_backend_hint(_pick_hash_error_message(hash_res), backend, model_id)
         logger.error("Model hash validation failed: %s/%s (%s)", backend, model_id, result["error"])
         return result
 

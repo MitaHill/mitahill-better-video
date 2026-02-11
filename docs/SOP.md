@@ -44,6 +44,7 @@
      - 镜像标签格式：`mitahill-better-video:YYYYMMDD-HHMM`
      - 若无特殊配置，`pre-run/.env` 保持默认（空或注释即可）
    - **在 `pre-run/` 中启动容器**（使用对应 compose）
+   - **禁止直接使用项目根目录的 `docker run` 作为常规验证手段**，避免挂载到错误的 `storage/` 路径
    - **持久化目录固定在 `pre-run/storage/`**（输出、上传、数据库、日志）
    - **等待 3 秒**并检查容器运行状态
    - **查看容器日志**，确认无异常

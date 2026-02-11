@@ -44,6 +44,7 @@ Response:
 
 Fields:
 - `media_files` (required, multiple; also兼容 `files` / `file`)
+- `transcription_backend` (`whisper` | `faster_whisper`，可省略；省略时使用管理页当前配置)
 - `transcribe_mode` (`subtitle_zip` | `subtitled_video` | `subtitle_and_video_zip`)
 - `subtitle_format` (`srt` | `vtt`)
 - `whisper_model` (e.g. `small` / `medium` / `large-v3` / `turbo`)
@@ -295,8 +296,16 @@ Header:
 - `Authorization: Bearer <token>`
 
 执行转录模型测试：
-1. HASH 校验
-2. GPU 热身（5秒静音音频识别）
+1. 目标解析（读取当前管理配置中的 backend + active_model）
+2. HASH 校验
+3. GPU 热身（5秒静音音频识别）
+
+Request (optional):
+```json
+{ "mode": "hash" }
+```
+- `mode=hash`：执行到 HASH 校验即返回
+- `mode=warmup` / `mode=full`：执行完整链路
 
 ### POST /api/admin/debug/test-translation-provider
 Header:

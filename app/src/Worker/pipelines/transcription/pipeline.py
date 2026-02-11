@@ -72,6 +72,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
         )
         result = ENGINE.transcribe(
             audio_path,
+            backend=options.get("transcription_backend", "whisper"),
             model_name=options.get("whisper_model", "medium"),
             language=options.get("language", "auto"),
             temperature=options.get("temperature", 0.0),

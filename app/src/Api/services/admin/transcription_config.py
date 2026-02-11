@@ -8,6 +8,8 @@ from app.src.Data.transcription_languages import (
 )
 from app.src.Database import transcription_admin as db_transcription
 
+from .transcription_catalog import get_models_for_backend
+
 
 _VALID_BACKENDS = {"whisper", "faster_whisper"}
 _VALID_TRANSLATORS = {"none", "ollama", "openai_compatible"}
@@ -89,6 +91,19 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     merged["transcription"]["allowed_models"] = [
         str(item).strip().lower() for item in allowed if str(item).strip()
     ]
+    backend_supported = get_models_for_backend(backend)
+    backend_supported_set = {str(item).strip().lower() for item in backend_supported}
+    active_model = str(merged["transcription"].get("active_model") or "").strip().lower()
+    if active_model not in backend_supported_set:
+        compatible_from_allowed = [
+            item for item in merged["transcription"]["allowed_models"] if item in backend_supported_set
+        ]
+        fallback_model = (
+            compatible_from_allowed[0]
+            if compatible_from_allowed
+            else (backend_supported[0] if backend_supported else "medium")
+        )
+        merged["transcription"]["active_model"] = fallback_model
 
     provider = str(merged["translation"].get("provider") or "none").strip().lower()
     if provider not in _VALID_TRANSLATORS:
@@ -169,6 +184,7 @@ def get_parser_defaults() -> Dict[str, Any]:
     transcription = current.get("transcription") or {}
     translation = current.get("translation") or {}
     return {
+        "transcription_backend": str(transcription.get("backend") or "whisper").strip().lower(),
         "whisper_model": str(transcription.get("active_model") or "medium").strip().lower(),
         "translator_provider": str(translation.get("provider") or "none").strip().lower(),
         "translator_base_url": str(translation.get("base_url") or "").strip(),
@@ -199,16 +215,25 @@ def _sync_transcription_constraints(current: Dict[str, Any]):
     translate_to_field = fields.get("translate_to") or {}
 
     transcription = current.get("transcription") or {}
+    backend = str(transcription.get("backend") or "whisper").strip().lower()
+    backend_supported = [
+        str(item).strip().lower()
+        for item in get_models_for_backend(backend)
+        if str(item).strip()
+    ]
+    backend_supported_set = set(backend_supported)
     allowed = [
         str(item).strip().lower()
         for item in (transcription.get("allowed_models") or [])
         if str(item).strip()
     ]
+    compatible_allowed = [item for item in allowed if item in backend_supported_set]
     active_model = str(transcription.get("active_model") or "medium").strip().lower()
-    if active_model and active_model not in allowed:
-        allowed.append(active_model)
-    if allowed:
-        whisper_field["allowed_values"] = allowed
+    if active_model and active_model not in compatible_allowed and active_model in backend_supported_set:
+        compatible_allowed.append(active_model)
+    if not compatible_allowed:
+        compatible_allowed = backend_supported or [active_model or "medium"]
+    whisper_field["allowed_values"] = compatible_allowed
     whisper_field["default_value"] = active_model or whisper_field.get("default_value", "medium")
     if whisper_field.get("lock") == "fixed":
         whisper_field["fixed_value"] = active_model or whisper_field.get("fixed_value", "medium")

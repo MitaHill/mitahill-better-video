@@ -22,13 +22,19 @@ A lightweight Flask + Vue UI around Real-ESRGAN for upscaling videos and images.
 
 ## Quick Start
 
-Docker (recommended):
+Docker (recommended, pre-run only):
 
-```
-# Start the app (requires NVIDIA runtime)
-docker-compose -f deploy/compose/docker-compose.dev.yml up --build
+```bash
+cd pre-run
+# Build app image from project root first, then run here.
+docker compose up -d
 # Open http://localhost:8501
 ```
+
+Important:
+- Runtime operations should always be executed inside `pre-run/`.
+- Persistent data path is fixed to `pre-run/storage/` (uploads, outputs, database, logs, models).
+- Do not mix with project-root `storage/` when validating behavior.
 
 Prerequisites:
 - NVIDIA driver installed on host + nvidia-container-toolkit

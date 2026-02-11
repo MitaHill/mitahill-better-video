@@ -4,6 +4,7 @@ VALID_TRANSCRIBE_MODES = {"subtitle_zip", "subtitled_video", "subtitle_and_video
 VALID_SUBTITLE_FORMATS = {"srt", "vtt"}
 VALID_TRANSLATOR_PROVIDERS = {"none", "ollama", "openai_compatible"}
 VALID_TRANSLATOR_FALLBACK_MODES = {"model_full_text", "source_text"}
+VALID_TRANSCRIPTION_BACKENDS = {"whisper", "faster_whisper"}
 
 
 def _to_bool(value, default=False):
@@ -40,6 +41,9 @@ def _to_float(value, default=0.0, min_value=None, max_value=None):
 
 def normalize_transcription_options(raw):
     options = raw or {}
+    backend = (options.get("transcription_backend") or "whisper").strip().lower()
+    if backend not in VALID_TRANSCRIPTION_BACKENDS:
+        backend = "whisper"
 
     mode = (options.get("transcribe_mode") or "subtitle_zip").strip().lower()
     if mode not in VALID_TRANSCRIBE_MODES:
@@ -61,6 +65,7 @@ def normalize_transcription_options(raw):
         fallback_mode = "model_full_text"
 
     normalized = {
+        "transcription_backend": backend,
         "transcribe_mode": mode,
         "subtitle_format": subtitle_format,
         "whisper_model": whisper_model,

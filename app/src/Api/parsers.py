@@ -167,6 +167,11 @@ def parse_transcription_task_params(form):
 
     parsed = {
         "task_category": "transcribe",
+        "transcription_backend": (
+            form.get("transcription_backend", defaults.get("transcription_backend", "whisper"))
+            or defaults.get("transcription_backend", "whisper")
+            or "whisper"
+        ).strip().lower(),
         "transcribe_mode": (form.get("transcribe_mode", "subtitle_zip") or "subtitle_zip").lower(),
         "subtitle_format": (form.get("subtitle_format", "srt") or "srt").lower(),
         "whisper_model": (

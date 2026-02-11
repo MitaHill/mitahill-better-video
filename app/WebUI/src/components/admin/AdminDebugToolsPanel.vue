@@ -5,7 +5,7 @@
     <div class="inline-grid two" style="margin-top: 10px;">
       <div class="param-section">
         <div class="param-title">测试转录模型</div>
-        <p class="notice" style="margin-bottom: 10px;">步骤：HASH 校验 -> GPU 热身识别 5 秒静音音频</p>
+        <p class="notice" style="margin-bottom: 10px;">步骤：目标解析 -> HASH 校验 -> GPU 热身识别 5 秒静音音频</p>
         <button type="button" :disabled="loadingModel" @click="onTestModel">
           {{ loadingModel ? "测试中..." : "测试转录模型" }}
         </button>

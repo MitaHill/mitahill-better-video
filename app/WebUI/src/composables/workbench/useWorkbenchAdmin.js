@@ -522,6 +522,13 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
 
   const _createModelTestSteps = () => [
     {
+      key: "resolve",
+      label: "目标解析",
+      status: "pending",
+      message: "等待执行",
+      details: null,
+    },
+    {
       key: "hash",
       label: "HASH 校验",
       status: "pending",
@@ -550,6 +557,11 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     const payload = stepPayload || {};
     const explicit = String(payload.message || "").trim();
     if (explicit) return explicit;
+    if (stepName === "resolve") {
+      const checks = payload.checks || [];
+      const first = checks[0] || {};
+      return String(first.message || (payload.ok ? "目标解析完成" : "目标解析失败"));
+    }
     if (stepName === "hash") {
       const checks = payload.checks || [];
       const failed = checks.find((item) => String(item.status || "").toLowerCase() === "failed");
@@ -603,6 +615,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
 
     try {
       _updateModelTestStep("hash", { status: "running", message: "正在校验模型 HASH..." });
+      _updateModelTestStep("resolve", { status: "running", message: "正在解析当前测试目标..." });
       const hashRes = await _requestTranscriptionModelTest("hash");
       _applyModelTestPayload(hashRes.payload);
       debugTools.modelTestResult = hashRes.payload;
