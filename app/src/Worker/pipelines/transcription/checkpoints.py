@@ -55,6 +55,7 @@ def build_translation_signature(options: Dict) -> str:
             "provider": str(options.get("translator_provider") or "none").strip().lower(),
             "base_url": str(options.get("translator_base_url") or "").strip(),
             "model": str(options.get("translator_model") or "").strip(),
+            "enable_thinking": bool(options.get("translator_enable_thinking")),
             "prompt": str(options.get("translator_prompt") or "").strip(),
             "fallback_mode": str(options.get("translator_fallback_mode") or "model_full_text").strip().lower(),
             "timeout_sec": float(options.get("translator_timeout_sec") or 120.0),

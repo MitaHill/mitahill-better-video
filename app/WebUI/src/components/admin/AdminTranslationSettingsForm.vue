@@ -18,6 +18,14 @@
       </div>
     </div>
 
+    <label class="check-inline" style="margin: 8px 0 4px 0;">
+      <input v-model="local.enableThinking" :disabled="loading" type="checkbox" />
+      开启翻译模型 Thinking
+    </label>
+    <p class="notice" style="margin-top: 0;">
+      该开关当前主要对 Ollama 生效（请求中附带 <code>think=true/false</code>）；OpenAI 兼容端是否生效取决于上游实现。
+    </p>
+
     <div class="field compact">
       <label>极端情况回退策略</label>
       <select v-model="local.fallbackMode" :disabled="loading">
@@ -153,6 +161,7 @@ const local = reactive({
   model: "",
   apiKey: "",
   timeoutSec: 120,
+  enableThinking: false,
   prompt: "",
   fallbackMode: "model_full_text",
   previewTargetLanguage: "zh",
@@ -257,6 +266,7 @@ const applyFromProps = () => {
   local.model = translation.model || "";
   local.apiKey = translation.api_key || "";
   local.timeoutSec = Number(translation.timeout_sec ?? 120);
+  local.enableThinking = Boolean(translation.enable_thinking);
   local.prompt = translation.prompt || "";
   local.fallbackMode = translation.fallback_mode || "model_full_text";
 };
@@ -283,6 +293,7 @@ const save = async () => {
       model: String(local.model || "").trim(),
       api_key: String(local.apiKey || "").trim(),
       timeout_sec: Number(local.timeoutSec || 120),
+      enable_thinking: Boolean(local.enableThinking),
       prompt: String(local.prompt || "").trim(),
       fallback_mode: String(local.fallbackMode || "model_full_text").trim().toLowerCase(),
     },

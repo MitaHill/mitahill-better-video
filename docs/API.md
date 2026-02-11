@@ -54,6 +54,7 @@ Fields:
 - `translator_base_url` (optional)
 - `translator_model` (optional)
 - `translator_api_key` (optional)
+- `translator_enable_thinking` (optional, bool, 由管理页控制；当前主要对 Ollama 生效)
 - `translator_prompt` (optional)
 - `translator_timeout_sec` (optional)
 - `generate_bilingual` (true | false)
@@ -283,6 +284,7 @@ Request (example):
     "provider": "ollama",
     "base_url": "http://127.0.0.1:11434",
     "model": "qwen2.5:7b",
+    "enable_thinking": false,
     "timeout_sec": 120
   },
   "download": {

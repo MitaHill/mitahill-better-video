@@ -102,6 +102,10 @@ def normalize_transcription_options(raw):
             or config.TRANSCRIPTION_TRANSLATOR_API_KEY
             or ""
         ).strip(),
+        "translator_enable_thinking": _to_bool(
+            options.get("translator_enable_thinking"),
+            config.TRANSCRIPTION_TRANSLATOR_ENABLE_THINKING,
+        ),
         "translator_prompt": (
             options.get("translator_prompt")
             or config.TRANSCRIPTION_TRANSLATOR_PROMPT

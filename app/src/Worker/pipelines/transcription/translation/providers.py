@@ -58,6 +58,7 @@ class BaseTranslator:
         base_url: str,
         model: str,
         api_key: str,
+        enable_thinking: bool,
         prompt: str,
         timeout_sec: float,
         fallback_mode: str = "model_full_text",
@@ -66,6 +67,7 @@ class BaseTranslator:
         self.base_url = (base_url or "").strip()
         self.model = (model or "").strip()
         self.api_key = (api_key or "").strip()
+        self.enable_thinking = bool(enable_thinking)
         self.prompt = (prompt or "").strip()
         self.timeout_sec = float(timeout_sec or 120.0)
         mode = str(fallback_mode or "model_full_text").strip().lower()
@@ -251,6 +253,7 @@ class OllamaTranslator(BaseTranslator):
             ],
             "options": {"temperature": 0.2, "top_p": 0.9},
             "keep_alive": self._keep_alive_value(),
+            "think": bool(self.enable_thinking),
         }
         if stream_callback:
             try:
@@ -356,6 +359,7 @@ def create_translator(options) -> Optional[BaseTranslator]:
         "base_url": options.get("translator_base_url", ""),
         "model": options.get("translator_model", ""),
         "api_key": options.get("translator_api_key", ""),
+        "enable_thinking": bool(options.get("translator_enable_thinking")),
         "prompt": options.get("translator_prompt", ""),
         "fallback_mode": options.get("translator_fallback_mode", "model_full_text"),
         "timeout_sec": options.get("translator_timeout_sec", 120.0),

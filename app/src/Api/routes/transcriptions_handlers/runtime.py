@@ -9,6 +9,7 @@ def build_transcription_runtime_payload():
     provider = str(defaults.get("translator_provider") or "none").strip().lower()
     model = str(defaults.get("translator_model") or "").strip()
     base_url = str(defaults.get("translator_base_url") or "").strip()
+    enable_thinking = bool(defaults.get("translator_enable_thinking"))
     translation_enabled = provider != "none" and bool(model) and bool(base_url)
     return {
         "ok": True,
@@ -21,6 +22,7 @@ def build_transcription_runtime_payload():
             "provider": provider,
             "model": model,
             "base_url": base_url,
+            "enable_thinking": enable_thinking,
             "enabled": translation_enabled,
         },
     }

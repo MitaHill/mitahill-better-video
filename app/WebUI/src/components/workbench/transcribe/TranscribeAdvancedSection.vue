@@ -78,12 +78,6 @@
 
     <div class="inline-grid three">
       <div class="field compact">
-        <label>翻译提供器</label>
-        <select v-model="transcribeForm.translatorProvider" :disabled="isDisabled('translatorProvider')">
-          <option v-for="item in translatorProviderOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-        </select>
-      </div>
-      <div class="field compact">
         <label>翻译超时(秒)</label>
         <input
           v-model.number="transcribeForm.translatorTimeoutSec"
@@ -100,49 +94,23 @@
       </label>
     </div>
 
+    <p class="notice" style="margin-top: 4px;">
+      翻译提供器与翻译模型由后端管理页面统一配置，用户端任务创建不提供手动切换。
+    </p>
+    <p v-if="transcribeRuntime.loading" class="notice">正在读取后台翻译源配置...</p>
+    <p v-else-if="transcribeRuntime.error" class="notice" style="color: var(--accent-2);">
+      后台翻译源读取失败：{{ transcribeRuntime.error }}
+    </p>
+    <p v-else class="notice">
+      当前后台翻译源（只读）：{{ translatorProviderLabel }} / {{ transcribeRuntime.translation?.model || "-" }}
+      （{{ transcribeRuntime.translation?.enabled ? "可用" : "未就绪" }}，Thinking: {{ transcribeRuntime.translation?.enable_thinking ? "开启" : "关闭" }}）
+    </p>
+
     <label class="check-inline">
       <input v-model="transcribeForm.exportJson" type="checkbox" :disabled="isDisabled('exportJson')" />
       导出 JSON 分段
     </label>
 
-    <div v-if="transcribeForm.translateTo && transcribeForm.translatorProvider !== 'none'" class="inline-grid two">
-      <div class="field compact">
-        <label>翻译服务地址</label>
-        <input
-          v-model="transcribeForm.translatorBaseUrl"
-          placeholder="http://127.0.0.1:11434 或 https://api.xxx/v1"
-          :disabled="isDisabled('translatorBaseUrl')"
-        />
-      </div>
-      <div class="field compact">
-        <label>翻译模型名</label>
-        <input
-          v-model="transcribeForm.translatorModel"
-          placeholder="qwen3:8b / gpt-4o-mini"
-          :disabled="isDisabled('translatorModel')"
-        />
-      </div>
-    </div>
-
-    <div v-if="transcribeForm.translateTo && transcribeForm.translatorProvider !== 'none'" class="field compact">
-      <label>翻译 API Key（可选，OpenAI兼容常用）</label>
-      <input
-        v-model="transcribeForm.translatorApiKey"
-        type="password"
-        placeholder="留空则不带 Authorization 头"
-        :disabled="isDisabled('translatorApiKey')"
-      />
-    </div>
-
-    <div v-if="transcribeForm.translateTo && transcribeForm.translatorProvider !== 'none'" class="field compact">
-      <label>翻译提示词（可选）</label>
-      <textarea
-        v-model="transcribeForm.translatorPrompt"
-        rows="4"
-        placeholder="留空使用后端默认提示词"
-        :disabled="isDisabled('translatorPrompt')"
-      ></textarea>
-    </div>
   </div>
 </template>
 
@@ -151,6 +119,10 @@ import { computed } from "vue";
 
 const props = defineProps({
   transcribeForm: {
+    type: Object,
+    required: true,
+  },
+  transcribeRuntime: {
     type: Object,
     required: true,
   },
@@ -183,10 +155,10 @@ const outputVideoCodecOptions = computed(() =>
   }))
 );
 
-const translatorProviderOptions = computed(() =>
-  allowed("translatorProvider", ["none", "ollama", "openai_compatible"]).map((value) => ({
-    value,
-    label: value === "none" ? "不启用" : value === "ollama" ? "Ollama" : value === "openai_compatible" ? "OpenAI兼容" : value,
-  }))
-);
+const translatorProviderLabel = computed(() => {
+  const provider = String(props.transcribeRuntime?.translation?.provider || "none").trim().toLowerCase();
+  if (provider === "ollama") return "Ollama";
+  if (provider === "openai_compatible") return "OpenAI兼容";
+  return "不启用";
+});
 </script>

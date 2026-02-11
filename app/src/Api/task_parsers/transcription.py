@@ -55,6 +55,9 @@ def parse_transcription_task_params(form):
             defaults.get("translator_api_key", config.TRANSCRIPTION_TRANSLATOR_API_KEY)
             or ""
         ).strip(),
+        "translator_enable_thinking": bool(
+            defaults.get("translator_enable_thinking", config.TRANSCRIPTION_TRANSLATOR_ENABLE_THINKING)
+        ),
         "translator_prompt": (
             defaults.get("translator_prompt", config.TRANSCRIPTION_TRANSLATOR_PROMPT)
             or ""

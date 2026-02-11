@@ -26,6 +26,14 @@ _DEFAULT_MODEL_BY_BACKEND = {
 }
 
 
+def _to_bool(value: Any, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on", "enabled"}
+
+
 def default_transcription_config() -> Dict[str, Any]:
     return {
         "version": 1,
@@ -57,6 +65,7 @@ def default_transcription_config() -> Dict[str, Any]:
             "model": config.TRANSCRIPTION_TRANSLATOR_MODEL,
             "api_key": config.TRANSCRIPTION_TRANSLATOR_API_KEY,
             "timeout_sec": config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS,
+            "enable_thinking": bool(config.TRANSCRIPTION_TRANSLATOR_ENABLE_THINKING),
             "prompt": config.TRANSCRIPTION_TRANSLATOR_PROMPT,
             "fallback_mode": "model_full_text",
         },
@@ -136,6 +145,10 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     merged["translation"]["base_url"] = str(merged["translation"].get("base_url") or "").strip()
     merged["translation"]["model"] = str(merged["translation"].get("model") or "").strip()
     merged["translation"]["api_key"] = str(merged["translation"].get("api_key") or "").strip()
+    merged["translation"]["enable_thinking"] = _to_bool(
+        merged["translation"].get("enable_thinking"),
+        bool(config.TRANSCRIPTION_TRANSLATOR_ENABLE_THINKING),
+    )
     merged["translation"]["prompt"] = str(merged["translation"].get("prompt") or "").strip()
     fallback_mode = str(merged["translation"].get("fallback_mode") or "model_full_text").strip().lower()
     if fallback_mode not in _VALID_TRANSLATION_FALLBACK_MODES:
@@ -224,6 +237,7 @@ def get_parser_defaults() -> Dict[str, Any]:
         "translator_base_url": str(translation.get("base_url") or "").strip(),
         "translator_model": str(translation.get("model") or "").strip(),
         "translator_api_key": str(translation.get("api_key") or "").strip(),
+        "translator_enable_thinking": _to_bool(translation.get("enable_thinking")),
         "translator_prompt": str(translation.get("prompt") or "").strip(),
         "translator_fallback_mode": str(translation.get("fallback_mode") or "model_full_text").strip().lower(),
         "translator_timeout_sec": float(translation.get("timeout_sec") or 120.0),
