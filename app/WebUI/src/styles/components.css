@@ -657,6 +657,37 @@ button:hover {
   gap: 6px;
 }
 
+.admin-nav-subgroup {
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.admin-nav-subgroup-toggle {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  padding: 6px 8px;
+}
+
+.admin-nav-subgroup-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.admin-nav-third-list {
+  display: grid;
+  gap: 6px;
+}
+
 .admin-nav-item {
   width: 100%;
   text-align: left;
@@ -767,6 +798,7 @@ button:hover {
   background: var(--surface-strong);
   position: relative;
   min-height: 300px;
+  padding-bottom: 22px;
 }
 
 .admin-gpu-chart {
@@ -796,6 +828,18 @@ button:hover {
   pointer-events: none;
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.admin-gpu-device-info {
+  position: absolute;
+  left: 8px;
+  bottom: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: calc(100% - 16px);
 }
 
 .admin-gpu-legend {

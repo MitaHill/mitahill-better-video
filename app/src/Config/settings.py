@@ -175,8 +175,8 @@ try:
     TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS = get_env_float("TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS", 120.0)
     TRANSCRIPTION_TRANSLATOR_PROMPT = os.getenv(
         "TRANSCRIPTION_TRANSLATOR_PROMPT",
-        "Use concise and natural translation.\n"
-        "Target language: {{target_language_name}} ({{target_language_code}}).",
+        "You are a translation engine. Translate the user text to the target language only. "
+        "Do not add explanations.",
     ).strip()
 except Exception as e:
     logger.critical(f"[FAILED] Configuration error: {e}")

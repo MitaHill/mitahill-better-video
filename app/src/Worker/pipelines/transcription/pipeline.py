@@ -1,6 +1,7 @@
 import json
 import logging
 from pathlib import Path
+import traceback
 
 from app.src.Database import core as db
 from app.src.Notifications.events import send_event
@@ -51,7 +52,11 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
         raise RuntimeError(f"uploaded media missing: {media_item.get('filename')}")
 
     stem = _safe_stem(index, media_path)
-    output_dir = run_dir / "results"
+    output_root = run_dir / "results" / stem
+    subtitle_dir = output_root / "subtitles"
+    text_dir = output_root / "texts"
+    json_dir = output_root / "json"
+    video_dir = output_root / "video"
 
     emit_progress(
         task_id,
@@ -78,10 +83,14 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
             temperature=options.get("temperature", 0.0),
             beam_size=options.get("beam_size", 5),
             best_of=options.get("best_of", 5),
+            runtime_mode=options.get("transcribe_runtime_mode", "parallel"),
+            task_id=task_id,
         )
         source_segments = _extract_segments(result)
         if not source_segments:
             raise RuntimeError(f"no transcript segments extracted from {media_item.get('filename')}")
+
+        ENGINE.after_transcription_step(runtime_mode=options.get("transcribe_runtime_mode", "parallel"))
 
         subtitle_ext = _subtitle_suffix(options.get("subtitle_format", "srt"))
         text_outputs = []
@@ -94,7 +103,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
             file_count=total,
         )
         original_subtitle = write_subtitle_file(
-            output_dir / f"{stem}_original.{subtitle_ext}",
+            subtitle_dir / f"original.{subtitle_ext}",
             source_segments,
             subtitle_format=options.get("subtitle_format", "srt"),
             max_line_chars=options.get("max_line_chars", 42),
@@ -102,7 +111,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
         text_outputs.append(original_subtitle)
         text_outputs.append(
             write_text_file(
-                output_dir / f"{stem}_original.txt",
+                text_dir / "original.txt",
                 source_segments,
                 prepend_timestamps=options.get("prepend_timestamps", False),
             )
@@ -110,7 +119,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
         if options.get("export_json"):
             text_outputs.append(
                 write_json_file(
-                    output_dir / f"{stem}_original.json",
+                    json_dir / "original.json",
                     {"media": media_item, "segments": source_segments},
                 )
             )
@@ -146,7 +155,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
             )
 
             translated_subtitle = write_subtitle_file(
-                output_dir / f"{stem}_translated.{subtitle_ext}",
+                subtitle_dir / f"translated.{subtitle_ext}",
                 translated_segments,
                 subtitle_format=options.get("subtitle_format", "srt"),
                 max_line_chars=options.get("max_line_chars", 42),
@@ -154,7 +163,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
             text_outputs.append(translated_subtitle)
             text_outputs.append(
                 write_text_file(
-                    output_dir / f"{stem}_translated.txt",
+                    text_dir / "translated.txt",
                     translated_segments,
                     prepend_timestamps=options.get("prepend_timestamps", False),
                 )
@@ -163,7 +172,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 bilingual_segments = build_bilingual_segments(source_segments, translated_segments)
                 text_outputs.append(
                     write_subtitle_file(
-                        output_dir / f"{stem}_bilingual.{subtitle_ext}",
+                        subtitle_dir / f"bilingual.{subtitle_ext}",
                         bilingual_segments,
                         subtitle_format=options.get("subtitle_format", "srt"),
                         max_line_chars=options.get("max_line_chars", 42),
@@ -172,7 +181,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
             if options.get("export_json"):
                 text_outputs.append(
                     write_json_file(
-                        output_dir / f"{stem}_translated.json",
+                        json_dir / "translated.json",
                         {"media": media_item, "segments": translated_segments},
                     )
                 )
@@ -192,11 +201,27 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 render_subtitled_video(
                     media_path,
                     subtitle_for_video,
-                    output_dir / f"{stem}_subtitled.mp4",
+                    video_dir / "subtitled.mp4",
                     options.get("output_video_codec", "h264"),
                     options.get("output_audio_bitrate_k", 192),
                 )
             )
+
+        text_outputs.append(
+            write_json_file(
+                output_root / "meta.json",
+                {
+                    "task_id": task_id,
+                    "source_file": media_item,
+                    "runtime_mode": options.get("transcribe_runtime_mode", "parallel"),
+                    "transcription_backend": options.get("transcription_backend", "whisper"),
+                    "whisper_model": options.get("whisper_model", "medium"),
+                    "translate_to": options.get("translate_to", ""),
+                    "subtitle_format": options.get("subtitle_format", "srt"),
+                    "transcribe_mode": options.get("transcribe_mode", "subtitle_zip"),
+                },
+            )
+        )
 
         if mode == "subtitled_video":
             if video_outputs:
@@ -227,32 +252,55 @@ def process_transcription_task(task):
     emit_progress(task_id, 2, "转录任务初始化中...")
 
     translator = None
-    if (options.get("translate_to") or "").strip():
-        translator = create_translator(options)
-        if translator is None:
-            raise RuntimeError("translation requested but translator provider is disabled (translator_provider=none).")
-        logger.info("Task %s translation enabled, provider=%s", task_id, getattr(translator, "label", "-"))
+    try:
+        if (options.get("translate_to") or "").strip():
+            translator = create_translator(options)
+            if translator is None:
+                raise RuntimeError("translation requested but translator provider is disabled (translator_provider=none).")
+            logger.info("Task %s translation enabled, provider=%s", task_id, getattr(translator, "label", "-"))
+            try:
+                translator.prepare_for_task()
+            except Exception:
+                logger.warning("Task %s translator prepare failed", task_id, exc_info=True)
 
-    all_outputs = []
-    total = len(media_files)
-    for idx, media_item in enumerate(media_files, start=1):
-        outputs = _process_single_media(task_id, media_item, options, run_dir, idx, total, translator)
-        all_outputs.extend(outputs)
+        all_outputs = []
+        total = len(media_files)
+        for idx, media_item in enumerate(media_files, start=1):
+            outputs = _process_single_media(task_id, media_item, options, run_dir, idx, total, translator)
+            all_outputs.extend(outputs)
 
-    if not all_outputs:
-        raise RuntimeError("No output generated by transcription pipeline.")
+        if not all_outputs:
+            raise RuntimeError("No output generated by transcription pipeline.")
 
-    mode = options.get("transcribe_mode", "subtitle_zip")
-    should_zip = len(media_files) > 1 or mode in {"subtitle_zip", "subtitle_and_video_zip"}
-    if mode == "subtitled_video" and not any(str(p).lower().endswith(".mp4") for p in all_outputs):
-        should_zip = True
+        mode = options.get("transcribe_mode", "subtitle_zip")
+        should_zip = len(media_files) > 1 or mode in {"subtitle_zip", "subtitle_and_video_zip"}
+        if mode == "subtitled_video" and not any(str(p).lower().endswith(".mp4") for p in all_outputs):
+            should_zip = True
 
-    if should_zip:
-        result_path = run_dir / "results" / f"transcribe_{task_id}.zip"
-        zip_outputs(all_outputs, result_path)
-    else:
-        result_path = all_outputs[-1]
+        if should_zip:
+            result_path = run_dir / "results" / f"transcribe_{task_id}.zip"
+            zip_outputs(
+                all_outputs,
+                result_path,
+                base_dir=run_dir / "results",
+                root_prefix=f"transcribe_{task_id}",
+            )
+        else:
+            result_path = all_outputs[-1]
 
-    db.update_task_result(task_id, result_path)
-    db.update_task_status(task_id, "COMPLETED", 100, f"Completed: {Path(result_path).name}")
-    send_event({"task_id": task_id, "progress": 100, "message": "转录任务已完成"})
+        db.update_task_result(task_id, result_path)
+        db.update_task_status(task_id, "COMPLETED", 100, f"Completed: {Path(result_path).name}")
+        send_event({"task_id": task_id, "progress": 100, "message": "转录任务已完成"})
+    except Exception:
+        logger.error("Task %s transcription pipeline failed.\n%s", task_id, traceback.format_exc())
+        raise
+    finally:
+        try:
+            ENGINE.finalize_task(runtime_mode=options.get("transcribe_runtime_mode", "parallel"))
+        except Exception:
+            logger.warning("Task %s engine finalize failed", task_id, exc_info=True)
+        if translator:
+            try:
+                translator.on_task_end()
+            except Exception:
+                logger.warning("Task %s translator finalize failed", task_id, exc_info=True)

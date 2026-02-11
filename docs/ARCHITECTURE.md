@@ -34,6 +34,8 @@
 - `app/WebUI/src/components/workbench/transcribe/*`: transcription section modules.
 - `app/src/Worker/pipelines/transcription/translation/*`: 转录翻译提供器与分段翻译子模块（Ollama/OpenAI兼容）。
 - `app/src/Worker/pipelines/transcription/whisper_engine.py`: 转录执行器（支持 `whisper` / `faster_whisper` 双后端，按任务参数选择）。
+- `app/src/Api/task_parsers/*`: 后端任务参数解析按类别原子化拆分（enhance/convert/transcribe/download）；`app/src/Api/parsers.py` 仅保留兼容导出层。
+- `app/src/Api/routes/transcriptions_handlers/*`: 转录路由子处理器（参数应用、提交处理、运行时配置载荷）原子化拆分。
 - `app/src/Api/services/form_constraints.py`: 三大任务类别统一参数约束引擎（固定锁/范围锁/不约束，前后端同源）。
 - `app/WebUI/src/components/workbench/TaskStatusPanel.vue`: status panel shell.
 - `app/WebUI/src/components/workbench/status/StatusQueryHeader.vue`: status query row + task list.
@@ -43,6 +45,8 @@
 - `app/WebUI/src/components/admin/*`: 后端管理页原子组件（登录、任务表、IP统计、密码修改）。
 - `app/WebUI/src/composables/useWorkbenchController.js`: workbench state orchestration and API interactions.
 - `app/WebUI/src/composables/workbench/*`: atomic workbench logic units (theme/routing/forms/uploads/status/submission/builders).
+- `app/WebUI/src/composables/workbench/submitPayloadBuilders/*`: 按任务类别拆分的提交载荷构建器（index 聚合导出）。
+- `app/WebUI/src/composables/workbench/submission/*`: 提交流程原子模块（通用动作 + enhance/convert/transcribe/download 各自 submitter）。
 - `app/WebUI/src/composables/workbench/useWorkbenchAdmin.js`: 管理鉴权与总览数据获取。
 - `app/WebUI/src/composables/workbench/useWorkbenchFormConstraints.js`: 前端参数约束获取、字段策略解析与表单值纠正。
 - `app/WebUI/src/components/admin/AdminConstraintEditor.vue`: 管理面板参数约束编辑器（按类别）。

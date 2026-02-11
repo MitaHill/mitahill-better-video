@@ -1,4 +1,10 @@
+import logging
 from typing import Callable, List, Optional
+
+import requests
+
+
+logger = logging.getLogger("TRANSCRIBE_TRANSLATION")
 
 
 def translate_segments(segments, translator, target_language, progress_callback: Optional[Callable[[int, int], None]] = None):
@@ -8,13 +14,46 @@ def translate_segments(segments, translator, target_language, progress_callback:
 
     translated: List[dict] = []
     total = len(payload)
+    timeout_circuit_open = False
     for idx, segment in enumerate(payload, start=1):
         current = dict(segment or {})
         text = " ".join(str(current.get("text", "")).split())
-        if text:
-            current["text"] = translator.translate_text(text, target_language)
-        else:
+
+        if not text:
             current["text"] = text
+            translated.append(current)
+            if progress_callback:
+                progress_callback(idx, total)
+            continue
+
+        if timeout_circuit_open:
+            current["text"] = translator.fallback_text(text)
+            translated.append(current)
+            if progress_callback:
+                progress_callback(idx, total)
+            continue
+
+        try:
+            current["text"] = translator.translate_text(text, target_language)
+        except requests.exceptions.ReadTimeout as exc:
+            timeout_circuit_open = True
+            logger.warning(
+                "Translation timeout at segment %s/%s, switch to fallback for remaining segments: %s",
+                idx,
+                total,
+                exc,
+            )
+            current["text"] = translator.fallback_text(text)
+        except Exception as exc:
+            logger.warning(
+                "Translation failed at segment %s/%s, use fallback text: %s",
+                idx,
+                total,
+                exc,
+            )
+            current["text"] = translator.fallback_text(text)
+        else:
+            current["text"] = " ".join(str(current.get("text", "")).split())
         translated.append(current)
         if progress_callback:
             progress_callback(idx, total)

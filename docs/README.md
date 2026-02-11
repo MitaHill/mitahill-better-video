@@ -84,6 +84,16 @@ Audio models are packaged into the image and symlinked into `/root/.cache/voicef
 - Template: `config/.env.example`
 - Env parsing uses `python-dotenv` (loaded in `app/src/Config/settings.py`).
 
+### Transcription Runtime
+- Admin path: `管理 -> 转录中心 -> 转录源设置 -> 转录模型设置`
+- `转录运行模式`:
+  - `并行模式`：Whisper 常驻显存，Ollama 翻译使用长驻 keep-alive（更快）
+  - `节省显存`：转录阶段与翻译阶段之间会执行显存清理与卸载（更省显存）
+- `启动时自检`:
+  - 全局开关，仅支持整体启用/禁用
+  - 启用后容器启动会依次自检 `视频转换`、`视频增强`、`视频转录`
+  - 任一步失败会中止启动并输出完整错误堆栈
+
 
 ## Project Structure
 - `app/src/Api/` — Flask API service

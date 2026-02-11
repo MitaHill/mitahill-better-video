@@ -5,6 +5,7 @@ VALID_SUBTITLE_FORMATS = {"srt", "vtt"}
 VALID_TRANSLATOR_PROVIDERS = {"none", "ollama", "openai_compatible"}
 VALID_TRANSLATOR_FALLBACK_MODES = {"model_full_text", "source_text"}
 VALID_TRANSCRIPTION_BACKENDS = {"whisper", "faster_whisper"}
+VALID_TRANSCRIBE_RUNTIME_MODES = {"parallel", "memory_saving"}
 
 
 def _to_bool(value, default=False):
@@ -63,6 +64,9 @@ def normalize_transcription_options(raw):
     fallback_mode = (options.get("translator_fallback_mode") or "model_full_text").strip().lower()
     if fallback_mode not in VALID_TRANSLATOR_FALLBACK_MODES:
         fallback_mode = "model_full_text"
+    runtime_mode = (options.get("transcribe_runtime_mode") or "parallel").strip().lower()
+    if runtime_mode not in VALID_TRANSCRIBE_RUNTIME_MODES:
+        runtime_mode = "parallel"
 
     normalized = {
         "transcription_backend": backend,
@@ -100,6 +104,7 @@ def normalize_transcription_options(raw):
             or ""
         ).strip(),
         "translator_fallback_mode": fallback_mode,
+        "transcribe_runtime_mode": runtime_mode,
         "translator_timeout_sec": _to_float(
             options.get("translator_timeout_sec"),
             config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS,

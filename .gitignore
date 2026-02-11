@@ -152,15 +152,3 @@ app/frontend/node_modules/
 app/frontend/dist/
 app/WebUI/node_modules/
 app/WebUI/dist/
-
-# Publish safety
-tranvideo/
-pre-run/storage/
-pre-run/.env
-storage/
-*.pt
-*.pth
-*.ckpt
-*.onnx
-*.safetensors
-*.bin

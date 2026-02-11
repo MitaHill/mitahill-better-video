@@ -49,6 +49,7 @@ class BaseTranslator:
         prompt: str,
         timeout_sec: float,
         fallback_mode: str = "model_full_text",
+        runtime_mode: str = "parallel",
     ):
         self.base_url = (base_url or "").strip()
         self.model = (model or "").strip()
@@ -57,6 +58,8 @@ class BaseTranslator:
         self.timeout_sec = float(timeout_sec or 120.0)
         mode = str(fallback_mode or "model_full_text").strip().lower()
         self.fallback_mode = mode if mode in {"model_full_text", "source_text"} else "model_full_text"
+        safe_runtime_mode = str(runtime_mode or "parallel").strip().lower()
+        self.runtime_mode = safe_runtime_mode if safe_runtime_mode in {"parallel", "memory_saving"} else "parallel"
 
     def translate_text(self, text: str, target_language: str) -> str:
         raise NotImplementedError
@@ -84,7 +87,19 @@ class BaseTranslator:
     def _resolve_fallback_text(self, *, model_raw_text: str, source_text: str) -> str:
         if self.fallback_mode == "source_text":
             return str(source_text or "")
-        return self._sanitize_model_text(model_raw_text)
+        sanitized = self._sanitize_model_text(model_raw_text)
+        if sanitized:
+            return sanitized
+        return str(source_text or "")
+
+    def fallback_text(self, source_text: str, model_raw_text: str = "") -> str:
+        return self._resolve_fallback_text(model_raw_text=model_raw_text, source_text=source_text)
+
+    def prepare_for_task(self):
+        return None
+
+    def on_task_end(self):
+        return None
 
     @staticmethod
     def _resolve_target_language(target_language: str):
@@ -128,6 +143,47 @@ class BaseTranslator:
 class OllamaTranslator(BaseTranslator):
     label = "ollama"
 
+    def _keep_alive_value(self):
+        if self.runtime_mode == "parallel":
+            return -1
+        return "2m"
+
+    def prepare_for_task(self):
+        if not self.base_url or not self.model:
+            return None
+        try:
+            endpoint = f"{self.base_url.rstrip('/')}/api/generate"
+            requests.post(
+                endpoint,
+                json={
+                    "model": self.model,
+                    "prompt": "",
+                    "stream": False,
+                    "keep_alive": self._keep_alive_value(),
+                },
+                timeout=min(self.timeout_sec, 10.0),
+            )
+        except Exception:
+            # warmup failure should not fail task creation
+            return None
+        return None
+
+    def on_task_end(self):
+        if self.runtime_mode != "memory_saving":
+            return None
+        if not self.base_url or not self.model:
+            return None
+        try:
+            endpoint = f"{self.base_url.rstrip('/')}/api/generate"
+            requests.post(
+                endpoint,
+                json={"model": self.model, "prompt": "", "stream": False, "keep_alive": 0},
+                timeout=min(self.timeout_sec, 10.0),
+            )
+        except Exception:
+            return None
+        return None
+
     def translate_text(self, text: str, target_language: str) -> str:
         if not self.base_url or not self.model:
             raise ValueError("Ollama translator requires translator_base_url and translator_model.")
@@ -140,6 +196,7 @@ class OllamaTranslator(BaseTranslator):
                 {"role": "user", "content": str(text or "")},
             ],
             "options": {"temperature": 0.2, "top_p": 0.9},
+            "keep_alive": self._keep_alive_value(),
         }
         response = requests.post(endpoint, json=payload, timeout=self.timeout_sec)
         response.raise_for_status()
@@ -200,6 +257,7 @@ def create_translator(options) -> Optional[BaseTranslator]:
         "prompt": options.get("translator_prompt", ""),
         "fallback_mode": options.get("translator_fallback_mode", "model_full_text"),
         "timeout_sec": options.get("translator_timeout_sec", 120.0),
+        "runtime_mode": options.get("transcribe_runtime_mode", "parallel"),
     }
     if provider == "ollama":
         return OllamaTranslator(**kwargs)

@@ -14,7 +14,7 @@
         <div class="status-row admin-head-row">
           <div class="status-row" style="gap: 8px;">
             <button class="secondary" type="button" @click="toggleSidebar">{{ sidebarOpen ? "隐藏菜单" : "显示菜单" }}</button>
-            <h2>后端管理</h2>
+            <h2>管理</h2>
           </div>
           <div class="status-row" style="gap: 8px;">
             <span class="notice">会话有效期：{{ auth.expiresAt || '-' }}</span>
@@ -28,7 +28,7 @@
           :open="sidebarOpen"
           :query="menuSearch"
           :active-key="activeMenuKey"
-          :filtered-groups="filteredMenuGroups"
+          :filtered-tree="filteredMenuTree"
           @update:query="onMenuSearchChange"
           @select="onMenuSelect"
           @close="sidebarOpen = false"
@@ -151,6 +151,7 @@
           <AdminTranscriptionModelSettingsForm
             v-if="activeMenuKey === 'transcribe_cfg_model'"
             :config-data="transcriptionConfig.data || {}"
+            :model-options="transcriptionModels.items"
             :loading="transcriptionConfig.loading"
             :error="transcriptionConfig.error"
             :message="transcriptionConfig.message"
@@ -280,68 +281,89 @@ const sidebarOpen = ref(true);
 const menuSearch = ref("");
 const activeMenuKey = ref("overview");
 
-const menuGroups = Object.freeze([
+const menuTree = Object.freeze([
   {
-    key: "monitoring",
-    label: "任务监控",
-    keywords: "monitor overview task ip 监控 总览 状态 统计",
+    key: "runtime",
+    label: "运行监控",
+    keywords: "runtime monitor task ip gpu log 监控 任务 统计",
     children: Object.freeze([
-      { key: "overview", label: "任务总览", keywords: "overview summary 任务 总览" },
-      { key: "tasks", label: "任务状态浏览", keywords: "task queue processing 任务 状态" },
-      { key: "ips", label: "访问IP统计", keywords: "ip ipv6 stats 访问 统计" },
+      {
+        key: "runtime_tasks",
+        label: "任务与状态",
+        keywords: "overview task queue status maintenance 任务 总览 状态 维护",
+        children: Object.freeze([
+          { key: "overview", label: "任务总览", keywords: "overview summary 任务 总览" },
+          { key: "tasks", label: "任务状态浏览", keywords: "task queue processing 任务 状态" },
+        ]),
+      },
+      {
+        key: "runtime_access",
+        label: "访问与日志",
+        keywords: "ip ipv6 logs warning error 访问 ip 日志",
+        children: Object.freeze([
+          { key: "ips", label: "访问IP统计", keywords: "ip ipv6 stats 访问 统计" },
+          { key: "logs_warn", label: "系统日志", keywords: "log warn error warning 系统 日志" },
+        ]),
+      },
     ]),
   },
   {
-    key: "network",
-    label: "网络配置",
-    keywords: "proxy trusted frp nginx 代理 网络",
+    key: "transcription_center",
+    label: "转录中心",
+    keywords: "transcribe whisper faster translation debug constraint 转录 模型 翻译 调试 约束",
     children: Object.freeze([
-      { key: "proxy", label: "受信代理配置", keywords: "proxy trusted frp nginx 代理" },
+      {
+        key: "transcription_sources",
+        label: "转录源设置",
+        keywords: "model source translation catalog download aria2 转录源 模型 翻译 下载",
+        children: Object.freeze([
+          { key: "transcribe_cfg_model", label: "转录模型设置", keywords: "transcribe whisper faster 模型 设置" },
+          { key: "transcribe_cfg_translation", label: "翻译源设置", keywords: "translate ollama openai 翻译 源" },
+          { key: "transcribe_cfg_catalog", label: "模型目录与下载", keywords: "model catalog aria2 hash warmup 下载 校验 热身" },
+        ]),
+      },
+      {
+        key: "transcription_constraints",
+        label: "参数约束",
+        keywords: "constraints policy lock 参数 约束 锁 范围",
+        children: Object.freeze([
+          { key: "constraints_transcribe", label: "转录参数约束", keywords: "transcribe constraints 参数 约束 锁 范围 whisper subtitle" },
+          { key: "constraints_enhance", label: "增强参数约束", keywords: "enhance constraints 参数 约束 锁 范围" },
+          { key: "constraints_convert", label: "转换参数约束", keywords: "convert constraints 参数 约束 锁 范围" },
+        ]),
+      },
+      {
+        key: "transcription_debug",
+        label: "调试工具",
+        keywords: "debug test transcription translator 调试 测试",
+        children: Object.freeze([
+          { key: "debug_model", label: "测试转录模型", keywords: "debug transcribe model whisper 调试 转录 模型" },
+          { key: "debug_translate", label: "测试翻译源", keywords: "debug translate provider 调试 翻译 源" },
+        ]),
+      },
     ]),
   },
   {
-    key: "transcribe_sources",
-    label: "转录源设置",
-    keywords: "transcribe whisper faster translator model download 转录 模型 翻译",
+    key: "system",
+    label: "系统设置",
+    keywords: "network security proxy password 网络 安全 代理 密码",
     children: Object.freeze([
-      { key: "transcribe_cfg_model", label: "转录模型设置", keywords: "transcribe whisper faster 模型 设置" },
-      { key: "transcribe_cfg_translation", label: "翻译源设置", keywords: "translate ollama openai 翻译 源" },
-      { key: "transcribe_cfg_catalog", label: "模型目录与下载", keywords: "model catalog aria2 hash warmup 下载 校验 热身" },
-    ]),
-  },
-  {
-    key: "constraints",
-    label: "参数约束",
-    keywords: "constraints policy lock 参数 约束 锁 范围",
-    children: Object.freeze([
-      { key: "constraints_enhance", label: "增强参数约束", keywords: "enhance constraints 参数 约束 锁 范围" },
-      { key: "constraints_convert", label: "转换参数约束", keywords: "convert constraints 参数 约束 锁 范围" },
-      { key: "constraints_transcribe", label: "转录参数约束", keywords: "transcribe constraints 参数 约束 锁 范围 whisper subtitle" },
-    ]),
-  },
-  {
-    key: "debug",
-    label: "调试工具",
-    keywords: "debug test transcription translator 调试 测试",
-    children: Object.freeze([
-      { key: "debug_model", label: "测试转录模型", keywords: "debug transcribe model whisper 调试 转录 模型" },
-      { key: "debug_translate", label: "测试翻译源", keywords: "debug translate provider 调试 翻译 源" },
-    ]),
-  },
-  {
-    key: "logs",
-    label: "日志",
-    keywords: "log warn error warning 日志",
-    children: Object.freeze([
-      { key: "logs_warn", label: "系统日志", keywords: "log warn error warning 系统 日志" },
-    ]),
-  },
-  {
-    key: "security",
-    label: "安全设置",
-    keywords: "password security 密码 安全",
-    children: Object.freeze([
-      { key: "password", label: "修改管理密码", keywords: "password security 密码 安全" },
+      {
+        key: "network",
+        label: "网络配置",
+        keywords: "proxy trusted frp nginx 代理 网络",
+        children: Object.freeze([
+          { key: "proxy", label: "受信代理配置", keywords: "proxy trusted frp nginx 代理" },
+        ]),
+      },
+      {
+        key: "security",
+        label: "安全",
+        keywords: "password security 密码 安全",
+        children: Object.freeze([
+          { key: "password", label: "修改管理密码", keywords: "password security 密码 安全" },
+        ]),
+      },
     ]),
   },
 ]);
@@ -359,27 +381,23 @@ const fuzzyIncludes = (text, query) => {
   return false;
 };
 
-const filteredMenuGroups = computed(() => {
-  const query = menuSearch.value.trim();
-  if (!query) return menuGroups;
+const filterTreeNode = (node, query) => {
+  const current = `${node.label || ""} ${node.keywords || ""}`;
+  const selfMatched = fuzzyIncludes(current, query);
+  const children = Array.isArray(node.children) ? node.children : [];
+  if (!children.length) return selfMatched ? { ...node } : null;
+  if (selfMatched) return { ...node };
+  const filteredChildren = children
+    .map((child) => filterTreeNode(child, query))
+    .filter(Boolean);
+  if (!filteredChildren.length) return null;
+  return { ...node, children: filteredChildren };
+};
 
-  const out = [];
-  for (const group of menuGroups) {
-    const groupTarget = `${group.label} ${group.keywords || ""}`;
-    const groupMatched = fuzzyIncludes(groupTarget, query);
-    if (groupMatched) {
-      out.push(group);
-      continue;
-    }
-    const children = group.children.filter((item) => {
-      const target = `${item.label} ${item.keywords || ""}`;
-      return fuzzyIncludes(target, query);
-    });
-    if (children.length) {
-      out.push({ ...group, children });
-    }
-  }
-  return out;
+const filteredMenuTree = computed(() => {
+  const query = menuSearch.value.trim();
+  if (!query) return menuTree;
+  return menuTree.map((node) => filterTreeNode(node, query)).filter(Boolean);
 });
 
 const transcribeReadyModelOptions = computed(() =>
@@ -536,6 +554,9 @@ const loadByMenuKey = async (value) => {
   }
   if (value === "transcribe_cfg_model" || value === "transcribe_cfg_translation") {
     await fetchTranscriptionConfig();
+    if (value === "transcribe_cfg_model") {
+      await fetchTranscriptionModels();
+    }
     return;
   }
   if (value === "transcribe_cfg_catalog") {
@@ -567,18 +588,24 @@ const categoryConstraint = (categoryKey) => {
   return formConstraints?.data?.categories?.[categoryKey] || { global_lock: "free", fields: {} };
 };
 
-const flattenMenuKeys = (groups) => {
+const flattenMenuKeys = (nodes) => {
   const keys = [];
-  for (const group of groups || []) {
-    for (const item of group.children || []) {
-      keys.push(item.key);
+  const walk = (items) => {
+    for (const item of items || []) {
+      const children = Array.isArray(item.children) ? item.children : [];
+      if (!children.length) {
+        keys.push(item.key);
+      } else {
+        walk(children);
+      }
     }
-  }
+  };
+  walk(nodes);
   return keys;
 };
 
-watch(filteredMenuGroups, (groups) => {
-  const keys = flattenMenuKeys(groups);
+watch(filteredMenuTree, (tree) => {
+  const keys = flattenMenuKeys(tree);
   if (!keys.length) return;
   const hasActive = keys.includes(activeMenuKey.value);
   if (!hasActive) {

@@ -85,6 +85,7 @@ export const buildParamRows = (status) => {
 export const buildProgressDetails = (status, live) => {
   if (!status) return "";
 
+  const category = String(status?.task_params?.task_category || "").trim().toLowerCase();
   const fallbackProgress = status.task_progress || {};
   const fallbackSegment = status.segment_progress || {};
   const totalFrames = live.totalFrames || fallbackProgress.total_frames || 0;
@@ -97,7 +98,13 @@ export const buildProgressDetails = (status, live) => {
   const parts = [];
   if (live.gpu !== null) parts.push(`GPU ${live.gpu}%`);
   if (totalFrames) parts.push(`总帧 ${totalFrame}/${totalFrames}`);
-  if (segmentCount) parts.push(`第${segmentIndex}/${segmentCount}段`);
+  if (segmentCount) {
+    if (category === "transcribe") {
+      parts.push(`文件 ${segmentIndex}/${segmentCount}`);
+    } else {
+      parts.push(`第${segmentIndex}/${segmentCount}段`);
+    }
+  }
   if (segmentTotal) parts.push(`分段 ${segmentFrame}/${segmentTotal}`);
   return parts.join(" | ");
 };

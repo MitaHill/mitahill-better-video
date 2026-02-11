@@ -108,20 +108,31 @@ def render_subtitled_video(video_path, subtitle_path, output_path, codec_key, au
     return output_path
 
 
-def zip_outputs(paths, destination):
+def zip_outputs(paths, destination, base_dir=None, root_prefix=""):
     destination.parent.mkdir(parents=True, exist_ok=True)
     arcname_counts = {}
+    base_path = Path(base_dir).resolve() if base_dir else None
+    safe_prefix = str(root_prefix or "").strip().strip("/")
     with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for path in paths:
             file_path = Path(path)
             if not file_path.exists() or not file_path.is_file():
                 continue
-            arcname = file_path.name
+            if base_path:
+                try:
+                    arcname = str(file_path.resolve().relative_to(base_path)).replace("\\", "/")
+                except Exception:
+                    arcname = file_path.name
+            else:
+                arcname = file_path.name
+            if safe_prefix:
+                arcname = f"{safe_prefix}/{arcname}".replace("//", "/")
             count = arcname_counts.get(arcname, 0)
             if count > 0:
-                stem = Path(arcname).stem
-                suffix = Path(arcname).suffix
-                arcname = f"{stem}_{count}{suffix}"
-            arcname_counts[file_path.name] = count + 1
+                arc_path = Path(arcname)
+                stem = arc_path.stem
+                suffix = arc_path.suffix
+                arcname = str(arc_path.parent / f"{stem}_{count}{suffix}").replace("\\", "/")
+            arcname_counts[arcname] = count + 1
             zf.write(file_path, arcname=arcname)
     return destination

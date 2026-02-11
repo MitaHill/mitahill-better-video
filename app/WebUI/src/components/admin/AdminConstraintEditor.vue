@@ -97,31 +97,14 @@
             </td>
             <td>
               <template v-if="row.field.kind === 'enum' || row.field.kind === 'string'">
-                <template v-if="_usePresetSelector(row.fieldKey, row.field)">
-                  <select
-                    class="constraint-multi-select"
-                    multiple
-                    :disabled="loading"
-                    @change="updateAllowedFromMultiSelect(row.fieldKey, $event.target.options)"
-                  >
-                    <option
-                      v-for="item in _fieldOptionList(row.fieldKey, row.field)"
-                      :key="item"
-                      :value="item"
-                      :selected="(row.field.allowed_values || []).includes(item)"
-                    >
-                      {{ item }}
-                    </option>
-                  </select>
-                </template>
-                <template v-else>
-                  <input
-                    :value="(row.field.allowed_values || []).join(',')"
-                    :disabled="loading"
-                    placeholder="逗号分隔，例如: zh,en,ja"
-                    @input="updateAllowed(row.fieldKey, $event.target.value)"
-                  />
-                </template>
+                <AdminModernMultiSelect
+                  :model-value="row.field.allowed_values || []"
+                  :options="_fieldOptionList(row.fieldKey, row.field)"
+                  :disabled="loading"
+                  :allow-custom="true"
+                  placeholder="搜索并回车添加，可多选"
+                  @update:model-value="updateAllowedValues(row.fieldKey, $event)"
+                />
               </template>
               <template v-else>
                 <span class="notice">-</span>
@@ -145,6 +128,7 @@
 
 <script setup>
 import { computed, reactive, watch } from "vue";
+import AdminModernMultiSelect from "./AdminModernMultiSelect.vue";
 
 const props = defineProps({
   categoryKey: {
@@ -284,20 +268,10 @@ const updateBool = (fieldKey, prop, value) => {
   });
 };
 
-const updateAllowed = (fieldKey, value) => {
+const updateAllowedValues = (fieldKey, values) => {
   updateField(fieldKey, (field) => {
-    field.allowed_values = String(value || "")
-      .split(",")
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0);
-  });
-};
-
-const updateAllowedFromMultiSelect = (fieldKey, htmlOptions) => {
-  updateField(fieldKey, (field) => {
-    field.allowed_values = Array.from(htmlOptions || [])
-      .filter((item) => item && item.selected)
-      .map((item) => String(item.value ?? "").trim())
+    field.allowed_values = (Array.isArray(values) ? values : [])
+      .map((item) => String(item || "").trim())
       .filter((item) => item.length > 0);
   });
 };
@@ -310,10 +284,3 @@ const resetLocal = () => {
   setLocalFromProps();
 };
 </script>
-
-<style scoped>
-.constraint-multi-select {
-  min-width: 220px;
-  min-height: 112px;
-}
-</style>

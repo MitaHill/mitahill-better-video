@@ -205,6 +205,19 @@ def update_task_result(task_id, result_path):
     conn.commit()
     conn.close()
 
+
+def update_task_video_info(task_id, video_info):
+    if video_info is None:
+        return
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        "UPDATE task_queue SET video_info = ?, updated_at = ? WHERE task_id = ?",
+        (json.dumps(video_info, ensure_ascii=False), datetime.datetime.now(), task_id),
+    )
+    conn.commit()
+    conn.close()
+
 def delete_task(task_id):
     logger.warning(f"Deleting task and all associated files: {task_id}")
     task = get_task(task_id)
@@ -405,6 +418,22 @@ def get_unfinished_tasks():
     rows = c.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+def count_processing_tasks(exclude_task_id=None):
+    conn = get_connection()
+    c = conn.cursor()
+    safe_exclude = str(exclude_task_id or "").strip()
+    if safe_exclude:
+        c.execute(
+            "SELECT COUNT(1) FROM task_queue WHERE status = 'PROCESSING' AND task_id != ?",
+            (safe_exclude,),
+        )
+    else:
+        c.execute("SELECT COUNT(1) FROM task_queue WHERE status = 'PROCESSING'")
+    row = c.fetchone()
+    conn.close()
+    return int((row or [0])[0] or 0)
 
 
 def request_task_cancel(task_id, reason="已取消（管理员操作）"):

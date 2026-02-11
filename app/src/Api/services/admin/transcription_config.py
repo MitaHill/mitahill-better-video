@@ -14,6 +14,7 @@ from .transcription_catalog import get_models_for_backend
 _VALID_BACKENDS = {"whisper", "faster_whisper"}
 _VALID_TRANSLATORS = {"none", "ollama", "openai_compatible"}
 _VALID_TRANSLATION_FALLBACK_MODES = {"model_full_text", "source_text"}
+_VALID_RUNTIME_MODES = {"parallel", "memory_saving"}
 
 _DEFAULT_MODEL_BY_BACKEND = {
     "whisper": "medium",
@@ -65,6 +66,10 @@ def default_transcription_config() -> Dict[str, Any]:
                 "connect_timeout_sec": 10,
                 "timeout_sec": 120,
             }
+        },
+        "runtime": {
+            "transcribe_runtime_mode": "parallel",
+            "startup_self_check_enabled": False,
         },
     }
 
@@ -166,6 +171,16 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
         "timeout_sec": max(10, min(timeout_sec, 600)),
     }
 
+    runtime = merged.get("runtime") or {}
+    runtime_mode = str(runtime.get("transcribe_runtime_mode") or "parallel").strip().lower()
+    if runtime_mode not in _VALID_RUNTIME_MODES:
+        runtime_mode = "parallel"
+    startup_self_check_enabled = bool(runtime.get("startup_self_check_enabled"))
+    merged["runtime"] = {
+        "transcribe_runtime_mode": runtime_mode,
+        "startup_self_check_enabled": startup_self_check_enabled,
+    }
+
     return merged
 
 
@@ -200,6 +215,7 @@ def get_parser_defaults() -> Dict[str, Any]:
         "translator_prompt": str(translation.get("prompt") or "").strip(),
         "translator_fallback_mode": str(translation.get("fallback_mode") or "model_full_text").strip().lower(),
         "translator_timeout_sec": float(translation.get("timeout_sec") or 120.0),
+        "transcribe_runtime_mode": str((current.get("runtime") or {}).get("transcribe_runtime_mode") or "parallel").strip().lower(),
     }
 
 
