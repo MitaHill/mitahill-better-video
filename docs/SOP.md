@@ -81,5 +81,14 @@
   2. 手动将 `deploy/compose/docker-compose.local.yml` 中的镜像标签改为上一个稳定版本的 Tag。
   3. `docker-compose -f deploy/compose/docker-compose.local.yml up -d --force-recreate` 确保旧逻辑物理生效。
 
+**5. 远端同步策略（本地为主） [CRITICAL]**：
+- 本项目以**本地仓库**为主（Source of Truth），远程仓库为从。
+- 任何本地新增/更新的提交与分支，都必须同步到远程，确保“本地状态 = 远程状态”。
+- 每次阶段性开发完成后，至少执行以下命令（以 `github` 远程为准）：
+  1. `git fetch github --prune`
+  2. `git push github --all`
+  3. `git push github --tags`
+- 若存在多个远程，请以项目主远程（当前为 `github`）为强制同步目标；其他远程按权限与需要另行处理。
+
 ---
-*Last Updated: 2026-01-08*
+*Last Updated: 2026-02-11*

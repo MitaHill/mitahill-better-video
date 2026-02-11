@@ -11,15 +11,35 @@
     </div>
 
     <div class="admin-sidebar-list">
-      <div v-for="level1 in filteredTree" :key="level1.key" class="admin-nav-group">
-        <button class="admin-nav-group-toggle" type="button" @click="toggleNode(level1.key)">
+      <div
+        v-for="level1 in filteredTree"
+        :key="level1.key"
+        class="admin-nav-group"
+        :class="{ 'is-active-branch': isActiveBranch(level1) }"
+      >
+        <button
+          class="admin-nav-group-toggle"
+          :class="{ 'is-active-branch': isActiveBranch(level1) }"
+          type="button"
+          @click="toggleNode(level1.key)"
+        >
           <span class="admin-nav-group-title">{{ level1.label }}</span>
           <span class="admin-nav-group-chevron" :class="{ 'is-open': isNodeOpen(level1.key) }">▾</span>
         </button>
 
         <div v-show="isNodeOpen(level1.key)" class="admin-nav-sub-list">
-          <div v-for="level2 in level1.children || []" :key="level2.key" class="admin-nav-subgroup">
-            <button class="admin-nav-subgroup-toggle" type="button" @click="toggleNode(level2.key)">
+          <div
+            v-for="level2 in level1.children || []"
+            :key="level2.key"
+            class="admin-nav-subgroup"
+            :class="{ 'is-active-branch': isActiveBranch(level2) }"
+          >
+            <button
+              class="admin-nav-subgroup-toggle"
+              :class="{ 'is-active-branch': isActiveBranch(level2) }"
+              type="button"
+              @click="toggleNode(level2.key)"
+            >
               <span class="admin-nav-subgroup-title">{{ level2.label }}</span>
               <span class="admin-nav-group-chevron" :class="{ 'is-open': isNodeOpen(level2.key) }">▾</span>
             </button>
@@ -81,6 +101,16 @@ const isNodeOpen = (key) => {
 const toggleNode = (key) => {
   openNodes[key] = !isNodeOpen(key);
 };
+
+const hasActiveLeaf = (node, activeKey) => {
+  const children = Array.isArray(node?.children) ? node.children : [];
+  if (!children.length) {
+    return String(node?.key || "") === String(activeKey || "");
+  }
+  return children.some((child) => hasActiveLeaf(child, activeKey));
+};
+
+const isActiveBranch = (node) => hasActiveLeaf(node, props.activeKey);
 
 const ensureOpenKeys = (nodes) => {
   for (const level1 of nodes || []) {
