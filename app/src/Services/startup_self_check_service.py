@@ -83,7 +83,8 @@ class StartupSelfCheckService:
                 "-b:a",
                 "128k",
                 str(self.sample_video),
-            ]
+            ],
+            timeout_sec=90,
         )
         if not self.sample_video.exists():
             raise RuntimeError("测试视频生成失败")
@@ -107,7 +108,8 @@ class StartupSelfCheckService:
                 "-ac",
                 "2",
                 str(output_file),
-            ]
+            ],
+            timeout_sec=120,
         )
         if not output_file.exists():
             raise RuntimeError("视频转换自检失败：未生成输出文件")
@@ -133,7 +135,8 @@ class StartupSelfCheckService:
                 "-vframes",
                 "1",
                 str(frame_path),
-            ]
+            ],
+            timeout_sec=60,
         )
         if not frame_path.exists():
             raise RuntimeError("视频增强自检失败：无法提取测试帧")
@@ -167,7 +170,8 @@ class StartupSelfCheckService:
                 "-acodec",
                 "pcm_s16le",
                 str(audio_input),
-            ]
+            ],
+            timeout_sec=90,
         )
         enhancer = AudioEnhancer()
         enhancer.process(audio_input, audio_output)
@@ -196,13 +200,23 @@ class StartupSelfCheckService:
                 "-acodec",
                 "pcm_s16le",
                 str(audio_input),
-            ]
+            ],
+            timeout_sec=90,
         )
         transcription = self.config_payload.get("transcription") or {}
         runtime = self.config_payload.get("runtime") or {}
         backend = str(transcription.get("backend") or "whisper").strip().lower()
         model_name = str(transcription.get("active_model") or "medium").strip().lower()
         runtime_mode = str(runtime.get("transcribe_runtime_mode") or "parallel").strip().lower()
+        runtime_mode_for_selfcheck = "parallel"
+        if runtime_mode != runtime_mode_for_selfcheck:
+            logger.info(
+                "Self-check [视频转录] 覆盖 runtime_mode: configured=%s -> selfcheck=%s",
+                runtime_mode,
+                runtime_mode_for_selfcheck,
+            )
+        else:
+            logger.info("Self-check [视频转录] 使用 runtime_mode=%s", runtime_mode_for_selfcheck)
 
         result = ENGINE.transcribe(
             audio_input,
@@ -212,7 +226,7 @@ class StartupSelfCheckService:
             temperature=0.0,
             beam_size=1,
             best_of=1,
-            runtime_mode=runtime_mode,
+            runtime_mode=runtime_mode_for_selfcheck,
             task_id="startup_self_check",
         )
         if not isinstance(result, dict):
@@ -224,7 +238,7 @@ class StartupSelfCheckService:
             model_name,
             segment_count,
         )
-        ENGINE.finalize_task(runtime_mode=runtime_mode)
+        ENGINE.finalize_task(runtime_mode=runtime_mode_for_selfcheck)
         self._cleanup_memory()
 
     def cleanup_workspace(self):

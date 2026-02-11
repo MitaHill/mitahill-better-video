@@ -75,10 +75,20 @@ class WhisperEngine:
     @staticmethod
     def _wait_until_no_other_processing(task_id: str = "", timeout_sec: float = 1800.0, poll_sec: float = 1.0):
         deadline = time.time() + max(1.0, float(timeout_sec or 1800.0))
+        last_log_time = 0.0
         while True:
             processing = db.count_processing_tasks(exclude_task_id=task_id)
             if processing <= 0:
                 return
+            now = time.time()
+            if now - last_log_time >= 10.0:
+                remain = max(0.0, deadline - now)
+                logger.info(
+                    "Waiting for other PROCESSING tasks to finish before memory_saving transcription: active=%s, remaining=%.1fs",
+                    processing,
+                    remain,
+                )
+                last_log_time = now
             if time.time() >= deadline:
                 raise TimeoutError(f"waiting for idle processing tasks timed out ({processing} active)")
             time.sleep(max(0.2, float(poll_sec or 1.0)))

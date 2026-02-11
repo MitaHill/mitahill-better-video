@@ -32,7 +32,12 @@ class GpuSamplerService:
     def stop(self):
         self._stop_event.set()
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=2.0)
+            try:
+                self._thread.join(timeout=2.0)
+            except AssertionError:
+                # eventlet monkey patch can raise "Cannot switch to MAINLOOP from MAINLOOP"
+                # while joining a native thread from signal shutdown context.
+                logger.warning("GPU sampler join skipped due eventlet shutdown context.")
         self._thread = None
         logger.info("GPU metrics sampler stopped")
 

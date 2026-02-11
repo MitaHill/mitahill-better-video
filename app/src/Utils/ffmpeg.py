@@ -3,6 +3,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+import time
 
 logger = logging.getLogger("FFMPEG")
 
@@ -16,14 +17,51 @@ def _write_ffmpeg_stderr(stderr_text):
     return log_path
 
 
-def run_ffmpeg(args, fallback_args=None):
+def _with_no_stdin(args):
+    safe_args = list(args or [])
+    if not safe_args:
+        return safe_args
+    if safe_args[0] != "ffmpeg":
+        return safe_args
+    if "-nostdin" in safe_args:
+        return safe_args
+    return [safe_args[0], "-nostdin", *safe_args[1:]]
+
+
+def run_ffmpeg(args, fallback_args=None, timeout_sec=None):
     """Run ffmpeg and raise error on failure."""
-    logger.info("Running: %s", " ".join(args))
-    proc = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    safe_args = _with_no_stdin(args)
+    safe_fallback_args = _with_no_stdin(fallback_args) if fallback_args else None
+    logger.info("Running: %s", " ".join(safe_args))
+    started = time.time()
+    try:
+        proc = subprocess.run(
+            safe_args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout_sec,
+        )
+    except subprocess.TimeoutExpired as exc:
+        tail = str(exc.stderr or "").strip().splitlines()[-20:]
+        tail_text = "\n".join(tail)
+        raise RuntimeError(f"ffmpeg timeout after {timeout_sec}s: {tail_text}") from exc
     if proc.returncode != 0 and fallback_args:
         logger.warning("ffmpeg failed, retrying without HWAccel.")
-        logger.info("Fallback: %s", " ".join(fallback_args))
-        proc = subprocess.run(fallback_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        logger.info("Fallback: %s", " ".join(safe_fallback_args))
+        started = time.time()
+        try:
+            proc = subprocess.run(
+                safe_fallback_args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=timeout_sec,
+            )
+        except subprocess.TimeoutExpired as exc:
+            tail = str(exc.stderr or "").strip().splitlines()[-20:]
+            tail_text = "\n".join(tail)
+            raise RuntimeError(f"ffmpeg fallback timeout after {timeout_sec}s: {tail_text}") from exc
     if proc.returncode != 0:
         stderr_text = proc.stderr or ""
         log_path = _write_ffmpeg_stderr(stderr_text)
@@ -32,6 +70,7 @@ def run_ffmpeg(args, fallback_args=None):
         logger.error("ffmpeg failed (last 20 lines):\n%s", tail_text)
         logger.error("Full ffmpeg stderr archived at %s", log_path)
         raise RuntimeError(f"ffmpeg failed: {tail_text}")
+    logger.info("ffmpeg done in %.2fs", time.time() - started)
 
 def get_video_codec(file_path):
     cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)]
