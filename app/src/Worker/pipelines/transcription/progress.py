@@ -2,7 +2,18 @@ from app.src.Database import core as db
 from app.src.Notifications.events import send_event
 
 
+class TaskCancelledError(RuntimeError):
+    pass
+
+
+def ensure_not_cancelled(task_id):
+    if db.is_task_cancel_requested(task_id):
+        db.update_task_status(task_id, "FAILED", message="已取消（管理员操作）")
+        raise TaskCancelledError("任务已取消")
+
+
 def emit_progress(task_id, progress, message, *, file_index=0, file_count=0):
+    ensure_not_cancelled(task_id)
     progress_value = int(max(0, min(100, progress)))
     db.update_task_status(task_id, "PROCESSING", progress_value, message)
     send_event(

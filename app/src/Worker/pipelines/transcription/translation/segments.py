@@ -3,6 +3,7 @@ from typing import Callable, Dict, List, Optional
 
 import requests
 
+from ..progress import TaskCancelledError
 
 logger = logging.getLogger("TRANSCRIBE_TRANSLATION")
 
@@ -14,6 +15,7 @@ def translate_segments(
     progress_callback: Optional[Callable[[int, int], None]] = None,
     cached_text_map: Optional[Dict[int, str]] = None,
     checkpoint_callback: Optional[Callable[[int, str, str, str, str], None]] = None,
+    should_cancel: Optional[Callable[[], bool]] = None,
 ):
     payload = segments or []
     if not translator:
@@ -24,6 +26,8 @@ def translate_segments(
     total = len(payload)
     timeout_circuit_open = False
     for idx, segment in enumerate(payload, start=1):
+        if should_cancel and should_cancel():
+            raise TaskCancelledError("任务已取消")
         current = dict(segment or {})
         text = " ".join(str(current.get("text", "")).split())
 
@@ -54,7 +58,11 @@ def translate_segments(
             continue
 
         try:
+            if should_cancel and should_cancel():
+                raise TaskCancelledError("任务已取消")
             translated_text = translator.translate_text(text, target_language)
+        except TaskCancelledError:
+            raise
         except requests.exceptions.ReadTimeout as exc:
             timeout_circuit_open = True
             logger.warning(

@@ -27,7 +27,7 @@ from .io_ops import (
     zip_outputs,
 )
 from .options import normalize_transcription_options
-from .progress import emit_progress
+from .progress import TaskCancelledError, emit_progress, ensure_not_cancelled
 from .translation import build_bilingual_segments, create_translator, translate_segments
 from .whisper_engine import ENGINE
 
@@ -59,6 +59,7 @@ def _subtitle_suffix(subtitle_format):
 
 
 def _process_single_media(task_id, media_item, options, run_dir, index, total, translator):
+    ensure_not_cancelled(task_id)
     media_path = Path(media_item.get("upload_path", ""))
     if not media_path.exists():
         raise RuntimeError(f"uploaded media missing: {media_item.get('filename')}")
@@ -85,6 +86,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
     audio_path = media_path
 
     try:
+        ensure_not_cancelled(task_id)
         source_segments = load_cached_source_segments(
             task_id,
             stem,
@@ -223,6 +225,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 progress_callback=_translation_progress,
                 cached_text_map=cached_translation_map,
                 checkpoint_callback=_translation_checkpoint,
+                should_cancel=lambda: db.is_task_cancel_requested(task_id),
             )
             save_translated_segments(
                 task_id,
@@ -336,6 +339,7 @@ def process_transcription_task(task):
         raise RuntimeError("No uploaded audio/video files for transcription.")
 
     emit_progress(task_id, 2, "转录任务初始化中...")
+    ensure_not_cancelled(task_id)
 
     translator = None
     try:
@@ -377,6 +381,9 @@ def process_transcription_task(task):
         db.update_task_result(task_id, result_path)
         db.update_task_status(task_id, "COMPLETED", 100, f"Completed: {Path(result_path).name}")
         send_event({"task_id": task_id, "progress": 100, "message": "转录任务已完成"})
+    except TaskCancelledError:
+        logger.info("Task %s transcription cancelled by admin.", task_id)
+        raise
     except Exception:
         logger.error("Task %s transcription pipeline failed.\n%s", task_id, traceback.format_exc())
         raise
