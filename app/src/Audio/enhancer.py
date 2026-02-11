@@ -41,6 +41,7 @@ class AudioEnhancer:
     def load_model(self):
         if self._model is None:
             self._ensure_cache_links()
+            self._apply_torch_weight_norm_compat()
             required = [
                 Path("/root/.cache/voicefixer/analysis_module/checkpoints/vf.ckpt"),
                 Path("/root/.cache/voicefixer/model.ckpt-1490000_trimed.pt"),
@@ -55,6 +56,27 @@ class AudioEnhancer:
             from voicefixer import VoiceFixer
             self._model = VoiceFixer()
         return self._model
+
+    @staticmethod
+    def _apply_torch_weight_norm_compat():
+        """VoiceFixer expects torch.nn.utils.parametrizations.weight_norm on old torch builds."""
+        try:
+            parametrizations = getattr(torch.nn.utils, "parametrizations", None)
+            if parametrizations is None:
+                return
+            if hasattr(parametrizations, "weight_norm"):
+                return
+            legacy_weight_norm = getattr(torch.nn.utils, "weight_norm", None)
+            if not callable(legacy_weight_norm):
+                return
+
+            def _compat_weight_norm(module, name="weight", dim=0):
+                return legacy_weight_norm(module, name=name, dim=dim)
+
+            setattr(parametrizations, "weight_norm", _compat_weight_norm)
+            logger.info("Applied torch weight_norm compatibility patch for VoiceFixer.")
+        except Exception:
+            logger.warning("Failed to apply VoiceFixer weight_norm compatibility patch.", exc_info=True)
 
     def unload_model(self):
         if self._model is not None:

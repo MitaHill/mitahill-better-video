@@ -657,6 +657,37 @@ button:hover {
   gap: 6px;
 }
 
+.admin-nav-subgroup {
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.admin-nav-subgroup-toggle {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  padding: 6px 8px;
+}
+
+.admin-nav-subgroup-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.admin-nav-third-list {
+  display: grid;
+  gap: 6px;
+}
+
 .admin-nav-item {
   width: 100%;
   text-align: left;

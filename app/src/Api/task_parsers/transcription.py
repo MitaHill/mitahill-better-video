@@ -60,6 +60,10 @@ def parse_transcription_task_params(form):
             or defaults.get("translator_fallback_mode", "model_full_text")
             or "model_full_text"
         ).strip().lower(),
+        "transcribe_runtime_mode": (
+            defaults.get("transcribe_runtime_mode", "parallel")
+            or "parallel"
+        ).strip().lower(),
         "translator_timeout_sec": float_from_form(
             form,
             "translator_timeout_sec",

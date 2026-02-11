@@ -7,11 +7,11 @@ export const CATEGORY_PATH = Object.freeze({
 });
 
 export const CATEGORY_TABS = Object.freeze([
-  { key: "enhance", label: "视频增强" },
-  { key: "convert", label: "视频转换" },
-  { key: "transcribe", label: "视频转录" },
-  { key: "download", label: "视频下载" },
-  { key: "admin", label: "后端管理" },
+  { key: "enhance", label: "增强" },
+  { key: "convert", label: "转换" },
+  { key: "transcribe", label: "转录" },
+  { key: "download", label: "下载" },
+  { key: "admin", label: "管理" },
 ]);
 
 export const getCategoryByPath = (path) => {

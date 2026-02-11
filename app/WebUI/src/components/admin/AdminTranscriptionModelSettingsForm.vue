@@ -1,7 +1,7 @@
 <template>
   <div class="panel admin-card">
     <h2>转录模型设置</h2>
-    <p class="notice" style="margin-bottom: 10px;">用于配置默认转录后端、默认模型和 aria2 下载行为。</p>
+    <p class="notice" style="margin-bottom: 10px;">用于配置默认转录后端、默认模型、运行模式与 aria2 下载行为。</p>
 
     <div class="inline-grid two">
       <div class="field compact">
@@ -38,6 +38,31 @@
       <p class="notice" style="margin-top: 6px;">
         候选项会按当前后端过滤并优先展示已安装模型，也可手动输入新模型ID。
       </p>
+    </div>
+
+    <div class="param-section" style="margin-top: 10px;">
+      <div class="param-title">运行与启动策略</div>
+      <div class="inline-grid two">
+        <div class="field compact">
+          <label>转录运行模式</label>
+          <select v-model="local.runtimeMode" :disabled="loading">
+            <option value="parallel">并行模式（Whisper常驻，响应更快）</option>
+            <option value="memory_saving">节省显存（按阶段卸载/清理）</option>
+          </select>
+          <p class="notice" style="margin-top: 6px;">
+            节省显存模式下会在转录与翻译阶段之间主动释放显存，并在翻译结束后卸载 Ollama 模型（若使用）。
+          </p>
+        </div>
+        <div class="field compact">
+          <label class="check-inline" style="margin-top: 24px;">
+            <input v-model="local.startupSelfCheckEnabled" :disabled="loading" type="checkbox" />
+            启用容器启动自检（增强/转换/转录）
+          </label>
+          <p class="notice" style="margin-top: 6px;">
+            仅支持全局开启/关闭。开启后，任一模块自检失败将中止程序启动并输出详细堆栈日志。
+          </p>
+        </div>
+      </div>
     </div>
 
     <div class="param-section" style="margin-top: 10px;">
@@ -130,6 +155,8 @@ const local = reactive({
     timeoutSec: 120,
     proxy: "",
   },
+  runtimeMode: "parallel",
+  startupSelfCheckEnabled: false,
 });
 
 const normalizeModelIds = (values) =>
@@ -172,6 +199,9 @@ const applyFromProps = () => {
   local.aria2.connectTimeoutSec = Number(aria2.connect_timeout_sec ?? 10);
   local.aria2.timeoutSec = Number(aria2.timeout_sec ?? 120);
   local.aria2.proxy = aria2.proxy || "";
+  const runtime = cfg.runtime || {};
+  local.runtimeMode = runtime.transcribe_runtime_mode || "parallel";
+  local.startupSelfCheckEnabled = Boolean(runtime.startup_self_check_enabled);
 };
 
 watch(
@@ -203,6 +233,10 @@ const save = async () => {
         timeout_sec: Number(local.aria2.timeoutSec || 120),
         proxy: String(local.aria2.proxy || "").trim(),
       },
+    },
+    runtime: {
+      transcribe_runtime_mode: String(local.runtimeMode || "parallel").trim().toLowerCase(),
+      startup_self_check_enabled: Boolean(local.startupSelfCheckEnabled),
     },
   });
 };
