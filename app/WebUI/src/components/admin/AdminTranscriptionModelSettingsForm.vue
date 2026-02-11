@@ -13,13 +13,31 @@
       </div>
       <div class="field compact">
         <label>默认模型</label>
-        <input v-model="local.activeModel" :disabled="loading" placeholder="例如: medium / large-v3 / distil-large-v3" />
+        <input
+          v-model="local.activeModel"
+          list="admin-transcribe-active-model-list"
+          :disabled="loading"
+          placeholder="例如: medium / large-v3 / distil-large-v3"
+        />
+        <datalist id="admin-transcribe-active-model-list">
+          <option v-for="item in activeModelOptions" :key="item" :value="item" />
+        </datalist>
       </div>
     </div>
 
     <div class="field">
-      <label>允许用户可选模型（逗号分隔）</label>
-      <textarea v-model="local.allowedModelsRaw" :disabled="loading" rows="3" placeholder="tiny,base,small,medium,large-v3,turbo"></textarea>
+      <label>允许用户可选模型（多选）</label>
+      <AdminModernMultiSelect
+        :model-value="local.allowedModels"
+        :options="activeModelOptions"
+        :disabled="loading"
+        :allow-custom="true"
+        placeholder="搜索模型并回车添加"
+        @update:model-value="onAllowedModelsChange"
+      />
+      <p class="notice" style="margin-top: 6px;">
+        候选项会按当前后端过滤并优先展示已安装模型，也可手动输入新模型ID。
+      </p>
     </div>
 
     <div class="param-section" style="margin-top: 10px;">
@@ -69,7 +87,8 @@
 </template>
 
 <script setup>
-import { reactive, watch } from "vue";
+import { computed, reactive, watch } from "vue";
+import AdminModernMultiSelect from "./AdminModernMultiSelect.vue";
 
 const props = defineProps({
   configData: {
@@ -92,12 +111,16 @@ const props = defineProps({
     type: Function,
     required: true,
   },
+  modelOptions: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const local = reactive({
   backend: "whisper",
   activeModel: "medium",
-  allowedModelsRaw: "",
+  allowedModels: [],
   aria2: {
     split: 16,
     maxConnectionPerServer: 16,
@@ -109,6 +132,31 @@ const local = reactive({
   },
 });
 
+const normalizeModelIds = (values) =>
+  Array.from(
+    new Set(
+      (Array.isArray(values) ? values : [])
+        .map((item) => String(item || "").trim().toLowerCase())
+        .filter((item) => item.length > 0)
+    )
+  );
+
+const backendOptions = computed(() =>
+  normalizeModelIds(
+    (Array.isArray(props.modelOptions) ? props.modelOptions : [])
+      .filter((item) => String(item?.backend || "").trim().toLowerCase() === String(local.backend || "").trim().toLowerCase())
+      .map((item) => item?.model_id)
+  )
+);
+
+const activeModelOptions = computed(() =>
+  normalizeModelIds([
+    ...backendOptions.value,
+    ...(local.allowedModels || []),
+    local.activeModel,
+  ])
+);
+
 const applyFromProps = () => {
   const cfg = props.configData || {};
   const transcription = cfg.transcription || {};
@@ -116,9 +164,7 @@ const applyFromProps = () => {
   const aria2 = download.aria2 || {};
   local.backend = transcription.backend || "whisper";
   local.activeModel = transcription.active_model || "medium";
-  local.allowedModelsRaw = Array.isArray(transcription.allowed_models)
-    ? transcription.allowed_models.join(",")
-    : "";
+  local.allowedModels = normalizeModelIds(transcription.allowed_models || []);
   local.aria2.split = Number(aria2.split ?? 16);
   local.aria2.maxConnectionPerServer = Number(aria2.max_connection_per_server ?? 16);
   local.aria2.maxTries = Number(aria2.max_tries ?? 10);
@@ -136,17 +182,16 @@ watch(
   { immediate: true, deep: true }
 );
 
-const save = async () => {
-  const allowedModels = String(local.allowedModelsRaw || "")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter((item) => item.length > 0);
+const onAllowedModelsChange = (nextValues) => {
+  local.allowedModels = normalizeModelIds(nextValues);
+};
 
+const save = async () => {
   await props.onSave({
     transcription: {
       backend: local.backend,
       active_model: String(local.activeModel || "").trim().toLowerCase(),
-      allowed_models: allowedModels,
+      allowed_models: normalizeModelIds(local.allowedModels),
     },
     download: {
       aria2: {

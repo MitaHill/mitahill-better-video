@@ -151,6 +151,7 @@
           <AdminTranscriptionModelSettingsForm
             v-if="activeMenuKey === 'transcribe_cfg_model'"
             :config-data="transcriptionConfig.data || {}"
+            :model-options="transcriptionModels.items"
             :loading="transcriptionConfig.loading"
             :error="transcriptionConfig.error"
             :message="transcriptionConfig.message"
@@ -536,6 +537,9 @@ const loadByMenuKey = async (value) => {
   }
   if (value === "transcribe_cfg_model" || value === "transcribe_cfg_translation") {
     await fetchTranscriptionConfig();
+    if (value === "transcribe_cfg_model") {
+      await fetchTranscriptionModels();
+    }
     return;
   }
   if (value === "transcribe_cfg_catalog") {
