@@ -832,13 +832,14 @@ button:hover {
 
 .admin-gpu-device-info {
   position: absolute;
-  left: 8px;
+  right: 8px;
   bottom: 4px;
   font-size: 0.75rem;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: right;
   max-width: calc(100% - 16px);
 }
 
