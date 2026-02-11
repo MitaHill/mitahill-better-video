@@ -6,6 +6,35 @@ import requests
 
 _CODE_BLOCK_RE = re.compile(r"```(?:[a-zA-Z]+)?\s*([\s\S]*?)```", re.MULTILINE)
 _THINK_TAG_RE = re.compile(r"<think>[\s\S]*?</think>", re.IGNORECASE)
+_LANGUAGE_NAME_MAP = {
+    "zh": "Chinese",
+    "en": "English",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "ru": "Russian",
+    "ar": "Arabic",
+    "pt": "Portuguese",
+    "it": "Italian",
+    "nl": "Dutch",
+    "pl": "Polish",
+    "tr": "Turkish",
+    "uk": "Ukrainian",
+    "cs": "Czech",
+    "sv": "Swedish",
+    "no": "Norwegian",
+    "da": "Danish",
+    "fi": "Finnish",
+    "el": "Greek",
+    "he": "Hebrew",
+    "hi": "Hindi",
+    "id": "Indonesian",
+    "ms": "Malay",
+    "vi": "Vietnamese",
+    "th": "Thai",
+}
 
 
 class BaseTranslator:
@@ -55,12 +84,51 @@ class BaseTranslator:
     def _resolve_fallback_text(self, *, model_raw_text: str, source_text: str) -> str:
         if self.fallback_mode == "source_text":
             return str(source_text or "")
-        return self._sanitize_model_text(model_raw_text)
+        sanitized = self._sanitize_model_text(model_raw_text)
+        if sanitized:
+            return sanitized
+        return str(source_text or "")
+
+    def fallback_text(self, source_text: str, model_raw_text: str = "") -> str:
+        return self._resolve_fallback_text(model_raw_text=model_raw_text, source_text=source_text)
 
     @staticmethod
-    def _message_prompt(target_language: str) -> str:
-        lang = (target_language or "").strip()
-        return f"Translate the input text into {lang}. Output translated text only."
+    def _resolve_target_language(target_language: str):
+        code = str(target_language or "").strip().lower()
+        name = _LANGUAGE_NAME_MAP.get(code, code or "target-language")
+        display = f"{name} ({code})" if code else name
+        return code, name, display
+
+    @staticmethod
+    def _render_custom_prompt(prompt_text: str, target_language: str) -> str:
+        raw = str(prompt_text or "").strip()
+        if not raw:
+            return ""
+        code, name, display = BaseTranslator._resolve_target_language(target_language)
+        rendered = (
+            raw.replace("{{target_language_code}}", code)
+            .replace("{{target_language_name}}", name)
+            .replace("{{target_language}}", display)
+        )
+        return rendered
+
+    @classmethod
+    def _system_prompt(cls, target_language: str, custom_prompt: str = "") -> str:
+        code, name, display = cls._resolve_target_language(target_language)
+        resolved_custom = cls._render_custom_prompt(custom_prompt, target_language)
+        target_line = f"Target language: {display}" if code else f"Target language: {name}"
+        strict_rules = (
+            "You are a professional translation engine for transcription segments.\n"
+            f"{target_line}\n"
+            "Return translated text only, with no explanations.\n"
+            "Preserve original line breaks and text structure.\n"
+            "Keep numbers, punctuation, URLs, emails, and IDs unchanged unless translation is required.\n"
+            "Do not translate placeholders or markup, such as {name}, [MASK], <tag>, %s, ${VAR}.\n"
+            "If the source text is empty, return an empty string."
+        )
+        if resolved_custom:
+            return f"{resolved_custom}\n\n{strict_rules}"
+        return strict_rules
 
 
 class OllamaTranslator(BaseTranslator):
@@ -74,7 +142,7 @@ class OllamaTranslator(BaseTranslator):
             "model": self.model,
             "stream": False,
             "messages": [
-                {"role": "system", "content": self.prompt or self._message_prompt(target_language)},
+                {"role": "system", "content": self._system_prompt(target_language, self.prompt)},
                 {"role": "user", "content": str(text or "")},
             ],
             "options": {"temperature": 0.2, "top_p": 0.9},
@@ -107,7 +175,7 @@ class OpenAICompatibleTranslator(BaseTranslator):
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": self.prompt or self._message_prompt(target_language)},
+                {"role": "system", "content": self._system_prompt(target_language, self.prompt)},
                 {"role": "user", "content": str(text or "")},
             ],
             "temperature": 0.2,
