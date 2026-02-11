@@ -31,6 +31,7 @@ RUN pip install --no-cache-dir \
     flask-socketio==5.3.6 \
     eventlet==0.36.1 \
     faster-whisper==1.0.3 \
+    yt-dlp==2026.2.4 \
     voicefixer \
     deepfilternet \
     python-dotenv==1.0.1 \

@@ -111,6 +111,11 @@ export const useWorkbenchFormsState = () => {
     mediaFiles: [],
   });
   const transcribeMediaInfo = ref([]);
+  const downloadForm = reactive({
+    url: "",
+    outputFormat: "mp4",
+    audioOnly: false,
+  });
 
   const addWatermarkSegment = () => {
     const label = String.fromCharCode(65 + convertForm.watermarkTimeline.length);
@@ -127,6 +132,7 @@ export const useWorkbenchFormsState = () => {
     convertMediaInfo,
     transcribeForm,
     transcribeMediaInfo,
+    downloadForm,
     addWatermarkSegment,
     removeWatermarkSegment,
   };

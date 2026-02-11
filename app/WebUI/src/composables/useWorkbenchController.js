@@ -23,6 +23,7 @@ export const useWorkbenchController = () => {
     convertMediaInfo,
     transcribeForm,
     transcribeMediaInfo,
+    downloadForm,
     addWatermarkSegment,
     removeWatermarkSegment,
   } = useWorkbenchFormsState();
@@ -79,6 +80,7 @@ export const useWorkbenchController = () => {
     enhanceForm,
     convertForm,
     transcribeForm,
+    downloadForm,
     taskIds,
     setStatusQuery,
     fetchStatus,
@@ -115,6 +117,7 @@ export const useWorkbenchController = () => {
     convertMediaInfo,
     transcribeForm,
     transcribeMediaInfo,
+    downloadForm,
     taskIds,
     submitError,
     submitWarnings,

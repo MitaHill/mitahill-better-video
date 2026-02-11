@@ -8,6 +8,7 @@ export const useWorkbenchSubmission = ({
   enhanceForm,
   convertForm,
   transcribeForm,
+  downloadForm,
   taskIds,
   setStatusQuery,
   fetchStatus,
@@ -116,12 +117,40 @@ export const useWorkbenchSubmission = ({
     await fetchStatus();
   };
 
+  const submitDownloadTask = async () => {
+    const rawUrl = String(downloadForm.url || "").trim();
+    if (!rawUrl) {
+      throw new Error("请先输入要下载的视频链接。");
+    }
+    const data = new FormData();
+    data.append("url", rawUrl);
+    data.append("output_format", String(downloadForm.outputFormat || "mp4"));
+    data.append("audio_only", String(Boolean(downloadForm.audioOnly)));
+
+    const res = await fetch("/api/downloads/direct", { method: "POST", body: data });
+    const payload = await parseJsonSafe(res);
+    if (!res.ok) {
+      throw new Error(payload.error || "下载任务失败。");
+    }
+
+    taskIds.value = [];
+    setStatusQuery("");
+    const files = Array.isArray(payload.files) ? payload.files : [];
+    if (files.length) {
+      submitWarnings.value = `下载完成，输出目录：${payload.output_dir}，文件：${files.map((f) => f.name).join("，")}`;
+    } else {
+      submitWarnings.value = `下载完成，输出目录：${payload.output_dir}`;
+    }
+  };
+
   const submitTask = async () => {
     submitError.value = "";
     submitWarnings.value = "";
     loading.submit = true;
     try {
-      if (activeCategory.value === "convert") {
+      if (activeCategory.value === "download") {
+        await submitDownloadTask();
+      } else if (activeCategory.value === "convert") {
         await submitConvertTask();
       } else if (activeCategory.value === "transcribe") {
         await submitTranscribeTask();

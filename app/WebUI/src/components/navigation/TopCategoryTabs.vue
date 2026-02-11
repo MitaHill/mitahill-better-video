@@ -38,6 +38,7 @@ const safeTabs = computed(() => {
     { key: "enhance", label: "视频增强" },
     { key: "convert", label: "视频转换" },
     { key: "transcribe", label: "视频转录" },
+    { key: "download", label: "视频下载" },
     { key: "admin", label: "后端管理" },
   ];
 });

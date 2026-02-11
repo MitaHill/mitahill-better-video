@@ -16,6 +16,7 @@
           :convert-media-info="convertMediaInfo"
           :transcribe-form="transcribeForm"
           :transcribe-media-info="transcribeMediaInfo"
+          :download-form="downloadForm"
           :loading-submit="loading.submit"
           :submit-error="submitError"
           :submit-warnings="submitWarnings"
@@ -71,6 +72,7 @@ const {
   convertMediaInfo,
   transcribeForm,
   transcribeMediaInfo,
+  downloadForm,
   taskIds,
   submitError,
   submitWarnings,
