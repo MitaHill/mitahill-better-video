@@ -1,6 +1,8 @@
 from flask import Blueprint, jsonify, request
 
 from ...services.admin import (
+    cancel_download_job,
+    delete_download_job,
     get_download_job,
     list_download_jobs,
     list_transcription_models,
@@ -54,3 +56,27 @@ def admin_get_model_download(job_id: str):
     if not payload:
         return jsonify({"error": "job not found"}), 404
     return jsonify({"job": payload})
+
+
+@bp.post("/api/admin/transcription/models/downloads/<job_id>/cancel")
+def admin_cancel_model_download(job_id: str):
+    _session, err = get_admin_session(request)
+    if err:
+        return jsonify({"error": err}), 401
+    try:
+        payload = cancel_download_job(job_id)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, "job": payload})
+
+
+@bp.delete("/api/admin/transcription/models/downloads/<job_id>")
+def admin_delete_model_download(job_id: str):
+    _session, err = get_admin_session(request)
+    if err:
+        return jsonify({"error": err}), 401
+    try:
+        deleted = delete_download_job(job_id)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": bool(deleted), "job_id": job_id})

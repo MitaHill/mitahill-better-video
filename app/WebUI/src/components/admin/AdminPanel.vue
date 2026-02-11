@@ -137,6 +137,8 @@
             :message="transcriptionModels.message"
             :on-refresh="refreshTranscriptionCatalog"
             :on-download="startTranscriptionModelDownload"
+            :on-cancel-job="cancelTranscriptionModelDownloadJob"
+            :on-delete-job="deleteTranscriptionModelDownloadJob"
           />
 
           <AdminDebugToolsPanel
@@ -221,6 +223,8 @@ const {
   fetchTranscriptionModels,
   fetchModelDownloadJobs,
   startModelDownload,
+  cancelModelDownloadJob,
+  deleteModelDownloadJob,
   testTranscriptionModel,
   testTranslationProvider,
   fetchAdminLogs,
@@ -406,6 +410,16 @@ const refreshTranscriptionCatalog = async () => {
 
 const startTranscriptionModelDownload = async (backend, modelId) => {
   await startModelDownload(backend, modelId);
+  await fetchModelDownloadJobs();
+};
+
+const cancelTranscriptionModelDownloadJob = async (jobId) => {
+  await cancelModelDownloadJob(jobId);
+  await fetchModelDownloadJobs();
+};
+
+const deleteTranscriptionModelDownloadJob = async (jobId) => {
+  await deleteModelDownloadJob(jobId);
   await fetchModelDownloadJobs();
 };
 

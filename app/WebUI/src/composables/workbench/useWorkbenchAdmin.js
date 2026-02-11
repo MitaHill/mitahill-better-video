@@ -477,6 +477,48 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     }
   };
 
+  const cancelModelDownloadJob = async (jobId) => {
+    if (!auth.token || !jobId) return;
+    transcriptionModels.error = "";
+    transcriptionModels.message = "";
+    try {
+      const res = await fetch(`/api/admin/transcription/models/downloads/${encodeURIComponent(jobId)}/cancel`, {
+        method: "POST",
+        headers: _authHeaders(),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "取消下载任务失败");
+      }
+      transcriptionModels.message = `已取消任务: ${jobId}`;
+      await fetchModelDownloadJobs();
+    } catch (error) {
+      transcriptionModels.error = error.message;
+    }
+  };
+
+  const deleteModelDownloadJob = async (jobId) => {
+    if (!auth.token || !jobId) return;
+    transcriptionModels.error = "";
+    transcriptionModels.message = "";
+    try {
+      const res = await fetch(`/api/admin/transcription/models/downloads/${encodeURIComponent(jobId)}`, {
+        method: "DELETE",
+        headers: _authHeaders(),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "删除下载任务失败");
+      }
+      transcriptionModels.message = `已删除任务: ${jobId}`;
+      await fetchModelDownloadJobs();
+    } catch (error) {
+      transcriptionModels.error = error.message;
+    }
+  };
+
   const testTranscriptionModel = async () => {
     if (!auth.token) return;
     debugTools.loadingModelTest = true;
@@ -574,6 +616,8 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     fetchModelDownloadJobs,
     fetchModelDownloadJob,
     startModelDownload,
+    cancelModelDownloadJob,
+    deleteModelDownloadJob,
     testTranscriptionModel,
     testTranslationProvider,
     fetchAdminLogs,

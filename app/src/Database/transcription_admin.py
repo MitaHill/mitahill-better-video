@@ -168,3 +168,13 @@ def list_model_download_jobs(limit: int = 50) -> List[Dict]:
             except json.JSONDecodeError:
                 payload[key] = {}
     return rows
+
+
+def delete_model_download_job(job_id: str) -> bool:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM model_download_jobs WHERE job_id = ?", (str(job_id or ""),))
+    affected = cur.rowcount
+    conn.commit()
+    conn.close()
+    return bool(affected)

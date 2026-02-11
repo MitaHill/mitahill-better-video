@@ -11,21 +11,16 @@
       <table class="admin-table">
         <thead>
           <tr>
+            <th>操作</th>
             <th>模型</th>
             <th>后端</th>
             <th>引擎</th>
             <th>已安装</th>
             <th>存储路径</th>
-            <th>操作</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="item in models" :key="`${item.backend}:${item.model_id}`">
-            <td class="mono">{{ item.model_id }}</td>
-            <td>{{ item.backend }}</td>
-            <td>{{ item.engine }}</td>
-            <td>{{ item.installed ? "是" : "否" }}</td>
-            <td class="mono">{{ item.local_path }}</td>
             <td>
               <button
                 type="button"
@@ -35,6 +30,11 @@
                 下载
               </button>
             </td>
+            <td class="mono">{{ item.model_id }}</td>
+            <td>{{ item.backend }}</td>
+            <td>{{ item.engine }}</td>
+            <td>{{ item.installed ? "是" : "否" }}</td>
+            <td class="mono">{{ item.local_path }}</td>
           </tr>
           <tr v-if="!models.length">
             <td colspan="6" class="notice">暂无模型数据</td>
@@ -49,6 +49,7 @@
         <table class="admin-table">
           <thead>
             <tr>
+              <th>删除</th>
               <th>任务ID</th>
               <th>模型</th>
               <th>后端</th>
@@ -56,10 +57,23 @@
               <th>进度</th>
               <th>消息</th>
               <th>更新时间</th>
+              <th>取消</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="job in jobs" :key="job.job_id">
+              <td>
+                <button
+                  v-if="String(job.status || '').toUpperCase() === 'FAILED'"
+                  class="secondary"
+                  type="button"
+                  :disabled="loading"
+                  @click="onDeleteJob(job.job_id)"
+                >
+                  删除
+                </button>
+                <span v-else>-</span>
+              </td>
               <td class="mono">{{ job.job_id }}</td>
               <td class="mono">{{ job.model_id }}</td>
               <td>{{ job.backend }}</td>
@@ -72,9 +86,20 @@
               </td>
               <td>{{ job.message || job.error || "-" }}</td>
               <td>{{ formatDateTimeToSecond(job.updated_at) }}</td>
+              <td>
+                <button
+                  v-if="String(job.status || '').toUpperCase() === 'RUNNING'"
+                  type="button"
+                  :disabled="loading"
+                  @click="onCancelJob(job.job_id)"
+                >
+                  取消
+                </button>
+                <span v-else>-</span>
+              </td>
             </tr>
             <tr v-if="!jobs.length">
-              <td colspan="7" class="notice">暂无下载任务</td>
+              <td colspan="9" class="notice">暂无下载任务</td>
             </tr>
           </tbody>
         </table>
@@ -115,6 +140,14 @@ defineProps({
     required: true,
   },
   onDownload: {
+    type: Function,
+    required: true,
+  },
+  onCancelJob: {
+    type: Function,
+    required: true,
+  },
+  onDeleteJob: {
     type: Function,
     required: true,
   },

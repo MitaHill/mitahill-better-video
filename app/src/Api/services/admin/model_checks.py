@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import re
 import socket
 import tempfile
 import time
@@ -16,12 +17,59 @@ from .transcription_catalog import fetch_hf_model_files, get_model_entry, get_st
 logger = logging.getLogger("ADMIN_MODEL_CHECKS")
 
 
-def _sha256_of_file(path: Path) -> str:
-    digest = hashlib.sha256()
+def _digest_of_file(path: Path, algo: str) -> str:
+    safe_algo = str(algo or "").strip().lower()
+    if safe_algo == "sha1":
+        digest = hashlib.sha1()
+    else:
+        digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _git_blob_sha1_of_file(path: Path) -> str:
+    size = path.stat().st_size
+    digest = hashlib.sha1()
+    digest.update(f"blob {size}\0".encode("utf-8"))
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _clean_etag_digest(etag_value: str) -> str:
+    raw = str(etag_value or "").strip()
+    if not raw:
+        return ""
+    cleaned = raw.replace("W/", "").strip().strip("\"")
+    if "-" in cleaned:
+        # multipart etag is not a stable file digest, skip it
+        return ""
+    return cleaned if re.fullmatch(r"[a-fA-F0-9]{40}|[a-fA-F0-9]{64}", cleaned) else ""
+
+
+def _infer_hash_algo(digest: str) -> str:
+    token = str(digest or "").strip().lower()
+    if len(token) == 64 and re.fullmatch(r"[a-f0-9]{64}", token):
+        return "sha256"
+    if len(token) == 40 and re.fullmatch(r"[a-f0-9]{40}", token):
+        return "sha1"
+    return ""
+
+
+def _fetch_hf_hash_via_head(repo_id: str, filename: str) -> Dict:
+    resolve_url = f"https://huggingface.co/{repo_id}/resolve/main/{filename}?download=true"
+    response = requests.head(resolve_url, allow_redirects=True, timeout=30)
+    response.raise_for_status()
+    digest = _clean_etag_digest(response.headers.get("etag", ""))
+    algo = _infer_hash_algo(digest)
+    return {
+        "url": resolve_url,
+        "digest": digest.lower() if digest else "",
+        "algo": algo,
+    }
 
 
 def _speed_grade(latency_sec: float) -> str:
@@ -52,8 +100,20 @@ def verify_model_hashes(model_entry: Dict) -> Dict:
                 ],
             }
         expected = str(model_entry.get("expected_sha256") or "").strip().lower()
-        actual = _sha256_of_file(local_path)
-        status = expected and (actual == expected)
+        if not expected:
+            return {
+                "ok": False,
+                "checks": [
+                    {
+                        "name": "hash",
+                        "status": "failed",
+                        "file": str(local_path),
+                        "message": "远程未提供可用 HASH",
+                    }
+                ],
+            }
+        actual = _digest_of_file(local_path, "sha256")
+        status = actual == expected
         out["checks"].append(
             {
                 "name": "hash",
@@ -114,8 +174,28 @@ def verify_model_hashes(model_entry: Dict) -> Dict:
                 )
                 all_ok = False
                 continue
-            expected = str((remote_meta.get(filename) or {}).get("sha256") or "").strip().lower()
-            if not expected:
+
+            remote_entry = remote_meta.get(filename) or {}
+            expected = str(remote_entry.get("sha256") or "").strip().lower()
+            algo = "sha256" if expected and _infer_hash_algo(expected) == "sha256" else ""
+
+            if not expected or not algo:
+                blob_id = str(remote_entry.get("blob_id") or "").strip().lower()
+                if blob_id and _infer_hash_algo(blob_id) == "sha1":
+                    expected = blob_id
+                    algo = "git_blob_sha1"
+
+            if not expected or not algo:
+                try:
+                    head_meta = _fetch_hf_hash_via_head(repo_id, filename)
+                    expected = str(head_meta.get("digest") or "").strip().lower()
+                    algo = str(head_meta.get("algo") or "").strip().lower()
+                except Exception as exc:
+                    logger.warning("Failed to fetch HEAD hash for %s/%s: %s", repo_id, filename, exc)
+                    expected = ""
+                    algo = ""
+
+            if not expected or not algo:
                 checks.append(
                     {
                         "name": "hash",
@@ -126,17 +206,22 @@ def verify_model_hashes(model_entry: Dict) -> Dict:
                 )
                 all_ok = False
                 continue
-            actual = _sha256_of_file(local_file)
+
+            if algo == "git_blob_sha1":
+                actual = _git_blob_sha1_of_file(local_file)
+            else:
+                actual = _digest_of_file(local_file, algo)
             passed = actual == expected
             all_ok = all_ok and passed
             checks.append(
                 {
                     "name": "hash",
                     "status": "passed" if passed else "failed",
+                    "algorithm": algo,
                     "file": str(local_file),
                     "expected": expected,
                     "actual": actual,
-                    "message": "SHA256 校验通过" if passed else "SHA256 校验失败",
+                    "message": f"{algo.upper()} 校验通过" if passed else f"{algo.upper()} 校验失败",
                 }
             )
 

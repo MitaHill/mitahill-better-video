@@ -217,7 +217,7 @@ def list_transcription_models() -> List[Dict]:
 
 
 def fetch_hf_model_files(repo_id: str) -> Dict[str, Dict]:
-    endpoint = f"https://huggingface.co/api/models/{repo_id}"
+    endpoint = f"https://huggingface.co/api/models/{repo_id}?blobs=true"
     response = requests.get(endpoint, timeout=20)
     response.raise_for_status()
     payload = response.json() or {}
@@ -228,9 +228,13 @@ def fetch_hf_model_files(repo_id: str) -> Dict[str, Dict]:
         if not name:
             continue
         lfs = item.get("lfs") or {}
+        blob_id = str(item.get("blobId") or "").strip().lower()
+        sha256 = str((lfs.get("sha256") or lfs.get("oid") or "")).strip().lower()
+        size = int((lfs.get("size") or item.get("size") or 0) or 0)
         out[name] = {
-            "sha256": str(lfs.get("oid") or "").strip(),
-            "size": int(item.get("size") or 0),
+            "sha256": sha256,
+            "blob_id": blob_id,
+            "size": size,
             "url": f"https://huggingface.co/{repo_id}/resolve/main/{name}?download=true",
         }
     return out

@@ -16,6 +16,8 @@ logger = logging.getLogger("ADMIN_MODEL_DOWNLOAD")
 
 _PROGRESS_RE = re.compile(r"\((\d{1,3})%\)")
 _active_threads: Dict[str, threading.Thread] = {}
+_active_processes: Dict[str, subprocess.Popen] = {}
+_cancel_requested: set[str] = set()
 _lock = threading.Lock()
 
 
@@ -28,6 +30,7 @@ def _find_aria2c() -> str:
 
 def _run_aria2(
     *,
+    job_id: str,
     url: str,
     output_path: Path,
     aria2_config: Dict,
@@ -66,9 +69,16 @@ def _run_aria2(
         text=True,
         bufsize=1,
     )
+    with _lock:
+        _active_processes[job_id] = process
 
     try:
         for line in process.stdout or []:
+            if _is_cancel_requested(job_id):
+                try:
+                    process.terminate()
+                except Exception:
+                    pass
             text = str(line or "").strip()
             match = _PROGRESS_RE.search(text)
             if progress_callback and match:
@@ -78,9 +88,13 @@ def _run_aria2(
                     pass
         code = process.wait()
     finally:
+        with _lock:
+            _active_processes.pop(job_id, None)
         if process.stdout:
             process.stdout.close()
 
+    if _is_cancel_requested(job_id):
+        raise RuntimeError("任务已取消")
     if code != 0:
         raise RuntimeError(f"aria2 下载失败，退出码: {code}")
 
@@ -97,6 +111,7 @@ def _run_openai_download(job_id: str, model_entry: Dict, aria2_config: Dict):
         )
 
     _run_aria2(
+        job_id=job_id,
         url=str(model_entry.get("download_url") or ""),
         output_path=target_path,
         aria2_config=aria2_config,
@@ -145,6 +160,7 @@ def _run_faster_download(job_id: str, model_entry: Dict, aria2_config: Dict):
             )
 
         _run_aria2(
+            job_id=job_id,
             url=url,
             output_path=local_dir / filename,
             aria2_config=aria2_config,
@@ -153,9 +169,47 @@ def _run_faster_download(job_id: str, model_entry: Dict, aria2_config: Dict):
         done_weight += weight
 
 
+def _is_cancel_requested(job_id: str) -> bool:
+    with _lock:
+        return str(job_id or "") in _cancel_requested
+
+
+def _request_cancel(job_id: str):
+    safe_job_id = str(job_id or "")
+    with _lock:
+        _cancel_requested.add(safe_job_id)
+        process = _active_processes.get(safe_job_id)
+    if process and process.poll() is None:
+        try:
+            process.terminate()
+        except Exception:
+            pass
+
+
+def _build_hash_failure_message(hash_result: Dict) -> str:
+    checks = hash_result.get("checks") or []
+    failed = next((item for item in checks if str(item.get("status") or "").lower() == "failed"), None)
+    if not failed:
+        return "HASH 校验失败"
+
+    file_name = str(failed.get("file") or "").strip()
+    msg = str(failed.get("message") or "HASH 校验失败").strip()
+    expected = str(failed.get("expected") or "").strip()
+    actual = str(failed.get("actual") or "").strip()
+    parts = [msg]
+    if file_name:
+        parts.append(f"文件: {file_name}")
+    if expected:
+        parts.append(f"期望: {expected}")
+    if actual:
+        parts.append(f"实际: {actual}")
+    return " | ".join(parts)
+
+
 def _run_download_job(job_id: str, model_entry: Dict):
     backend = str(model_entry.get("backend") or "").strip().lower()
     model_id = str(model_entry.get("model_id") or "").strip()
+    partial_result: Dict = {}
 
     try:
         config = get_transcription_config()
@@ -168,12 +222,18 @@ def _run_download_job(job_id: str, model_entry: Dict):
             message=f"准备下载模型 {backend}/{model_id}",
         )
 
+        if _is_cancel_requested(job_id):
+            raise RuntimeError("任务已取消")
+
         if backend == "whisper":
             _run_openai_download(job_id, model_entry, aria2_cfg)
         elif backend == "faster_whisper":
             _run_faster_download(job_id, model_entry, aria2_cfg)
         else:
             raise RuntimeError(f"不支持的后端: {backend}")
+
+        if _is_cancel_requested(job_id):
+            raise RuntimeError("任务已取消")
 
         db_transcription.update_model_download_job(
             job_id,
@@ -183,8 +243,9 @@ def _run_download_job(job_id: str, model_entry: Dict):
         )
 
         hash_result = verify_model_hashes(model_entry)
+        partial_result["hash"] = hash_result
         if not hash_result.get("ok"):
-            raise RuntimeError("HASH 校验失败")
+            raise RuntimeError(_build_hash_failure_message(hash_result))
 
         db_transcription.update_model_download_job(
             job_id,
@@ -193,7 +254,11 @@ def _run_download_job(job_id: str, model_entry: Dict):
             message="HASH 校验通过，开始热身",
         )
 
+        if _is_cancel_requested(job_id):
+            raise RuntimeError("任务已取消")
+
         warmup_result = warmup_transcription_model(model_entry)
+        partial_result["warmup"] = warmup_result
         if not warmup_result.get("ok"):
             raise RuntimeError(f"模型热身失败: {warmup_result.get('message')}")
 
@@ -207,15 +272,21 @@ def _run_download_job(job_id: str, model_entry: Dict):
         )
     except Exception as exc:
         logger.error("Model download job failed (%s): %s", job_id, exc)
+        failure_result = {"model": model_entry}
+        if partial_result:
+            failure_result.update(partial_result)
         db_transcription.update_model_download_job(
             job_id,
             status="FAILED",
             message=f"任务失败: {exc}",
+            result=failure_result,
             error=str(exc),
         )
     finally:
         with _lock:
             _active_threads.pop(job_id, None)
+            _active_processes.pop(job_id, None)
+            _cancel_requested.discard(job_id)
 
 
 def start_model_download(model_id: str, backend: str, request_payload: Optional[Dict] = None) -> Dict:
@@ -239,6 +310,37 @@ def start_model_download(model_id: str, backend: str, request_payload: Optional[
     payload = db_transcription.get_model_download_job(job_id) or {}
     payload["model"] = model_entry
     return payload
+
+
+def cancel_download_job(job_id: str) -> Dict:
+    payload = db_transcription.get_model_download_job(job_id)
+    if not payload:
+        raise ValueError("job not found")
+
+    status = str(payload.get("status") or "").strip().upper()
+    if status in {"FAILED", "COMPLETED"}:
+        return payload
+
+    _request_cancel(job_id)
+    db_transcription.update_model_download_job(
+        job_id,
+        status="FAILED",
+        message="任务已取消",
+        error="cancelled_by_admin",
+    )
+    return db_transcription.get_model_download_job(job_id) or payload
+
+
+def delete_download_job(job_id: str) -> bool:
+    payload = db_transcription.get_model_download_job(job_id)
+    if not payload:
+        raise ValueError("job not found")
+
+    status = str(payload.get("status") or "").strip().upper()
+    if status == "RUNNING":
+        raise ValueError("RUNNING 状态任务请先取消")
+
+    return db_transcription.delete_model_download_job(job_id)
 
 
 def get_download_job(job_id: str) -> Optional[Dict]:
