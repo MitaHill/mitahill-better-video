@@ -92,7 +92,7 @@ export const useWorkbenchFormsState = () => {
     subtitleFormat: "srt",
     whisperModel: "medium",
     language: "auto",
-    translateTo: "",
+    translateTo: "zh",
     translatorProvider: "none",
     translatorBaseUrl: "",
     translatorModel: "",

@@ -605,11 +605,11 @@ def _default_constraints() -> Dict[str, Any]:
                         "allowed_values": TRANSCRIPTION_LANGUAGE_CODES,
                     },
                     "translate_to": {
-                        "label": "翻译目标语言",
+                        "label": "翻译到",
                         "kind": "enum",
                         "lock": "free",
-                        "default_value": "",
-                        "fixed_value": "",
+                        "default_value": "zh",
+                        "fixed_value": "zh",
                         "allowed_values": TRANSCRIPTION_TARGET_LANGUAGE_CODES,
                     },
                     "translator_provider": {

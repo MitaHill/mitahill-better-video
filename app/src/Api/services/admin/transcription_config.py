@@ -261,9 +261,9 @@ def _sync_transcription_constraints(current: Dict[str, Any]):
     target_allowed_set = {str(item).strip().lower() for item in TRANSCRIPTION_TARGET_LANGUAGE_CODES}
     translate_to_field["kind"] = "enum"
     translate_to_field["allowed_values"] = list(TRANSCRIPTION_TARGET_LANGUAGE_CODES)
-    default_target = str(translate_to_field.get("default_value") or "").strip().lower()
+    default_target = str(translate_to_field.get("default_value") or "zh").strip().lower()
     if default_target not in target_allowed_set:
-        default_target = ""
+        default_target = "zh"
     translate_to_field["default_value"] = default_target
     fixed_target = str(translate_to_field.get("fixed_value") or default_target).strip().lower()
     if fixed_target not in target_allowed_set:

@@ -47,7 +47,7 @@
     </div>
 
     <div class="field compact">
-      <label>翻译目标语言（留空=不翻译）</label>
+      <label>翻译到</label>
       <select v-model="transcribeForm.translateTo" :disabled="isDisabled('translateTo')">
         <option value="">不翻译</option>
         <option v-for="item in translateTargetOptions" :key="item.value" :value="item.value">{{ item.label }}</option>

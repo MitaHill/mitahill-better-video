@@ -34,7 +34,7 @@ export const buildParamRows = (status) => {
       { label: "字幕格式", value: (params.subtitle_format || "-").toUpperCase() },
       { label: "Whisper 模型", value: params.whisper_model || "-" },
       { label: "语言", value: params.language || "auto" },
-      { label: "翻译目标", value: params.translate_to || "-" },
+      { label: "翻译到", value: params.translate_to || "-" },
       { label: "翻译提供器", value: params.translator_provider || "-" },
       { label: "温度", value: params.temperature ?? "-" },
       { label: "Beam Size", value: params.beam_size ?? "-" },
