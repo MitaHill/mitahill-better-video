@@ -12,6 +12,8 @@ from .checkpoints import (
     build_asr_signature,
     build_media_signature,
     build_translation_signature,
+    build_translation_signature_legacy,
+    build_translation_signature_with_explicit_thinking,
     load_cached_source_segments,
     load_cached_translation_map,
     mark_media_completed,
@@ -74,6 +76,8 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
     media_signature = build_media_signature(media_path)
     asr_signature = build_asr_signature(options)
     translation_signature = build_translation_signature(options)
+    translation_signature_legacy = build_translation_signature_legacy(options)
+    translation_signature_transitional = build_translation_signature_with_explicit_thinking(options)
 
     emit_progress(
         task_id,
@@ -231,6 +235,10 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 source_segments,
                 media_signature=media_signature,
                 translation_signature=translation_signature,
+                compatible_translation_signatures=[
+                    translation_signature_legacy,
+                    translation_signature_transitional,
+                ],
             )
             emit_progress(
                 task_id,

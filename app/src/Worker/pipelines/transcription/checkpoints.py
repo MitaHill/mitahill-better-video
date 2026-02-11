@@ -48,19 +48,36 @@ def build_asr_signature(options: Dict) -> str:
     )
 
 
+def _translation_signature_payload(options: Dict, *, include_thinking_flag: bool) -> Dict:
+    payload = {
+        "target": str(options.get("translate_to") or "").strip().lower(),
+        "provider": str(options.get("translator_provider") or "none").strip().lower(),
+        "base_url": str(options.get("translator_base_url") or "").strip(),
+        "model": str(options.get("translator_model") or "").strip(),
+        "prompt": str(options.get("translator_prompt") or "").strip(),
+        "fallback_mode": str(options.get("translator_fallback_mode") or "model_full_text").strip().lower(),
+        "timeout_sec": float(options.get("translator_timeout_sec") or 120.0),
+    }
+    if include_thinking_flag:
+        payload["enable_thinking"] = bool(options.get("translator_enable_thinking"))
+    return payload
+
+
 def build_translation_signature(options: Dict) -> str:
-    return _stable_hash(
-        {
-            "target": str(options.get("translate_to") or "").strip().lower(),
-            "provider": str(options.get("translator_provider") or "none").strip().lower(),
-            "base_url": str(options.get("translator_base_url") or "").strip(),
-            "model": str(options.get("translator_model") or "").strip(),
-            "enable_thinking": bool(options.get("translator_enable_thinking")),
-            "prompt": str(options.get("translator_prompt") or "").strip(),
-            "fallback_mode": str(options.get("translator_fallback_mode") or "model_full_text").strip().lower(),
-            "timeout_sec": float(options.get("translator_timeout_sec") or 120.0),
-        }
-    )
+    # Canonical (backward compatible):
+    # include `enable_thinking` only when enabled to keep old checkpoints resumable.
+    include_thinking = bool(options.get("translator_enable_thinking"))
+    return _stable_hash(_translation_signature_payload(options, include_thinking_flag=include_thinking))
+
+
+def build_translation_signature_legacy(options: Dict) -> str:
+    # Legacy signature (before thinking flag was introduced).
+    return _stable_hash(_translation_signature_payload(options, include_thinking_flag=False))
+
+
+def build_translation_signature_with_explicit_thinking(options: Dict) -> str:
+    # Transitional signature used by previous implementation that always included thinking flag.
+    return _stable_hash(_translation_signature_payload(options, include_thinking_flag=True))
 
 
 def load_cached_source_segments(
@@ -110,14 +127,18 @@ def load_cached_translation_map(
     *,
     media_signature: str,
     translation_signature: str,
+    compatible_translation_signatures: Optional[List[str]] = None,
 ) -> Dict[int, str]:
+    accepted_signatures = {
+        str(translation_signature or "").strip(),
+        *(str(item or "").strip() for item in (compatible_translation_signatures or [])),
+    }
+    accepted_signatures.discard("")
     state = db.get_transcription_media_state(task_id, media_key)
     if state:
         media_mismatch = str(state.get("media_signature") or "") != str(media_signature or "")
         current_translation_signature = str(state.get("translation_signature") or "")
-        translation_mismatch = bool(
-            current_translation_signature and current_translation_signature != str(translation_signature or "")
-        )
+        translation_mismatch = bool(current_translation_signature and current_translation_signature not in accepted_signatures)
         if media_mismatch or translation_mismatch:
             db.clear_transcription_translation_segments(task_id, media_key)
         elif not current_translation_signature:
@@ -160,7 +181,7 @@ def load_cached_translation_map(
         return {}
     if str(state.get("media_signature") or "") != str(media_signature or ""):
         return {}
-    if str(state.get("translation_signature") or "") != str(translation_signature or ""):
+    if str(state.get("translation_signature") or "") not in accepted_signatures:
         return {}
     translated_segments = state.get("translated_segments")
     if not isinstance(translated_segments, list):
