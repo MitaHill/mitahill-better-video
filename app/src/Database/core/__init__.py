@@ -9,6 +9,7 @@ from .progress import (
     upsert_task_progress,
 )
 from .schema import init_db
+from .streams import append_task_stream_event, list_task_stream_events
 from .tasks import (
     cleanup_old_tasks,
     count_processing_tasks,
@@ -53,6 +54,8 @@ __all__ = [
     "get_latest_segment_progress",
     "get_unfinished_tasks",
     "count_processing_tasks",
+    "append_task_stream_event",
+    "list_task_stream_events",
     "request_task_cancel",
     "clear_task_cancel_request",
     "is_task_cancel_requested",

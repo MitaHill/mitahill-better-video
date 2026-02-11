@@ -530,6 +530,74 @@ button:hover {
   font-size: 0.9rem;
 }
 
+.stream-panel {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  padding: 10px 12px;
+}
+
+.stream-panel > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text-strong);
+  user-select: none;
+}
+
+.stream-panel[open] > summary {
+  margin-bottom: 8px;
+}
+
+.stream-note {
+  margin: 0 0 8px 0;
+}
+
+.stream-viewport {
+  height: 220px;
+  overflow-y: auto;
+  padding: 6px 2px 6px 0;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.8) 12%,
+    rgba(0, 0, 0, 1) 50%,
+    rgba(0, 0, 0, 0.8) 88%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.8) 12%,
+    rgba(0, 0, 0, 1) 50%,
+    rgba(0, 0, 0, 0.8) 88%,
+    transparent 100%
+  );
+}
+
+.stream-line {
+  margin: 0 0 8px 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+}
+
+.stream-prefix {
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--text-muted);
+  min-width: 72px;
+}
+
+.stream-asr .stream-prefix {
+  color: var(--accent);
+}
+
+.stream-translation_raw .stream-prefix {
+  color: var(--text-strong);
+}
+
 .admin-layout {
   display: grid;
   grid-template-columns: 1fr;

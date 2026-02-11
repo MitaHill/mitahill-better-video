@@ -138,21 +138,25 @@ class WhisperEngine:
         *,
         progress_callback: Optional[Callable[[float, float], None]] = None,
         total_duration_sec: float = 0.0,
+        segment_callback: Optional[Callable[[int, float, float, str], None]] = None,
     ) -> Dict:
         out_segments: List[Dict] = []
         safe_total = max(0.0, self._safe_float(total_duration_sec, 0.0))
         last_reported = 0.0
-        for seg in segments:
+        for seg_idx, seg in enumerate(segments, start=1):
             try:
                 start_sec = self._safe_float(getattr(seg, "start", 0.0), 0.0)
                 end_sec = self._safe_float(getattr(seg, "end", 0.0), 0.0)
+                text = str(getattr(seg, "text", "") or "").strip()
                 out_segments.append(
                     {
                         "start": start_sec,
                         "end": end_sec,
-                        "text": str(getattr(seg, "text", "") or "").strip(),
+                        "text": text,
                     }
                 )
+                if segment_callback and text:
+                    segment_callback(seg_idx, start_sec, end_sec, text)
                 if progress_callback:
                     done_sec = max(last_reported, end_sec)
                     if safe_total > 0:
@@ -182,6 +186,7 @@ class WhisperEngine:
         task_id="",
         progress_callback: Optional[Callable[[float, float], None]] = None,
         expected_duration_sec: float = 0.0,
+        segment_callback: Optional[Callable[[int, float, float, str], None]] = None,
     ):
         safe_backend = (backend or "whisper").strip().lower()
         safe_model = (model_name or "medium").strip().lower()
@@ -211,6 +216,17 @@ class WhisperEngine:
             if language_value and language_value != "auto":
                 options["language"] = language_value
             result = model.transcribe(str(media_path), **options)
+            if segment_callback:
+                for seg_idx, seg in enumerate((result or {}).get("segments") or [], start=1):
+                    try:
+                        text = str((seg or {}).get("text") or "").strip()
+                        if not text:
+                            continue
+                        start_sec = self._safe_float((seg or {}).get("start", 0.0), 0.0)
+                        end_sec = self._safe_float((seg or {}).get("end", 0.0), 0.0)
+                        segment_callback(seg_idx, start_sec, end_sec, text)
+                    except Exception:
+                        continue
             if progress_callback:
                 safe_expected = max(0.0, self._safe_float(expected_duration_sec, 0.0))
                 progress_callback(safe_expected, safe_expected)
@@ -231,6 +247,7 @@ class WhisperEngine:
                 segments,
                 progress_callback=progress_callback,
                 total_duration_sec=total_duration_sec,
+                segment_callback=segment_callback,
             )
 
         raise ValueError(f"unsupported transcription backend: {safe_backend}")

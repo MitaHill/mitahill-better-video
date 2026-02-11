@@ -24,12 +24,17 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     segmentFrame: 0,
     segmentTotal: 0,
   });
+  const stream = reactive({
+    events: [],
+    lines: [],
+  });
 
   const lastPreviewId = ref("");
   const lastPreviewFrame = ref(0);
 
   let socket = null;
   let pollTimer = null;
+  let streamSeenIds = new Set();
 
   const isPreviewSupported = computed(() => {
     const category = status.value?.task_params?.task_category || "";
@@ -37,15 +42,118 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   });
 
   const resolution = computed(() => {
-    if (!status.value?.video_info) return "?";
-    const w = status.value.video_info.width || "?";
-    const h = status.value.video_info.height || "?";
-    return `${w}x${h}`;
+    const info = status.value?.video_info || {};
+    const width = Number(info.width || 0);
+    const height = Number(info.height || 0);
+    if (width > 0 && height > 0) return `${width}x${height}`;
+    if (info.has_video === false) return "-";
+    return "?x?";
   });
 
   const paramRows = computed(() => buildParamRows(status.value));
   const statusClass = computed(() => resolveStatusClass(status.value));
   const progressDetails = computed(() => buildProgressDetails(status.value, live));
+  const streamLines = computed(() => stream.lines);
+
+  const buildLineKey = (event) =>
+    String(
+      event.line_key ||
+        `${String(event.channel || "general")}::${Number(event.file_index || 0)}::${Number(event.segment_index || 0)}`
+    );
+
+  const normalizeStreamEvent = (raw) => {
+    if (!raw || typeof raw !== "object") return null;
+    const channel = String(raw.channel || raw.stream_channel || "general").trim().toLowerCase();
+    const mode = String(raw.mode || raw.stream_mode || "line").trim().toLowerCase();
+    if (!["line", "append", "commit"].includes(mode)) return null;
+    return {
+      id: raw.id ?? raw.stream_event_id ?? null,
+      created_at: String(raw.created_at || raw.stream_created_at || ""),
+      channel,
+      mode,
+      line_key: String(raw.line_key || raw.stream_line_key || "").trim(),
+      text: String(raw.text || raw.stream_text || ""),
+      file_index: Number(raw.file_index || 0),
+      file_count: Number(raw.file_count || 0),
+      segment_index: Number(raw.segment_index || 0),
+    };
+  };
+
+  const rebuildStreamLines = () => {
+    const activeLineIndex = new Map();
+    const out = [];
+    for (const event of stream.events) {
+      const mode = String(event.mode || "").trim().toLowerCase();
+      const key = buildLineKey(event);
+      if (mode === "commit") {
+        activeLineIndex.delete(key);
+        continue;
+      }
+      if (mode === "append") {
+        const existingIdx = activeLineIndex.get(key);
+        if (existingIdx === undefined) {
+          out.push({
+            id: event.id || null,
+            channel: event.channel,
+            text: String(event.text || ""),
+            file_index: event.file_index,
+            file_count: event.file_count,
+            segment_index: event.segment_index,
+            created_at: event.created_at,
+            line_key: key,
+          });
+          activeLineIndex.set(key, out.length - 1);
+        } else {
+          out[existingIdx].text = `${String(out[existingIdx].text || "")}${String(event.text || "")}`;
+          out[existingIdx].id = event.id || out[existingIdx].id;
+        }
+        continue;
+      }
+      out.push({
+        id: event.id || null,
+        channel: event.channel,
+        text: String(event.text || ""),
+        file_index: event.file_index,
+        file_count: event.file_count,
+        segment_index: event.segment_index,
+        created_at: event.created_at,
+        line_key: key,
+      });
+    }
+    const maxLines = 600;
+    stream.lines = out.length > maxLines ? out.slice(out.length - maxLines) : out;
+  };
+
+  const replaceStreamEvents = (events) => {
+    const normalized = [];
+    streamSeenIds = new Set();
+    for (const item of Array.isArray(events) ? events : []) {
+      const safe = normalizeStreamEvent(item);
+      if (!safe) continue;
+      const eventId = safe.id == null ? "" : String(safe.id);
+      if (eventId && streamSeenIds.has(eventId)) continue;
+      if (eventId) streamSeenIds.add(eventId);
+      normalized.push(safe);
+    }
+    stream.events = normalized;
+    rebuildStreamLines();
+  };
+
+  const appendStreamEvent = (event) => {
+    const safe = normalizeStreamEvent(event);
+    if (!safe) return;
+    const eventId = safe.id == null ? "" : String(safe.id);
+    if (eventId && streamSeenIds.has(eventId)) return;
+    if (eventId) streamSeenIds.add(eventId);
+    stream.events.push(safe);
+    if (stream.events.length > 3000) {
+      stream.events = stream.events.slice(stream.events.length - 3000);
+      streamSeenIds = new Set(
+        stream.events.map((item) => (item.id == null ? "" : String(item.id))).filter((item) => item.length > 0)
+      );
+    }
+    rebuildStreamLines();
+  };
 
   const swapPreview = (kind, url) => {
     const img = new Image();
@@ -86,13 +194,14 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     }
 
     try {
-      const res = await fetch(`/api/tasks/${statusQuery.value}`);
+      const res = await fetch(`/api/tasks/${statusQuery.value}?stream_limit=800`);
       if (!res.ok) {
         const err = await parseJsonSafe(res);
         throw new Error(err.error || "未找到任务，请确认 ID 是否正确。");
       }
 
       status.value = await parseJsonSafe(res);
+      replaceStreamEvents(status.value.stream_events || []);
       if (lastPreviewId.value !== statusQuery.value) {
         preview.original = "";
         preview.upscaled = "";
@@ -100,6 +209,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
         preview.upscaledKey = 0;
         lastPreviewId.value = statusQuery.value;
         lastPreviewFrame.value = 0;
+        replaceStreamEvents(status.value.stream_events || []);
       }
 
       joinRoom();
@@ -130,6 +240,11 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
 
   const onFrame = (payload) => {
     if (!payload || payload.task_id !== statusQuery.value) return;
+
+    if (String(payload.event_type || "").trim().toLowerCase() === "task_stream") {
+      appendStreamEvent(payload);
+      return;
+    }
 
     live.gpu = payload.gpu_util ?? null;
     live.segmentIndex = payload.segment_index || 0;
@@ -183,6 +298,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     paramRows,
     statusClass,
     progressDetails,
+    streamLines,
     fetchStatus,
     downloadResult,
     joinRoom,

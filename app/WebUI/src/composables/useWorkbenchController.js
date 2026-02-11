@@ -13,6 +13,20 @@ export const useWorkbenchController = () => {
   const loading = reactive({ submit: false });
   const submitError = ref("");
   const submitWarnings = ref("");
+  const transcribeRuntime = reactive({
+    loading: false,
+    error: "",
+    transcription: {
+      backend: "whisper",
+      active_model: "medium",
+    },
+    translation: {
+      provider: "none",
+      model: "",
+      base_url: "",
+      enabled: false,
+    },
+  });
 
   const { themeMode, activeTheme, onThemeModeChange, initTheme, disposeTheme } = useWorkbenchTheme();
   const { activeCategory, switchCategory, initCategoryRouting, disposeCategoryRouting } = useWorkbenchCategory();
@@ -52,6 +66,7 @@ export const useWorkbenchController = () => {
     paramRows,
     statusClass,
     progressDetails,
+    streamLines,
     fetchStatus,
     downloadResult,
     joinRoom,
@@ -135,6 +150,24 @@ export const useWorkbenchController = () => {
     }
   };
 
+  const fetchTranscribeRuntimeConfig = async () => {
+    transcribeRuntime.loading = true;
+    transcribeRuntime.error = "";
+    try {
+      const res = await fetch("/api/transcriptions/runtime-config");
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        throw new Error(payload.error || "读取转录运行配置失败");
+      }
+      transcribeRuntime.transcription = payload.transcription || transcribeRuntime.transcription;
+      transcribeRuntime.translation = payload.translation || transcribeRuntime.translation;
+    } catch (error) {
+      transcribeRuntime.error = error.message;
+    } finally {
+      transcribeRuntime.loading = false;
+    }
+  };
+
   onMounted(() => {
     initTheme();
     initCategoryRouting();
@@ -143,6 +176,7 @@ export const useWorkbenchController = () => {
       addWatermarkSegment();
     }
     fetchConstraints();
+    fetchTranscribeRuntimeConfig();
     initRealtime();
   });
 
@@ -175,6 +209,7 @@ export const useWorkbenchController = () => {
     paramRows,
     statusClass,
     progressDetails,
+    streamLines,
     onEnhanceFileChange,
     onConvertMediaChange,
     onTranscribeMediaChange,
@@ -192,5 +227,6 @@ export const useWorkbenchController = () => {
     constraints,
     constraintsStatus,
     getFieldPolicy,
+    transcribeRuntime,
   };
 };

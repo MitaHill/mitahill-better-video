@@ -1,4 +1,5 @@
 import re
+import json
 from typing import Optional
 
 import requests
@@ -61,7 +62,7 @@ class BaseTranslator:
         safe_runtime_mode = str(runtime_mode or "parallel").strip().lower()
         self.runtime_mode = safe_runtime_mode if safe_runtime_mode in {"parallel", "memory_saving"} else "parallel"
 
-    def translate_text(self, text: str, target_language: str) -> str:
+    def translate_text(self, text: str, target_language: str, stream_callback=None) -> str:
         raise NotImplementedError
 
     @staticmethod
@@ -184,13 +185,53 @@ class OllamaTranslator(BaseTranslator):
             return None
         return None
 
-    def translate_text(self, text: str, target_language: str) -> str:
+    def _resolve_translated(self, source_text: str, model_raw_text: str) -> str:
+        parsed = self._extract_code_block_content(model_raw_text)
+        if parsed:
+            return parsed
+        return self._resolve_fallback_text(model_raw_text=model_raw_text, source_text=source_text)
+
+    def _translate_streaming(self, endpoint: str, payload: dict, stream_callback) -> str:
+        raw_parts = []
+        with requests.post(endpoint, json=payload, timeout=self.timeout_sec, stream=True) as response:
+            response.raise_for_status()
+            for line in response.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+                safe_line = str(line).strip()
+                if not safe_line:
+                    continue
+                try:
+                    packet = json.loads(safe_line)
+                except Exception:
+                    continue
+                delta = str(((packet.get("message") or {}).get("content") or ""))
+                if delta:
+                    raw_parts.append(delta)
+                    if stream_callback:
+                        stream_callback(delta)
+                if packet.get("done") is True:
+                    break
+        return "".join(raw_parts).strip()
+
+    def _translate_non_stream(self, endpoint: str, payload: dict, stream_callback=None) -> str:
+        payload = dict(payload or {})
+        payload["stream"] = False
+        response = requests.post(endpoint, json=payload, timeout=self.timeout_sec)
+        response.raise_for_status()
+        data = response.json()
+        content = ((data.get("message") or {}).get("content") or "").strip()
+        if stream_callback and content:
+            stream_callback(content)
+        return content
+
+    def translate_text(self, text: str, target_language: str, stream_callback=None) -> str:
         if not self.base_url or not self.model:
             raise ValueError("Ollama translator requires translator_base_url and translator_model.")
         endpoint = f"{self.base_url.rstrip('/')}/api/chat"
         payload = {
             "model": self.model,
-            "stream": False,
+            "stream": bool(stream_callback),
             "messages": [
                 {"role": "system", "content": self._system_prompt(target_language, self.prompt)},
                 {"role": "user", "content": str(text or "")},
@@ -198,14 +239,14 @@ class OllamaTranslator(BaseTranslator):
             "options": {"temperature": 0.2, "top_p": 0.9},
             "keep_alive": self._keep_alive_value(),
         }
-        response = requests.post(endpoint, json=payload, timeout=self.timeout_sec)
-        response.raise_for_status()
-        data = response.json()
-        content = ((data.get("message") or {}).get("content") or "").strip()
-        parsed = self._extract_code_block_content(content)
-        if parsed:
-            return parsed
-        return self._resolve_fallback_text(model_raw_text=content, source_text=text)
+        if stream_callback:
+            try:
+                content = self._translate_streaming(endpoint, payload, stream_callback)
+            except Exception:
+                content = self._translate_non_stream(endpoint, payload, stream_callback=stream_callback)
+        else:
+            content = self._translate_non_stream(endpoint, payload)
+        return self._resolve_translated(text, content)
 
 
 class OpenAICompatibleTranslator(BaseTranslator):
@@ -217,7 +258,55 @@ class OpenAICompatibleTranslator(BaseTranslator):
             return raw
         return f"{raw}/chat/completions"
 
-    def translate_text(self, text: str, target_language: str) -> str:
+    def _resolve_translated(self, source_text: str, model_raw_text: str) -> str:
+        parsed = self._extract_code_block_content(model_raw_text)
+        if parsed:
+            return parsed
+        return self._resolve_fallback_text(model_raw_text=model_raw_text, source_text=source_text)
+
+    def _translate_streaming(self, endpoint: str, headers: dict, payload: dict, stream_callback) -> str:
+        raw_parts = []
+        with requests.post(endpoint, headers=headers, json=payload, timeout=self.timeout_sec, stream=True) as response:
+            response.raise_for_status()
+            for line in response.iter_lines(decode_unicode=True):
+                if not line:
+                    continue
+                safe_line = str(line).strip()
+                if not safe_line.startswith("data:"):
+                    continue
+                data_text = safe_line[5:].strip()
+                if not data_text or data_text == "[DONE]":
+                    continue
+                try:
+                    packet = json.loads(data_text)
+                except Exception:
+                    continue
+                choices = packet.get("choices") or []
+                if not choices:
+                    continue
+                delta = choices[0].get("delta") or {}
+                piece = str(delta.get("content") or "")
+                if piece:
+                    raw_parts.append(piece)
+                    if stream_callback:
+                        stream_callback(piece)
+        return "".join(raw_parts).strip()
+
+    def _translate_non_stream(self, endpoint: str, headers: dict, payload: dict, stream_callback=None) -> str:
+        payload = dict(payload or {})
+        payload["stream"] = False
+        response = requests.post(endpoint, headers=headers, json=payload, timeout=self.timeout_sec)
+        response.raise_for_status()
+        data = response.json()
+        choices = data.get("choices") or []
+        if not choices:
+            return ""
+        content = ((choices[0].get("message") or {}).get("content") or "").strip()
+        if stream_callback and content:
+            stream_callback(content)
+        return content
+
+    def translate_text(self, text: str, target_language: str, stream_callback=None) -> str:
         if not self.base_url or not self.model:
             raise ValueError("OpenAI-compatible translator requires translator_base_url and translator_model.")
         headers = {"Content-Type": "application/json"}
@@ -230,19 +319,17 @@ class OpenAICompatibleTranslator(BaseTranslator):
                 {"role": "user", "content": str(text or "")},
             ],
             "temperature": 0.2,
-            "stream": False,
+            "stream": bool(stream_callback),
         }
-        response = requests.post(self._endpoint(), headers=headers, json=payload, timeout=self.timeout_sec)
-        response.raise_for_status()
-        data = response.json()
-        choices = data.get("choices") or []
-        if not choices:
-            return self._resolve_fallback_text(model_raw_text="", source_text=text)
-        content = ((choices[0].get("message") or {}).get("content") or "").strip()
-        parsed = self._extract_code_block_content(content)
-        if parsed:
-            return parsed
-        return self._resolve_fallback_text(model_raw_text=content, source_text=text)
+        endpoint = self._endpoint()
+        if stream_callback:
+            try:
+                content = self._translate_streaming(endpoint, headers, payload, stream_callback)
+            except Exception:
+                content = self._translate_non_stream(endpoint, headers, payload, stream_callback=stream_callback)
+        else:
+            content = self._translate_non_stream(endpoint, headers, payload)
+        return self._resolve_translated(text, content)
 
 
 def create_translator(options) -> Optional[BaseTranslator]:

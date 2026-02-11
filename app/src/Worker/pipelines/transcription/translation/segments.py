@@ -16,6 +16,7 @@ def translate_segments(
     cached_text_map: Optional[Dict[int, str]] = None,
     checkpoint_callback: Optional[Callable[[int, str, str, str, str], None]] = None,
     should_cancel: Optional[Callable[[], bool]] = None,
+    raw_stream_callback: Optional[Callable[[int, str], None]] = None,
 ):
     payload = segments or []
     if not translator:
@@ -60,7 +61,12 @@ def translate_segments(
         try:
             if should_cancel and should_cancel():
                 raise TaskCancelledError("任务已取消")
-            translated_text = translator.translate_text(text, target_language)
+
+            def _on_stream_delta(delta_text: str):
+                if raw_stream_callback:
+                    raw_stream_callback(idx, str(delta_text or ""))
+
+            translated_text = translator.translate_text(text, target_language, stream_callback=_on_stream_delta)
         except TaskCancelledError:
             raise
         except requests.exceptions.ReadTimeout as exc:

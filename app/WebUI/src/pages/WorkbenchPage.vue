@@ -16,6 +16,7 @@
           :convert-media-info="convertMediaInfo"
           :transcribe-form="transcribeForm"
           :transcribe-media-info="transcribeMediaInfo"
+          :transcribe-runtime="transcribeRuntime"
           :download-form="downloadForm"
           :loading-submit="loading.submit"
           :submit-error="submitError"
@@ -37,6 +38,7 @@
           :status="status"
           :status-class="statusClass"
           :progress-details="progressDetails"
+          :stream-lines="streamLines"
           :resolution="resolution"
           :task-ids="taskIds"
           :preview="preview"
@@ -73,6 +75,7 @@ const {
   convertMediaInfo,
   transcribeForm,
   transcribeMediaInfo,
+  transcribeRuntime,
   downloadForm,
   taskIds,
   submitError,
@@ -87,6 +90,7 @@ const {
   paramRows,
   statusClass,
   progressDetails,
+  streamLines,
   onEnhanceFileChange,
   onConvertMediaChange,
   onTranscribeMediaChange,

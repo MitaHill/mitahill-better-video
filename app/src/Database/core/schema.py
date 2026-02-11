@@ -159,6 +159,22 @@ def init_db():
         )
         c.execute("CREATE INDEX IF NOT EXISTS idx_gpu_usage_samples_collected ON gpu_usage_samples(collected_at)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_gpu_usage_samples_gpu ON gpu_usage_samples(gpu_index)")
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS task_stream_events
+               (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id TEXT,
+                created_at DATETIME,
+                channel TEXT,
+                mode TEXT,
+                line_key TEXT,
+                text TEXT,
+                file_index INTEGER,
+                file_count INTEGER,
+                segment_index INTEGER,
+                meta_json TEXT)"""
+        )
+        c.execute("CREATE INDEX IF NOT EXISTS idx_task_stream_events_task ON task_stream_events(task_id)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_task_stream_events_created ON task_stream_events(created_at)")
         conn.commit()
         conn.close()
         logger.debug("Database initialized successfully.")

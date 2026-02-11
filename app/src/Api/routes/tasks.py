@@ -92,10 +92,12 @@ def get_task(task_id):
     task = db.get_task(task_id)
     if not task:
         return jsonify({"error": "task not found"}), 404
+    stream_limit = request.args.get("stream_limit", type=int) or 300
     task["task_params"] = json.loads(task.get("task_params", "{}"))
     task["video_info"] = json.loads(task.get("video_info", "{}"))
     task["task_progress"] = db.get_task_progress(task_id)
     task["segment_progress"] = db.get_latest_segment_progress(task_id)
+    task["stream_events"] = db.list_task_stream_events(task_id, limit=stream_limit)
     return jsonify(task)
 
 

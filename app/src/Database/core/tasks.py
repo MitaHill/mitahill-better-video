@@ -127,6 +127,7 @@ def delete_task(task_id):
     c.execute("DELETE FROM task_control WHERE task_id = ?", (task_id,))
     c.execute("DELETE FROM transcription_media_state WHERE task_id = ?", (task_id,))
     c.execute("DELETE FROM transcription_translation_state WHERE task_id = ?", (task_id,))
+    c.execute("DELETE FROM task_stream_events WHERE task_id = ?", (task_id,))
     conn.commit()
     conn.close()
 

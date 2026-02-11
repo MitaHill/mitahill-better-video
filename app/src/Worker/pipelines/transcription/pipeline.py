@@ -28,7 +28,7 @@ from .io_ops import (
     zip_outputs,
 )
 from .options import normalize_transcription_options
-from .progress import TaskCancelledError, emit_progress, ensure_not_cancelled
+from .progress import TaskCancelledError, emit_progress, emit_stream_event, ensure_not_cancelled
 from .translation import build_bilingual_segments, create_translator, translate_segments
 from .whisper_engine import ENGINE
 
@@ -147,6 +147,22 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                     file_count=total,
                 )
 
+            def _asr_segment(seg_idx, start_sec, end_sec, text):
+                safe_text = str(text or "").strip()
+                if not safe_text:
+                    return
+                emit_stream_event(
+                    task_id,
+                    channel="asr",
+                    mode="line",
+                    text=safe_text,
+                    file_index=index,
+                    file_count=total,
+                    segment_index=int(seg_idx or 0),
+                    line_key=f"asr:{index}:{int(seg_idx or 0)}",
+                    meta={"start_sec": float(start_sec or 0.0), "end_sec": float(end_sec or 0.0)},
+                )
+
             result = ENGINE.transcribe(
                 audio_path,
                 backend=options.get("transcription_backend", "whisper"),
@@ -159,6 +175,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 task_id=task_id,
                 progress_callback=_asr_progress,
                 expected_duration_sec=media_duration,
+                segment_callback=_asr_segment,
             )
             source_segments = _extract_segments(result)
             if not source_segments:
@@ -256,6 +273,48 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                     status=status,
                     message=message,
                 )
+                line_key = f"translate:{index}:{int(seg_idx or 0)}"
+                if not _translation_raw_seen.get(int(seg_idx or 0)) and str(translated_text or "").strip():
+                    emit_stream_event(
+                        task_id,
+                        channel="translation_raw",
+                        mode="append",
+                        text=str(translated_text or ""),
+                        file_index=index,
+                        file_count=total,
+                        segment_index=int(seg_idx or 0),
+                        line_key=line_key,
+                    )
+                emit_stream_event(
+                    task_id,
+                    channel="translation_raw",
+                    mode="commit",
+                    text="",
+                    file_index=index,
+                    file_count=total,
+                    segment_index=int(seg_idx or 0),
+                    line_key=line_key,
+                    meta={"status": status, "message": str(message or "")},
+                )
+
+            _translation_raw_seen = {}
+
+            def _translation_raw_stream(seg_idx, raw_delta):
+                safe_delta = str(raw_delta or "")
+                if not safe_delta:
+                    return
+                safe_seg_idx = int(seg_idx or 0)
+                _translation_raw_seen[safe_seg_idx] = True
+                emit_stream_event(
+                    task_id,
+                    channel="translation_raw",
+                    mode="append",
+                    text=safe_delta,
+                    file_index=index,
+                    file_count=total,
+                    segment_index=safe_seg_idx,
+                    line_key=f"translate:{index}:{safe_seg_idx}",
+                )
 
             translated_segments = translate_segments(
                 source_segments,
@@ -265,6 +324,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 cached_text_map=cached_translation_map,
                 checkpoint_callback=_translation_checkpoint,
                 should_cancel=lambda: db.is_task_cancel_requested(task_id),
+                raw_stream_callback=_translation_raw_stream,
             )
             save_translated_segments(
                 task_id,

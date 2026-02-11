@@ -14,6 +14,10 @@
 
     <div v-if="status" style="margin-top: 16px;">
       <StatusProgressSummary :status="status" :progress-details="progressDetails" :resolution="resolution" />
+      <StatusRawStreamPanel
+        v-if="String(status?.task_params?.task_category || '').trim().toLowerCase() === 'transcribe'"
+        :lines="streamLines"
+      />
 
       <StatusPreviewGrid v-if="isPreviewSupported && status.status !== 'PENDING'" :preview="preview" />
 
@@ -29,6 +33,7 @@ import StatusParamTable from "./status/StatusParamTable.vue";
 import StatusPreviewGrid from "./status/StatusPreviewGrid.vue";
 import StatusProgressSummary from "./status/StatusProgressSummary.vue";
 import StatusQueryHeader from "./status/StatusQueryHeader.vue";
+import StatusRawStreamPanel from "./status/StatusRawStreamPanel.vue";
 
 defineProps({
   statusQuery: {
@@ -45,6 +50,10 @@ defineProps({
   },
   progressDetails: {
     type: String,
+    required: true,
+  },
+  streamLines: {
+    type: Array,
     required: true,
   },
   resolution: {
