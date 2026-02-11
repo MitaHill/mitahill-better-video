@@ -74,6 +74,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     loadingModelTest: false,
     modelTestError: "",
     modelTestResult: null,
+    modelTestSteps: [],
     loadingTranslationTest: false,
     translationTestError: "",
     translationTestResult: null,
@@ -519,22 +520,104 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     }
   };
 
+  const _createModelTestSteps = () => [
+    {
+      key: "hash",
+      label: "HASH 校验",
+      status: "pending",
+      message: "等待执行",
+      details: null,
+    },
+    {
+      key: "warmup",
+      label: "GPU 热身识别 5 秒静音音频",
+      status: "pending",
+      message: "等待执行",
+      details: null,
+    },
+  ];
+
+  const _updateModelTestStep = (stepKey, patch) => {
+    const idx = debugTools.modelTestSteps.findIndex((item) => item.key === stepKey);
+    if (idx < 0) return;
+    debugTools.modelTestSteps[idx] = {
+      ...debugTools.modelTestSteps[idx],
+      ...(patch || {}),
+    };
+  };
+
+  const _buildStepMessage = (stepName, stepPayload) => {
+    const payload = stepPayload || {};
+    const explicit = String(payload.message || "").trim();
+    if (explicit) return explicit;
+    if (stepName === "hash") {
+      const checks = payload.checks || [];
+      const failed = checks.find((item) => String(item.status || "").toLowerCase() === "failed");
+      if (failed && failed.message) return String(failed.message);
+      return payload.ok ? "HASH 校验通过" : "HASH 校验失败";
+    }
+    if (stepName === "warmup") {
+      return payload.ok ? "GPU 热身成功" : "GPU 热身失败";
+    }
+    return payload.ok ? "通过" : "失败";
+  };
+
+  const _applyModelTestPayload = (payload) => {
+    const steps = (payload && payload.steps) || [];
+    for (const step of steps) {
+      const name = String(step.name || "").trim().toLowerCase();
+      if (!name) continue;
+      _updateModelTestStep(name, {
+        status: step.ok ? "passed" : "failed",
+        message: _buildStepMessage(name, step),
+        details: step,
+      });
+    }
+  };
+
+  const _requestTranscriptionModelTest = async (mode) => {
+    const res = await fetch("/api/admin/debug/test-transcription-model", {
+      method: "POST",
+      headers: {
+        ..._authHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ mode }),
+    });
+    const payload = await parseJsonSafe(res);
+    if (!res.ok) {
+      _handleAuthedError(res);
+    }
+    return {
+      ok: res.ok,
+      payload: payload || {},
+    };
+  };
+
   const testTranscriptionModel = async () => {
     if (!auth.token) return;
     debugTools.loadingModelTest = true;
     debugTools.modelTestError = "";
     debugTools.modelTestResult = null;
+    debugTools.modelTestSteps = _createModelTestSteps();
+
     try {
-      const res = await fetch("/api/admin/debug/test-transcription-model", {
-        method: "POST",
-        headers: _authHeaders(),
-      });
-      const payload = await parseJsonSafe(res);
-      if (!res.ok) {
-        debugTools.modelTestResult = payload || null;
-        throw new Error(payload.error || "转录模型测试失败");
+      _updateModelTestStep("hash", { status: "running", message: "正在校验模型 HASH..." });
+      const hashRes = await _requestTranscriptionModelTest("hash");
+      _applyModelTestPayload(hashRes.payload);
+      debugTools.modelTestResult = hashRes.payload;
+      if (!hashRes.ok || !hashRes.payload.ok) {
+        _updateModelTestStep("warmup", { status: "pending", message: "未执行（前置校验失败）" });
+        throw new Error(hashRes.payload.error || "HASH 校验失败");
       }
-      debugTools.modelTestResult = payload;
+
+      _updateModelTestStep("warmup", { status: "running", message: "正在进行 GPU 热身识别..." });
+      const warmupRes = await _requestTranscriptionModelTest("warmup");
+      _applyModelTestPayload(warmupRes.payload);
+      debugTools.modelTestResult = warmupRes.payload;
+      if (!warmupRes.ok || !warmupRes.payload.ok) {
+        throw new Error(warmupRes.payload.error || "GPU 热身失败");
+      }
     } catch (error) {
       debugTools.modelTestError = error.message;
     } finally {

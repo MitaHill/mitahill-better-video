@@ -146,6 +146,7 @@
             :loading-model="debugTools.loadingModelTest"
             :model-error="debugTools.modelTestError"
             :model-result="debugTools.modelTestResult"
+            :model-steps="debugTools.modelTestSteps"
             :loading-translation="debugTools.loadingTranslationTest"
             :translation-error="debugTools.translationTestError"
             :translation-result="debugTools.translationTestResult"

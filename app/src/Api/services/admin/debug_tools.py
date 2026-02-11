@@ -12,7 +12,22 @@ from .transcription_config import get_transcription_config
 logger = logging.getLogger("ADMIN_DEBUG")
 
 
-def run_transcription_model_test() -> Dict:
+def _pick_hash_error_message(hash_res: Dict) -> str:
+    checks = hash_res.get("checks") or []
+    for item in checks:
+        if str(item.get("status") or "").strip().lower() != "failed":
+            continue
+        message = str(item.get("message") or "").strip()
+        if message:
+            return message
+    return "HASH 校验失败"
+
+
+def run_transcription_model_test(mode: str = "full") -> Dict:
+    safe_mode = str(mode or "full").strip().lower()
+    if safe_mode not in {"full", "hash", "warmup"}:
+        safe_mode = "full"
+
     current = get_transcription_config()
     transcription = current.get("transcription") or {}
     backend = str(transcription.get("backend") or "whisper").strip().lower()
@@ -22,6 +37,7 @@ def run_transcription_model_test() -> Dict:
         "ok": False,
         "backend": backend,
         "model_id": model_id,
+        "mode": safe_mode,
         "steps": [],
     }
 
@@ -35,8 +51,13 @@ def run_transcription_model_test() -> Dict:
     hash_res = verify_model_hashes(model_entry)
     result["steps"].append({"name": "hash", **hash_res})
     if not hash_res.get("ok"):
-        result["error"] = "HASH 校验失败"
-        logger.error("Model hash validation failed: %s/%s", backend, model_id)
+        result["error"] = _pick_hash_error_message(hash_res)
+        logger.error("Model hash validation failed: %s/%s (%s)", backend, model_id, result["error"])
+        return result
+
+    if safe_mode == "hash":
+        result["ok"] = True
+        result["message"] = "HASH 校验通过"
         return result
 
     warmup_res = warmup_transcription_model(model_entry)
@@ -47,6 +68,7 @@ def run_transcription_model_test() -> Dict:
         return result
 
     result["ok"] = True
+    result["message"] = "模型测试通过"
     return result
 
 

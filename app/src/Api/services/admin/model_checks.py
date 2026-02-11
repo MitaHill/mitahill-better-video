@@ -88,14 +88,28 @@ def verify_model_hashes(model_entry: Dict) -> Dict:
 
     if backend == "whisper":
         local_path = Path(model_entry.get("local_path") or "")
-        if not local_path.exists():
+        candidate_items = model_entry.get("local_candidates") or []
+        candidate_paths: List[Path] = []
+        for item in candidate_items:
+            safe = str(item or "").strip()
+            if safe:
+                candidate_paths.append(Path(safe))
+        if local_path and str(local_path):
+            if str(local_path) not in {str(path) for path in candidate_paths}:
+                candidate_paths.insert(0, local_path)
+        if not candidate_paths:
+            candidate_paths = [local_path]
+
+        matched_path = next((path for path in candidate_paths if path.exists()), None)
+        if not matched_path:
+            looked_up = ", ".join(str(path) for path in candidate_paths if str(path)) or str(local_path)
             return {
                 "ok": False,
                 "checks": [
                     {
                         "name": "hash",
                         "status": "failed",
-                        "message": f"模型文件不存在: {local_path}",
+                        "message": f"模型文件不存在，请先下载模型。已检查路径: {looked_up}",
                     }
                 ],
             }
@@ -107,18 +121,18 @@ def verify_model_hashes(model_entry: Dict) -> Dict:
                     {
                         "name": "hash",
                         "status": "failed",
-                        "file": str(local_path),
+                        "file": str(matched_path),
                         "message": "远程未提供可用 HASH",
                     }
                 ],
             }
-        actual = _digest_of_file(local_path, "sha256")
+        actual = _digest_of_file(matched_path, "sha256")
         status = actual == expected
         out["checks"].append(
             {
                 "name": "hash",
                 "status": "passed" if status else "failed",
-                "file": str(local_path),
+                "file": str(matched_path),
                 "expected": expected,
                 "actual": actual,
                 "message": "SHA256 校验通过" if status else "SHA256 校验失败",

@@ -11,7 +11,9 @@ def admin_test_transcription_model():
     _session, err = get_admin_session(request)
     if err:
         return jsonify({"error": err}), 401
-    result = run_transcription_model_test()
+    payload = request.get_json(silent=True) or {}
+    mode = payload.get("mode")
+    result = run_transcription_model_test(mode=mode)
     status_code = 200 if result.get("ok") else 400
     return jsonify(result), status_code
 

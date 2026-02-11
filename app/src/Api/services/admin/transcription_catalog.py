@@ -50,6 +50,12 @@ _OPENAI_MODEL_IDS = [
     "large-v3-turbo",
 ]
 
+_OPENAI_LOCAL_ALIASES = {
+    "turbo": ["large-v3-turbo.pt"],
+    "large-v3-turbo": ["turbo.pt"],
+    "large": ["large-v2.pt"],
+}
+
 _FASTER_MODELS = [
     {"id": "tiny", "repo": "Systran/faster-whisper-tiny"},
     {"id": "tiny.en", "repo": "Systran/faster-whisper-tiny.en"},
@@ -161,7 +167,14 @@ def build_openai_model_entry(model_id: str) -> Dict:
     url = registry.get(model_id) or fallback
     filename = _extract_filename(url, f"{model_id}.pt")
     expected_sha = _extract_sha_from_url(url)
-    local_path = _OPENAI_STORAGE_ROOT / filename
+    candidate_names = [filename, f"{model_id}.pt", *(_OPENAI_LOCAL_ALIASES.get(model_id) or [])]
+    dedup_names: List[str] = []
+    for item in candidate_names:
+        safe_name = str(item or "").strip()
+        if safe_name and safe_name not in dedup_names:
+            dedup_names.append(safe_name)
+    candidate_paths = [_OPENAI_STORAGE_ROOT / item for item in dedup_names]
+    local_path = next((path for path in candidate_paths if path.exists()), candidate_paths[0])
     return {
         "model_id": model_id,
         "label": model_id,
@@ -171,7 +184,8 @@ def build_openai_model_entry(model_id: str) -> Dict:
         "download_url": url,
         "expected_sha256": expected_sha,
         "local_path": str(local_path),
-        "installed": local_path.exists(),
+        "local_candidates": [str(path) for path in candidate_paths],
+        "installed": any(path.exists() for path in candidate_paths),
         "required_files": [filename],
     }
 
