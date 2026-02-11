@@ -19,6 +19,8 @@ def create_transcription():
     params, err = apply_constraints_to_params("transcribe", params)
     if err:
         return jsonify({"error": err}), 400
+    if (params.get("translate_to") or "").strip() and str(params.get("translator_provider") or "none").strip().lower() == "none":
+        return jsonify({"error": "已设置“翻译到”，请先选择翻译提供器，或将翻译目标设为“不翻译”。"}), 400
     task_id, err = create_transcription_task(
         request,
         client_ip,

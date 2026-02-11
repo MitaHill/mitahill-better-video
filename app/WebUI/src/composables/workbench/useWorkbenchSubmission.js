@@ -90,6 +90,12 @@ export const useWorkbenchSubmission = ({
     if (!transcribeForm.mediaFiles || transcribeForm.mediaFiles.length === 0) {
       throw new Error("请至少上传一个要转录的音频或视频文件。");
     }
+    if (
+      String(transcribeForm.translateTo || "").trim() &&
+      String(transcribeForm.translatorProvider || "none").trim().toLowerCase() === "none"
+    ) {
+      throw new Error("已设置“翻译到”，请先选择翻译提供器，或将“翻译到”改为“不翻译”。");
+    }
 
     const data = buildTranscriptionTaskFormData(transcribeForm);
     const res = await fetch("/api/transcriptions", { method: "POST", body: data });
