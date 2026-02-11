@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   better_video:
     image: better_video:latest

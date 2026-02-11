@@ -12,6 +12,10 @@
 4. Frontend polls `GET /api/tasks/<task_id>` and shows previews.
 5. Finished output is downloaded from `/api/tasks/<task_id>/result`.
 
+## Runtime Baseline
+- Standard runtime entry is `pre-run/` (`docker compose up -d`).
+- Persistent mount must target `pre-run/storage/` to avoid cross-environment state confusion.
+
 ## Process Model
 - **Main process**: Flask API server
 - **Worker process**: long-running task processing loop
@@ -29,6 +33,7 @@
 - `app/WebUI/src/components/workbench/convert/*`: conversion section modules.
 - `app/WebUI/src/components/workbench/transcribe/*`: transcription section modules.
 - `app/src/Worker/pipelines/transcription/translation/*`: 转录翻译提供器与分段翻译子模块（Ollama/OpenAI兼容）。
+- `app/src/Worker/pipelines/transcription/whisper_engine.py`: 转录执行器（支持 `whisper` / `faster_whisper` 双后端，按任务参数选择）。
 - `app/src/Api/services/form_constraints.py`: 三大任务类别统一参数约束引擎（固定锁/范围锁/不约束，前后端同源）。
 - `app/WebUI/src/components/workbench/TaskStatusPanel.vue`: status panel shell.
 - `app/WebUI/src/components/workbench/status/StatusQueryHeader.vue`: status query row + task list.
@@ -55,6 +60,9 @@
 - Run scratch: `/workspace/storage/output/run_<task_id>/`
 - Uploads: `/workspace/storage/upload/run_<task_id>/`
 - Task categories in unified queue: `enhance` / `convert` / `transcribe`
+- Transcription model cache roots:
+  - `whisper`: `/workspace/storage/models/transcription/whisper-openai`
+  - `faster_whisper`: `/workspace/storage/models/transcription/faster-whisper/<model_id>`
 
 ## Admin & Real IP
 - 管理入口通过顶部菜单 `后端管理` 访问，采用密码登录，密码哈希保存在 SQLite `app_settings`。
