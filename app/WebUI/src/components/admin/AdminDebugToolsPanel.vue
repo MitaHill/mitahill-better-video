@@ -110,6 +110,59 @@
           {{ loadingTranslation ? "测试中..." : "测试翻译源" }}
         </button>
         <p v-if="translationError" class="notice" style="color: var(--accent-2); margin-top: 8px;">{{ translationError }}</p>
+
+        <div v-if="translationResultSummary" class="debug-result-card">
+          <div class="debug-result-grid">
+            <div class="debug-kv">
+              <span>结果</span>
+              <strong :class="translationResultSummary.ok ? 'ok' : 'bad'">
+                {{ translationResultSummary.ok ? "通过" : "失败" }}
+              </strong>
+            </div>
+            <div class="debug-kv">
+              <span>提供器</span>
+              <strong>{{ translationResultSummary.provider }}</strong>
+            </div>
+            <div class="debug-kv" v-if="translationResultSummary.elapsedSec !== null">
+              <span>耗时</span>
+              <strong>{{ translationResultSummary.elapsedSec }}s</strong>
+            </div>
+            <div class="debug-kv" v-if="translationResultSummary.speedGrade">
+              <span>速度评估</span>
+              <strong>{{ translationResultSummary.speedGrade }}</strong>
+            </div>
+          </div>
+          <p class="notice" style="margin: 6px 0 0;">{{ translationResultSummary.message }}</p>
+          <p v-if="translationResultSummary.replyPreview" class="notice" style="margin: 4px 0 0;">
+            回复预览：{{ translationResultSummary.replyPreview }}
+          </p>
+        </div>
+
+        <div v-if="translationStepRows.length" class="hash-table-wrap">
+          <table class="hash-table">
+            <thead>
+              <tr>
+                <th>步骤</th>
+                <th>状态</th>
+                <th>耗时</th>
+                <th>说明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, idx) in translationStepRows" :key="`${item.step}-${idx}`">
+                <td>{{ item.label }}</td>
+                <td>
+                  <span :class="item.status === 'passed' ? 'chip-ok' : 'chip-bad'">
+                    {{ item.status === "passed" ? "通过" : "失败" }}
+                  </span>
+                </td>
+                <td>{{ item.elapsedSec !== null ? `${item.elapsedSec}s` : "-" }}</td>
+                <td>{{ item.message || "-" }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
         <details v-if="translationResult" class="raw-details">
           <summary>查看原始 JSON</summary>
           <pre class="mono" style="margin-top: 8px; white-space: pre-wrap;">{{ stringify(translationResult) }}</pre>
@@ -281,6 +334,51 @@ const shortHash = (value) => {
   if (safe.length <= 16) return safe;
   return `${safe.slice(0, 10)}...${safe.slice(-6)}`;
 };
+
+const _translationStepLabel = (name) => {
+  const key = String(name || "").trim().toLowerCase();
+  if (key === "tcp_ping") return "TCP 连通性";
+  if (key === "list_models") return "模型列表";
+  if (key === "chat") return "对话测试";
+  return key || "-";
+};
+
+const translationStepRows = computed(() => {
+  const payload = asObject(props.translationResult);
+  if (!payload) return [];
+  const steps = Array.isArray(payload.steps) ? payload.steps : [];
+  return steps.map((item) => ({
+    step: String(item.step || ""),
+    label: _translationStepLabel(item.step),
+    status: String(item.status || "").trim().toLowerCase() === "passed" ? "passed" : "failed",
+    elapsedSec: Number.isFinite(Number(item.elapsed_sec)) ? Number(item.elapsed_sec) : null,
+    message: String(item.message || item.speed_grade || item.reply_preview || ""),
+  }));
+});
+
+const translationResultSummary = computed(() => {
+  const payload = asObject(props.translationResult);
+  if (!payload) return null;
+  const steps = translationStepRows.value;
+  const chatStep = (Array.isArray(payload.steps) ? payload.steps : []).find(
+    (item) => String(item?.step || "").toLowerCase() === "chat"
+  ) || {};
+  const elapsedFromRoot = Number.isFinite(Number(payload.elapsed_sec)) ? Number(payload.elapsed_sec) : null;
+  const elapsedFromChat = Number.isFinite(Number(chatStep.elapsed_sec)) ? Number(chatStep.elapsed_sec) : null;
+  const speedGrade = String(chatStep.speed_grade || payload.speed_grade || "").trim();
+  const replyPreview = String(chatStep.reply_preview || payload.reply_preview || "").trim();
+  const message = String(payload.error || (payload.ok ? "翻译源测试通过" : "翻译源测试失败")).trim();
+  const statusOk = Boolean(payload.ok);
+  return {
+    ok: statusOk,
+    provider: String(payload.provider || "-"),
+    elapsedSec: elapsedFromRoot ?? elapsedFromChat,
+    speedGrade,
+    replyPreview,
+    message: message || (statusOk ? "翻译源测试通过" : "翻译源测试失败"),
+    stepCount: steps.length,
+  };
+});
 
 const toStatusLabel = (status) => {
   const key = String(status || "").trim().toLowerCase();
