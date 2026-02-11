@@ -1,7 +1,16 @@
-import { formatBool } from "./utils";
+import { formatBool, formatTranscribeModelRef, splitTranscribeModelRef } from "./utils";
 
 export const buildParamRows = (status) => {
   const params = status?.task_params || {};
+  const _transcribeModelText = () => {
+    const rawModel = String(params.whisper_model || "").trim();
+    if (!rawModel) return "-";
+    const parsed = splitTranscribeModelRef(
+      rawModel,
+      params.transcription_backend || "whisper"
+    );
+    return formatTranscribeModelRef(parsed.backend, parsed.modelId || rawModel);
+  };
   if (params.task_category === "convert") {
     return [
       { label: "任务类别", value: "视频转换" },
@@ -32,7 +41,7 @@ export const buildParamRows = (status) => {
       { label: "任务类别", value: "视频转录" },
       { label: "转录类型", value: modeLabelMap[params.transcribe_mode] || params.transcribe_mode || "-" },
       { label: "字幕格式", value: (params.subtitle_format || "-").toUpperCase() },
-      { label: "Whisper 模型", value: params.whisper_model || "-" },
+      { label: "Whisper 模型", value: _transcribeModelText() || "-" },
       { label: "语言", value: params.language || "auto" },
       { label: "翻译到", value: params.translate_to || "-" },
       { label: "翻译提供器", value: params.translator_provider || "-" },

@@ -30,7 +30,7 @@
                 下载
               </button>
             </td>
-            <td class="mono">{{ item.model_id }}</td>
+            <td class="mono">{{ prefixedModel(item.backend, item.model_id) }}</td>
             <td>{{ item.backend }}</td>
             <td>{{ item.engine }}</td>
             <td>{{ item.installed ? "是" : "否" }}</td>
@@ -75,7 +75,7 @@
                 <span v-else>-</span>
               </td>
               <td class="mono">{{ job.job_id }}</td>
-              <td class="mono">{{ job.model_id }}</td>
+              <td class="mono">{{ prefixedModel(job.backend, job.model_id) }}</td>
               <td>{{ job.backend }}</td>
               <td>{{ job.status }}</td>
               <td style="min-width: 180px;">
@@ -113,6 +113,9 @@
 
 <script setup>
 import { formatDateTimeToSecond } from "./formatDateTime";
+import { formatTranscribeModelRef } from "../../composables/workbench/utils";
+
+const prefixedModel = (backend, modelId) => formatTranscribeModelRef(backend, modelId);
 
 defineProps({
   models: {

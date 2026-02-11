@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
 import requests
+from app.src.Utils.transcription_model_ref import build_prefixed_model_ref
 
 logger = logging.getLogger("ADMIN_MODEL_CATALOG")
 
@@ -215,7 +216,7 @@ def build_openai_model_entry(model_id: str) -> Dict:
     local_path = next((path for path in candidate_paths if path.exists()), candidate_paths[0])
     return {
         "model_id": model_id,
-        "label": model_id,
+        "label": build_prefixed_model_ref("whisper", model_id),
         "backend": "whisper",
         "engine": "openai-whisper",
         "source": "openai",
@@ -236,7 +237,7 @@ def build_faster_model_entry(model_id: str) -> Optional[Dict]:
     model_bin = local_dir / "model.bin"
     return {
         "model_id": model_id,
-        "label": model_id,
+        "label": build_prefixed_model_ref("faster_whisper", model_id),
         "backend": "faster_whisper",
         "engine": "faster-whisper",
         "source": "huggingface",

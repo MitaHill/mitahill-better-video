@@ -3,10 +3,15 @@
     <TranscribeBaseSection
       :transcribe-form="transcribeForm"
       :transcribe-media-info="transcribeMediaInfo"
+      :transcribe-runtime="transcribeRuntime"
       :on-transcribe-media-change="onTranscribeMediaChange"
       :get-field-policy="getFieldPolicy"
     />
-    <TranscribeAdvancedSection :transcribe-form="transcribeForm" :get-field-policy="getFieldPolicy" />
+    <TranscribeAdvancedSection
+      :transcribe-form="transcribeForm"
+      :transcribe-runtime="transcribeRuntime"
+      :get-field-policy="getFieldPolicy"
+    />
   </div>
 </template>
 
@@ -21,6 +26,10 @@ defineProps({
   },
   transcribeMediaInfo: {
     type: Array,
+    required: true,
+  },
+  transcribeRuntime: {
+    type: Object,
     required: true,
   },
   onTranscribeMediaChange: {

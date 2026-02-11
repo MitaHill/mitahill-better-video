@@ -35,7 +35,7 @@
       <div class="field compact">
         <label>Whisper 模型</label>
         <select v-model="transcribeForm.whisperModel" :disabled="isDisabled('whisperModel')">
-          <option v-for="model in whisperModelOptions" :key="model" :value="model">{{ model }}</option>
+          <option v-for="item in whisperModelOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
         </select>
       </div>
       <div class="field compact">
@@ -64,6 +64,11 @@ import {
   TRANSCRIPTION_TARGET_LANGUAGE_CODES,
   TRANSCRIPTION_TARGET_LANGUAGE_OPTIONS,
 } from "../../../constants/transcriptionLanguages";
+import {
+  formatTranscribeModelRef,
+  normalizeTranscribeBackend,
+  splitTranscribeModelRef,
+} from "../../../composables/workbench/utils";
 
 const props = defineProps({
   transcribeForm: {
@@ -72,6 +77,10 @@ const props = defineProps({
   },
   transcribeMediaInfo: {
     type: Array,
+    required: true,
+  },
+  transcribeRuntime: {
+    type: Object,
     required: true,
   },
   onTranscribeMediaChange: {
@@ -112,8 +121,18 @@ const subtitleFormatOptions = computed(() =>
   }))
 );
 
+const runtimeBackend = computed(() =>
+  normalizeTranscribeBackend(props.transcribeRuntime?.transcription?.backend || "whisper")
+);
+
 const whisperModelOptions = computed(() =>
-  allowed("whisperModel", ["small", "medium", "large-v3", "turbo"])
+  allowed("whisperModel", ["small", "medium", "large-v3", "turbo"]).map((value) => {
+    const parsed = splitTranscribeModelRef(value, runtimeBackend.value);
+    return {
+      value,
+      label: formatTranscribeModelRef(parsed.backend, parsed.modelId),
+    };
+  })
 );
 
 const languageOptions = computed(() => {

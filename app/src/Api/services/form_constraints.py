@@ -576,24 +576,24 @@ def _default_constraints() -> Dict[str, Any]:
                         "label": "Whisper模型",
                         "kind": "enum",
                         "lock": "free",
-                        "default_value": "medium",
-                        "fixed_value": "medium",
+                        "default_value": "whisper-openai/medium",
+                        "fixed_value": "whisper-openai/medium",
                         "allowed_values": [
-                            "tiny",
-                            "tiny.en",
-                            "base",
-                            "base.en",
-                            "small",
-                            "small.en",
-                            "medium",
-                            "medium.en",
-                            "large",
-                            "large-v1",
-                            "large-v2",
-                            "large-v3",
-                            "turbo",
-                            "distil-large-v2",
-                            "distil-large-v3",
+                            "whisper-openai/tiny",
+                            "whisper-openai/tiny.en",
+                            "whisper-openai/base",
+                            "whisper-openai/base.en",
+                            "whisper-openai/small",
+                            "whisper-openai/small.en",
+                            "whisper-openai/medium",
+                            "whisper-openai/medium.en",
+                            "whisper-openai/large",
+                            "whisper-openai/large-v1",
+                            "whisper-openai/large-v2",
+                            "whisper-openai/large-v3",
+                            "whisper-openai/turbo",
+                            "fast-whisper/distil-large-v2",
+                            "fast-whisper/distil-large-v3",
                         ],
                     },
                     "language": {
@@ -932,6 +932,13 @@ def get_form_constraints_config() -> Dict[str, Any]:
 
 
 def get_public_form_constraints_config() -> Dict[str, Any]:
+    # Keep transcribe model constraints aligned with admin transcription config.
+    try:
+        from app.src.Api.services.admin.transcription_config import get_transcription_config
+
+        _ = get_transcription_config()
+    except Exception:
+        pass
     config = get_form_constraints_config()
     public_config = copy.deepcopy(config)
     for category in public_config.get("categories", {}).values():

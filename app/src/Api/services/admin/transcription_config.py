@@ -7,6 +7,10 @@ from app.src.Data.transcription_languages import (
     TRANSCRIPTION_TARGET_LANGUAGE_CODES,
 )
 from app.src.Database import transcription_admin as db_transcription
+from app.src.Utils.transcription_model_ref import (
+    build_prefixed_model_ref,
+    parse_prefixed_model_ref,
+)
 
 from .transcription_catalog import get_models_for_backend
 
@@ -91,16 +95,24 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     if backend not in _VALID_BACKENDS:
         backend = "whisper"
     merged["transcription"]["backend"] = backend
-    merged["transcription"]["active_model"] = str(
-        merged["transcription"].get("active_model") or "medium"
-    ).strip().lower()
+    _active_model_backend, active_model = parse_prefixed_model_ref(
+        str(merged["transcription"].get("active_model") or "medium").strip().lower(),
+        fallback_backend=backend,
+    )
+    merged["transcription"]["active_model"] = active_model or "medium"
 
     allowed = merged["transcription"].get("allowed_models") or []
     if not isinstance(allowed, list):
         allowed = []
-    merged["transcription"]["allowed_models"] = [
-        str(item).strip().lower() for item in allowed if str(item).strip()
-    ]
+    normalized_allowed = []
+    for item in allowed:
+        safe_raw = str(item or "").strip().lower()
+        if not safe_raw:
+            continue
+        _item_backend, item_model = parse_prefixed_model_ref(safe_raw, fallback_backend=backend)
+        if item_model:
+            normalized_allowed.append(item_model)
+    merged["transcription"]["allowed_models"] = normalized_allowed
     backend_supported = get_models_for_backend(backend)
     backend_supported_set = {str(item).strip().lower() for item in backend_supported}
     active_model = str(merged["transcription"].get("active_model") or "").strip().lower()
@@ -250,16 +262,27 @@ def _sync_transcription_constraints(current: Dict[str, Any]):
         for item in (transcription.get("allowed_models") or [])
         if str(item).strip()
     ]
-    compatible_allowed = [item for item in allowed if item in backend_supported_set]
+    normalized_allowed = []
+    for item in allowed:
+        _item_backend, item_model = parse_prefixed_model_ref(item, fallback_backend=backend)
+        if item_model:
+            normalized_allowed.append(item_model)
+    compatible_allowed = [item for item in normalized_allowed if item in backend_supported_set]
     active_model = str(transcription.get("active_model") or "medium").strip().lower()
+    _active_backend, active_model = parse_prefixed_model_ref(active_model, fallback_backend=backend)
     if active_model and active_model not in compatible_allowed and active_model in backend_supported_set:
         compatible_allowed.append(active_model)
     if not compatible_allowed:
         compatible_allowed = backend_supported or [active_model or "medium"]
-    whisper_field["allowed_values"] = compatible_allowed
-    whisper_field["default_value"] = active_model or whisper_field.get("default_value", "medium")
+    prefixed_allowed = [build_prefixed_model_ref(backend, item) for item in compatible_allowed]
+    prefixed_active = build_prefixed_model_ref(
+        backend,
+        active_model or str(whisper_field.get("default_value") or "medium"),
+    )
+    whisper_field["allowed_values"] = prefixed_allowed
+    whisper_field["default_value"] = prefixed_active
     if whisper_field.get("lock") == "fixed":
-        whisper_field["fixed_value"] = active_model or whisper_field.get("fixed_value", "medium")
+        whisper_field["fixed_value"] = prefixed_active
     fields["whisper_model"] = whisper_field
     language_allowed_set = {str(item).strip().lower() for item in TRANSCRIPTION_LANGUAGE_CODES}
     language_field["kind"] = "enum"

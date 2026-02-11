@@ -218,7 +218,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 
 import { useWorkbenchAdmin } from "../../composables/workbench/useWorkbenchAdmin";
-import { parseJsonSafe } from "../../composables/workbench/utils";
+import { formatTranscribeModelRef, parseJsonSafe } from "../../composables/workbench/utils";
 import AdminConstraintEditor from "./AdminConstraintEditor.vue";
 import AdminDebugToolsPanel from "./AdminDebugToolsPanel.vue";
 import AdminGpuUsageChart from "./AdminGpuUsageChart.vue";
@@ -405,7 +405,12 @@ const transcribeReadyModelOptions = computed(() =>
     new Set(
       (Array.isArray(transcriptionModels.items) ? transcriptionModels.items : [])
         .filter((item) => Boolean(item?.installed))
-        .map((item) => String(item?.model_id || "").trim().toLowerCase())
+        .map((item) =>
+          formatTranscribeModelRef(
+            String(item?.backend || "").trim().toLowerCase(),
+            String(item?.model_id || "").trim().toLowerCase()
+          )
+        )
         .filter((item) => item.length > 0)
     )
   )

@@ -1,4 +1,5 @@
 from app.src.Config import settings as config
+from app.src.Utils.transcription_model_ref import parse_prefixed_model_ref
 
 from .common import bool_from_form, float_from_form, int_from_form, merge_unparsed_form_fields
 
@@ -19,20 +20,23 @@ def _load_parser_defaults():
 
 def parse_transcription_task_params(form):
     defaults = _load_parser_defaults()
+    backend_raw = (
+        form.get("transcription_backend", defaults.get("transcription_backend", "whisper"))
+        or defaults.get("transcription_backend", "whisper")
+        or "whisper"
+    ).strip().lower()
+    model_raw = (
+        form.get("whisper_model", defaults.get("whisper_model", "medium"))
+        or defaults.get("whisper_model", "medium")
+        or "medium"
+    ).strip().lower()
+    parsed_backend, parsed_model = parse_prefixed_model_ref(model_raw, fallback_backend=backend_raw)
     parsed = {
         "task_category": "transcribe",
-        "transcription_backend": (
-            form.get("transcription_backend", defaults.get("transcription_backend", "whisper"))
-            or defaults.get("transcription_backend", "whisper")
-            or "whisper"
-        ).strip().lower(),
+        "transcription_backend": parsed_backend or "whisper",
         "transcribe_mode": (form.get("transcribe_mode", "subtitle_zip") or "subtitle_zip").lower(),
         "subtitle_format": (form.get("subtitle_format", "srt") or "srt").lower(),
-        "whisper_model": (
-            form.get("whisper_model", defaults.get("whisper_model", "medium"))
-            or defaults.get("whisper_model", "medium")
-            or "medium"
-        ).lower(),
+        "whisper_model": parsed_model or "medium",
         "language": (form.get("language", "auto") or "auto").strip().lower(),
         "translate_to": (form.get("translate_to", "") or "").strip(),
         "translator_provider": (

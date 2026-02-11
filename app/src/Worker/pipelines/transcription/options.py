@@ -1,4 +1,5 @@
 from app.src.Config import settings as config
+from app.src.Utils.transcription_model_ref import parse_prefixed_model_ref
 
 VALID_TRANSCRIBE_MODES = {"subtitle_zip", "subtitled_video", "subtitle_and_video_zip"}
 VALID_SUBTITLE_FORMATS = {"srt", "vtt"}
@@ -42,9 +43,12 @@ def _to_float(value, default=0.0, min_value=None, max_value=None):
 
 def normalize_transcription_options(raw):
     options = raw or {}
-    backend = (options.get("transcription_backend") or "whisper").strip().lower()
-    if backend not in VALID_TRANSCRIPTION_BACKENDS:
-        backend = "whisper"
+    backend_raw = (options.get("transcription_backend") or "whisper").strip().lower()
+    if backend_raw not in VALID_TRANSCRIPTION_BACKENDS:
+        backend_raw = "whisper"
+    model_raw = (options.get("whisper_model") or "medium").strip().lower() or "medium"
+    parsed_backend, parsed_model = parse_prefixed_model_ref(model_raw, fallback_backend=backend_raw)
+    backend = parsed_backend if parsed_backend in VALID_TRANSCRIPTION_BACKENDS else backend_raw
 
     mode = (options.get("transcribe_mode") or "subtitle_zip").strip().lower()
     if mode not in VALID_TRANSCRIBE_MODES:
@@ -54,7 +58,7 @@ def normalize_transcription_options(raw):
     if subtitle_format not in VALID_SUBTITLE_FORMATS:
         subtitle_format = "srt"
 
-    whisper_model = (options.get("whisper_model") or "medium").strip().lower() or "medium"
+    whisper_model = parsed_model or "medium"
     language = (options.get("language") or "auto").strip().lower() or "auto"
 
     translate_to = (options.get("translate_to") or "").strip()

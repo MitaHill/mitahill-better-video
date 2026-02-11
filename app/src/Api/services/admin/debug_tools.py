@@ -1,6 +1,8 @@
 import logging
 from typing import Dict, Optional
 
+from app.src.Utils.transcription_model_ref import build_prefixed_model_ref
+
 from .model_checks import (
     resolve_model_entry,
     test_translation_provider,
@@ -30,11 +32,11 @@ def _pick_hash_error_message(hash_res: Dict) -> str:
 
 def _build_backend_mismatch_error(backend: str, model_id: str) -> str:
     supported = get_models_for_backend(backend)
-    preview = ", ".join(supported[:10])
+    preview = ", ".join(build_prefixed_model_ref(backend, item) for item in supported[:10])
     if len(supported) > 10:
         preview += " ..."
     return (
-        f"模型与后端不匹配: 当前后端={backend}, 当前模型={model_id}。"
+        f"模型与后端不匹配: 当前后端={backend}, 当前模型={build_prefixed_model_ref(backend, model_id)}。"
         f"该后端可用模型示例: {preview or '无'}"
     )
 
@@ -45,7 +47,11 @@ def _append_cross_backend_hint(message: str, backend: str, model_id: str) -> str
     if not others:
         return message
     hint = "；检测到同名模型已安装在其它后端: " + ", ".join(
-        f"{item.get('backend')}/{item.get('model_id')} ({item.get('local_path')})" for item in others
+        (
+            f"{build_prefixed_model_ref(item.get('backend'), item.get('model_id'))} "
+            f"({item.get('local_path')})"
+        )
+        for item in others
     )
     return f"{message}{hint}。请切换后端或下载当前后端对应模型。"
 
@@ -81,7 +87,7 @@ def run_transcription_model_test(
                 {
                     "name": "target",
                     "status": "passed",
-                    "message": f"当前测试目标: {chosen_backend}/{chosen_model_id}",
+                    "message": f"当前测试目标: {build_prefixed_model_ref(chosen_backend, chosen_model_id)}",
                 },
                 {
                     "name": "installed_variants",
@@ -90,7 +96,8 @@ def run_transcription_model_test(
                         "已安装变体: "
                         + (
                             ", ".join(
-                                f"{item.get('backend')}/{item.get('model_id')}" for item in installed_variants
+                                build_prefixed_model_ref(item.get("backend"), item.get("model_id"))
+                                for item in installed_variants
                             )
                             if installed_variants
                             else "无"

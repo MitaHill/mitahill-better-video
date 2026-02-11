@@ -174,6 +174,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
+import { formatTranscribeModelRef } from "../../composables/workbench/utils";
 
 const props = defineProps({
   loadingModel: {
@@ -240,7 +241,7 @@ const modelTargetOptions = computed(() => {
       value: key,
       backend,
       modelId,
-      label: `${backend === "faster_whisper" ? "fast-whisper" : backend} / ${modelId}`,
+      label: formatTranscribeModelRef(backend, modelId),
     });
   }
   out.sort((a, b) => a.label.localeCompare(b.label));
