@@ -28,6 +28,16 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     ipStats: [],
     statusFilter: "",
     realIpConfig: null,
+    maintenanceMode: false,
+    updatingMaintenanceMode: false,
+    taskActionLoading: {},
+  });
+
+  const gpuUsage = reactive({
+    loading: false,
+    error: "",
+    rangeSeconds: 60,
+    series: [],
   });
 
   const passwordForm = reactive({
@@ -166,6 +176,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       auth.expiresAt = payload.expires_at || "";
       adminPassword.value = "";
       await fetchOverview();
+      await fetchGpuUsage(60);
       await fetchFormConstraintsConfig();
       await fetchTranscriptionConfig();
       await fetchTranscriptionModels();
@@ -208,6 +219,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       overview.tasks = payload.tasks || [];
       overview.ipStats = payload.ip_stats || [];
       overview.realIpConfig = payload.real_ip_config || null;
+      overview.maintenanceMode = Boolean(payload.maintenance_mode);
       if (overview.realIpConfig) {
         proxyConfig.trustedProxies = overview.realIpConfig.trusted_proxies || "";
         proxyConfig.resolvedClientIp = overview.realIpConfig.resolved_client_ip || "";
@@ -216,6 +228,83 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       overview.error = error.message;
     } finally {
       overview.loading = false;
+    }
+  };
+
+  const setMaintenanceMode = async (enabled) => {
+    if (!auth.token) return;
+    overview.updatingMaintenanceMode = true;
+    overview.error = "";
+    try {
+      const res = await fetch("/api/admin/maintenance-mode", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ..._authHeaders(),
+        },
+        body: JSON.stringify({ enabled: Boolean(enabled) }),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "更新维护模式失败");
+      }
+      overview.maintenanceMode = Boolean(payload.enabled);
+      await fetchOverview();
+    } catch (error) {
+      overview.error = error.message;
+    } finally {
+      overview.updatingMaintenanceMode = false;
+    }
+  };
+
+  const cancelTaskById = async (taskId) => {
+    const safeTaskId = String(taskId || "").trim();
+    if (!auth.token || !safeTaskId) return;
+    overview.error = "";
+    overview.taskActionLoading[safeTaskId] = true;
+    try {
+      const res = await fetch(`/api/admin/tasks/${encodeURIComponent(safeTaskId)}/cancel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ..._authHeaders(),
+        },
+        body: JSON.stringify({ reason: "已取消（管理员操作）" }),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "取消任务失败");
+      }
+      await fetchOverview();
+    } catch (error) {
+      overview.error = error.message;
+    } finally {
+      overview.taskActionLoading[safeTaskId] = false;
+    }
+  };
+
+  const fetchGpuUsage = async (seconds = gpuUsage.rangeSeconds || 60) => {
+    if (!auth.token) return;
+    gpuUsage.loading = true;
+    gpuUsage.error = "";
+    try {
+      const safeSeconds = Math.max(10, Math.min(24 * 3600, Number(seconds || 60)));
+      gpuUsage.rangeSeconds = safeSeconds;
+      const query = new URLSearchParams();
+      query.set("seconds", String(safeSeconds));
+      const res = await fetch(`/api/admin/gpu-usage?${query.toString()}`, { headers: _authHeaders() });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "读取GPU使用率失败");
+      }
+      gpuUsage.series = Array.isArray(payload.series) ? payload.series : [];
+    } catch (error) {
+      gpuUsage.error = error.message;
+    } finally {
+      gpuUsage.loading = false;
     }
   };
 
@@ -699,6 +788,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     adminPassword,
     auth,
     overview,
+    gpuUsage,
     passwordForm,
     proxyConfig,
     formConstraints,
@@ -710,6 +800,9 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     loginAdmin,
     logoutAdmin,
     fetchOverview,
+    setMaintenanceMode,
+    cancelTaskById,
+    fetchGpuUsage,
     fetchRealIpConfig,
     updateRealIpConfig,
     changeAdminPassword,

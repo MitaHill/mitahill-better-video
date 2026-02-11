@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 
 from app.src.Config import settings as config
 from app.src.Database import admin as db_admin
+from app.src.Database import gpu_metrics as db_gpu
 
 from ..services.admin_auth import (
     change_password,
@@ -148,3 +149,44 @@ def admin_update_form_constraints():
     except Exception as exc:
         return jsonify({"error": f"failed to update form constraints: {exc}"}), 400
     return jsonify({"ok": True, "config": updated})
+
+
+@bp.post("/api/admin/tasks/<task_id>/cancel")
+def admin_cancel_task(task_id: str):
+    _session, err = get_admin_session(request)
+    if err:
+        return jsonify({"error": err}), 401
+    payload = request.get_json(silent=True) or {}
+    reason = str(payload.get("reason") or "已取消（管理员操作）").strip() or "已取消（管理员操作）"
+    try:
+        task = db_admin.cancel_task(task_id, reason=reason)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, "task": task})
+
+
+@bp.put("/api/admin/maintenance-mode")
+def admin_update_maintenance_mode():
+    _session, err = get_admin_session(request)
+    if err:
+        return jsonify({"error": err}), 401
+    payload = request.get_json(silent=True) or {}
+    raw = payload.get("enabled", False)
+    if isinstance(raw, bool):
+        enabled = raw
+    else:
+        enabled = str(raw).strip().lower() in {"1", "true", "yes", "on", "enabled"}
+    db_admin.update_worker_maintenance_mode(enabled)
+    return jsonify({"ok": True, "enabled": enabled})
+
+
+@bp.get("/api/admin/gpu-usage")
+def admin_get_gpu_usage():
+    _session, err = get_admin_session(request)
+    if err:
+        return jsonify({"error": err}), 401
+    seconds = request.args.get("seconds", type=int) or 60
+    payload = db_gpu.list_gpu_usage_series(seconds=seconds)
+    return jsonify(payload)

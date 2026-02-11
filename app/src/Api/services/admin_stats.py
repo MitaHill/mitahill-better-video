@@ -5,6 +5,7 @@ def build_overview(limit=200, offset=0, status=""):
     counts = db_admin.get_task_counts()
     tasks = db_admin.list_tasks(limit=limit, offset=offset, status=status)
     ip_stats = db_admin.get_ip_access_stats(limit=200)
+    maintenance_mode = db_admin.get_worker_maintenance_mode(default=False)
     return {
         "counts": {
             "total": counts.get("TOTAL", 0),
@@ -15,4 +16,5 @@ def build_overview(limit=200, offset=0, status=""):
         },
         "tasks": tasks,
         "ip_stats": ip_stats,
+        "maintenance_mode": maintenance_mode,
     }

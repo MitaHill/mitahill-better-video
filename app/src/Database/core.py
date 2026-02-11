@@ -105,6 +105,27 @@ def init_db():
         )
         c.execute("CREATE INDEX IF NOT EXISTS idx_model_download_jobs_status ON model_download_jobs(status)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_model_download_jobs_created ON model_download_jobs(created_at)")
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS task_control
+               (task_id TEXT PRIMARY KEY,
+                cancel_requested INTEGER DEFAULT 0,
+                cancel_reason TEXT,
+                updated_at DATETIME)"""
+        )
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS gpu_usage_samples
+               (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                collected_at DATETIME,
+                gpu_index INTEGER,
+                gpu_name TEXT,
+                utilization_gpu REAL,
+                utilization_mem REAL,
+                memory_used_mb REAL,
+                memory_total_mb REAL,
+                temperature_c REAL)"""
+        )
+        c.execute("CREATE INDEX IF NOT EXISTS idx_gpu_usage_samples_collected ON gpu_usage_samples(collected_at)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_gpu_usage_samples_gpu ON gpu_usage_samples(gpu_index)")
         conn.commit()
         conn.close()
         logger.debug("Database initialized successfully.")
@@ -123,6 +144,7 @@ def create_task(task_id, client_ip, task_params, video_info, task_category=None)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
               (task_id, datetime.datetime.now(), datetime.datetime.now(), client_ip, category, "PENDING", 
                json.dumps(task_params), json.dumps(video_info), 0, "Waiting to start", None))
+    c.execute("DELETE FROM task_control WHERE task_id = ?", (task_id,))
     conn.commit()
     conn.close()
     logger.debug(f"Task {task_id} inserted into queue.")
@@ -140,6 +162,19 @@ def update_task_status(task_id, status, progress=None, message=None):
     logger.debug(f"Updating Task {task_id}: {status} ({progress}%) - {message}")
     conn = get_connection()
     c = conn.cursor()
+    c.execute(
+        "SELECT cancel_requested, COALESCE(cancel_reason, '') FROM task_control WHERE task_id = ?",
+        (task_id,),
+    )
+    ctrl = c.fetchone()
+    cancel_requested = bool(ctrl[0]) if ctrl else False
+    cancel_reason = str(ctrl[1]).strip() if ctrl else ""
+    normalized_status = str(status or "").strip().upper()
+    if cancel_requested:
+        if normalized_status != "FAILED":
+            status = "FAILED"
+        message = cancel_reason or "已取消（管理员操作）"
+        progress = None
     updates = ["status = ?", "updated_at = ?"]
     params = [status, datetime.datetime.now()]
     if progress is not None:
@@ -158,6 +193,11 @@ def update_task_status(task_id, status, progress=None, message=None):
 def update_task_result(task_id, result_path):
     conn = get_connection()
     c = conn.cursor()
+    c.execute("SELECT cancel_requested FROM task_control WHERE task_id = ?", (task_id,))
+    row = c.fetchone()
+    if row and int(row[0] or 0) == 1:
+        conn.close()
+        return
     c.execute(
         "UPDATE task_queue SET result_path = ?, updated_at = ? WHERE task_id = ?",
         (str(result_path), datetime.datetime.now(), task_id),
@@ -180,6 +220,7 @@ def delete_task(task_id):
     c.execute("DELETE FROM task_queue WHERE task_id = ?", (task_id,))
     c.execute("DELETE FROM task_progress WHERE task_id = ?", (task_id,))
     c.execute("DELETE FROM segment_progress WHERE task_id = ?", (task_id,))
+    c.execute("DELETE FROM task_control WHERE task_id = ?", (task_id,))
     conn.commit()
     conn.close()
     
@@ -364,3 +405,37 @@ def get_unfinished_tasks():
     rows = c.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+def request_task_cancel(task_id, reason="已取消（管理员操作）"):
+    safe_reason = str(reason or "已取消（管理员操作）").strip() or "已取消（管理员操作）"
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        """INSERT INTO task_control (task_id, cancel_requested, cancel_reason, updated_at)
+           VALUES (?, 1, ?, ?)
+           ON CONFLICT(task_id) DO UPDATE SET
+             cancel_requested = excluded.cancel_requested,
+             cancel_reason = excluded.cancel_reason,
+             updated_at = excluded.updated_at""",
+        (task_id, safe_reason, datetime.datetime.now()),
+    )
+    conn.commit()
+    conn.close()
+
+
+def clear_task_cancel_request(task_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM task_control WHERE task_id = ?", (task_id,))
+    conn.commit()
+    conn.close()
+
+
+def is_task_cancel_requested(task_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT cancel_requested FROM task_control WHERE task_id = ?", (task_id,))
+    row = c.fetchone()
+    conn.close()
+    return bool(row and int(row[0] or 0) == 1)

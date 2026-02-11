@@ -8,6 +8,7 @@ import sqlite3
 import torch
 
 from app.src.Database import core as db
+from app.src.Database import admin as db_admin
 from app.src.Config import settings as config
 from app.src.Worker.pipelines.dispatch import process_task
 
@@ -62,6 +63,10 @@ def worker_loop():
                 db.mark_stuck_tasks(config.TASK_TIMEOUT_SECONDS)
             except Exception as e:
                 logger.error(f"Background cleanup failed: {e}")
+
+            if db_admin.get_worker_maintenance_mode(default=False):
+                time.sleep(1)
+                continue
 
             # Atomic pick and mark
             task = db.get_next_task_atomic()

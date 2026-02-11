@@ -18,6 +18,7 @@
       <table class="admin-table">
         <thead>
           <tr>
+            <th>操作</th>
             <th>任务ID</th>
             <th>类别</th>
             <th>状态</th>
@@ -30,6 +31,17 @@
         </thead>
         <tbody>
           <tr v-for="task in tasks" :key="task.task_id">
+            <td>
+              <button
+                v-if="canCancel(task.status)"
+                type="button"
+                :disabled="loading || taskActionLoading(task.task_id)"
+                @click="onCancelTask(task.task_id)"
+              >
+                {{ taskActionLoading(task.task_id) ? "取消中..." : "取消" }}
+              </button>
+              <span v-else>-</span>
+            </td>
             <td class="mono">{{ task.task_id }}</td>
             <td>{{ task.task_category || "-" }}</td>
             <td>{{ statusText(task.status) }}</td>
@@ -40,7 +52,7 @@
             <td>{{ task.message || "-" }}</td>
           </tr>
           <tr v-if="!tasks.length">
-            <td colspan="8" class="notice">暂无任务记录</td>
+            <td colspan="9" class="notice">暂无任务记录</td>
           </tr>
         </tbody>
       </table>
@@ -74,6 +86,14 @@ defineProps({
     type: Function,
     required: true,
   },
+  onCancelTask: {
+    type: Function,
+    required: true,
+  },
+  taskActionLoading: {
+    type: Function,
+    default: () => false,
+  },
 });
 
 const emit = defineEmits(["update:statusFilter"]);
@@ -90,5 +110,10 @@ const statusText = (status) => {
     FAILED: "失败",
   };
   return map[status] || status || "-";
+};
+
+const canCancel = (status) => {
+  const raw = String(status || "").toUpperCase();
+  return raw === "PENDING" || raw === "PROCESSING";
 };
 </script>

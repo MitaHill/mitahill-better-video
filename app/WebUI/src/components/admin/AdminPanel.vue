@@ -36,10 +36,43 @@
 
         <div class="admin-content">
           <div v-if="activeMenuKey === 'overview'" class="panel admin-card">
-            <h2>任务总览</h2>
+            <div class="status-row admin-head-row">
+              <h2>任务总览</h2>
+              <div class="status-row" style="gap: 8px;">
+                <button
+                  type="button"
+                  :disabled="overview.updatingMaintenanceMode"
+                  @click="toggleMaintenanceMode"
+                >
+                  {{
+                    overview.updatingMaintenanceMode
+                      ? "切换中..."
+                      : overview.maintenanceMode
+                        ? "退出维护模式"
+                        : "进入维护模式"
+                  }}
+                </button>
+                <button class="secondary" type="button" :disabled="overview.loading" @click="fetchOverview">
+                  {{ overview.loading ? "刷新中..." : "刷新" }}
+                </button>
+              </div>
+            </div>
             <AdminOverviewCards :counts="overview.counts" />
+            <p class="notice" style="margin-top: 10px;">
+              维护模式：{{ overview.maintenanceMode ? "已开启（暂停拉取新任务）" : "关闭" }}
+            </p>
             <p class="notice" style="margin-top: 10px;">当前请求识别IP：{{ proxyConfig.resolvedClientIp || '-' }}</p>
           </div>
+
+          <AdminGpuUsageChart
+            v-if="activeMenuKey === 'overview'"
+            :series="gpuUsage.series"
+            :loading="gpuUsage.loading"
+            :error="gpuUsage.error"
+            :range-seconds="gpuUsage.rangeSeconds"
+            :on-range-change="onGpuRangeChange"
+            :on-refresh="onGpuRefresh"
+          />
 
           <AdminTaskTable
             v-if="activeMenuKey === 'tasks'"
@@ -48,6 +81,8 @@
             :loading="overview.loading"
             :error="overview.error"
             :on-refresh="fetchOverview"
+            :on-cancel-task="onTaskCancel"
+            :task-action-loading="taskActionLoading"
             @update:status-filter="onStatusFilterChange"
           />
 
@@ -185,6 +220,7 @@ import { useWorkbenchAdmin } from "../../composables/workbench/useWorkbenchAdmin
 import { parseJsonSafe } from "../../composables/workbench/utils";
 import AdminConstraintEditor from "./AdminConstraintEditor.vue";
 import AdminDebugToolsPanel from "./AdminDebugToolsPanel.vue";
+import AdminGpuUsageChart from "./AdminGpuUsageChart.vue";
 import AdminIpTable from "./AdminIpTable.vue";
 import AdminLoginCard from "./AdminLoginCard.vue";
 import AdminLogsPanel from "./AdminLogsPanel.vue";
@@ -208,6 +244,7 @@ const {
   adminPassword,
   auth,
   overview,
+  gpuUsage,
   passwordForm,
   proxyConfig,
   formConstraints,
@@ -219,6 +256,9 @@ const {
   loginAdmin,
   logoutAdmin,
   fetchOverview,
+  setMaintenanceMode,
+  cancelTaskById,
+  fetchGpuUsage,
   fetchRealIpConfig,
   updateRealIpConfig,
   changeAdminPassword,
@@ -369,6 +409,7 @@ const stopTimer = () => {
 const needOverviewRefresh = () => ["overview", "tasks", "ips"].includes(activeMenuKey.value);
 const needModelDownloadRefresh = () => activeMenuKey.value === "transcribe_cfg_catalog";
 const needLogsRefresh = () => activeMenuKey.value === "logs_warn";
+const needGpuUsageRefresh = () => activeMenuKey.value === "overview";
 
 const startTimer = () => {
   stopTimer();
@@ -376,6 +417,9 @@ const startTimer = () => {
   timer = setInterval(() => {
     if (needOverviewRefresh()) {
       fetchOverview();
+    }
+    if (needGpuUsageRefresh()) {
+      fetchGpuUsage(gpuUsage.rangeSeconds || 60);
     }
     if (needModelDownloadRefresh()) {
       fetchModelDownloadJobs();
@@ -405,6 +449,24 @@ const onProxyInput = (value) => {
 const onStatusFilterChange = (value) => {
   overview.statusFilter = value;
   fetchOverview();
+};
+
+const onTaskCancel = async (taskId) => {
+  await cancelTaskById(taskId);
+};
+
+const taskActionLoading = (taskId) => Boolean(overview.taskActionLoading[String(taskId || "")]);
+
+const toggleMaintenanceMode = async () => {
+  await setMaintenanceMode(!overview.maintenanceMode);
+};
+
+const onGpuRangeChange = async (seconds) => {
+  await fetchGpuUsage(seconds);
+};
+
+const onGpuRefresh = async () => {
+  await fetchGpuUsage(gpuUsage.rangeSeconds || 60);
 };
 
 const toggleSidebar = () => {
@@ -491,6 +553,9 @@ const loadByMenuKey = async (value) => {
   }
   if (needOverviewRefresh()) {
     await fetchOverview();
+    if (value === "overview") {
+      await fetchGpuUsage(gpuUsage.rangeSeconds || 60);
+    }
   }
 };
 

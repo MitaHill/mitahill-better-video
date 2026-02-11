@@ -168,6 +168,39 @@ Response includes:
 - `tasks` (task_id, category, status, progress, client_ip...)
 - `ip_stats` (IPv4/IPv6 with scope classification)
 - `real_ip_config` (trusted proxy config and resolved request IP)
+- `maintenance_mode` (bool, 是否维护模式)
+
+### POST /api/admin/tasks/<task_id>/cancel
+Header:
+- `Authorization: Bearer <token>`
+
+按任务ID取消任务。
+- `PENDING`/`PROCESSING`：置为 `FAILED`，消息为“已取消（管理员操作）”
+- `COMPLETED`/`FAILED`：返回当前任务状态（幂等）
+
+### PUT /api/admin/maintenance-mode
+Header:
+- `Authorization: Bearer <token>`
+
+Request:
+```json
+{ "enabled": true }
+```
+
+说明：
+- `enabled=true`：进入维护模式，Worker 暂停拉取新任务（已有运行任务不会被强杀）
+- `enabled=false`：退出维护模式，恢复任务拉取
+
+### GET /api/admin/gpu-usage
+Header:
+- `Authorization: Bearer <token>`
+
+Query:
+- `seconds` (optional, 默认 60，范围 10~86400)
+
+说明：
+- 服务端每 1 秒通过 `nvidia-smi` 采样并写入数据库
+- 此接口返回所选时间窗口内的按GPU分组序列，用于管理页折线图展示
 
 ### GET /api/admin/config/real-ip
 Header:

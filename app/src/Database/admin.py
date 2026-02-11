@@ -9,10 +9,12 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from app.src.Utils.client_ip import describe_ip
 
 from .core import get_connection
+from . import core as db_core
 
 
 _SETTINGS_ADMIN_PASSWORD_HASH = "admin_password_hash"
 _SETTINGS_REAL_IP_TRUSTED_PROXIES = "real_ip_trusted_proxies"
+_SETTINGS_WORKER_MAINTENANCE_MODE = "worker_maintenance_mode"
 
 
 def _now():
@@ -79,6 +81,18 @@ def get_real_ip_trusted_proxies(default_value: str = "") -> str:
 
 def update_real_ip_trusted_proxies(value: str):
     set_setting(_SETTINGS_REAL_IP_TRUSTED_PROXIES, (value or "").strip())
+
+
+def get_worker_maintenance_mode(default: bool = False) -> bool:
+    raw = get_setting(_SETTINGS_WORKER_MAINTENANCE_MODE)
+    if raw is None:
+        return bool(default)
+    value = str(raw).strip().lower()
+    return value in {"1", "true", "yes", "on", "enabled"}
+
+
+def update_worker_maintenance_mode(enabled: bool):
+    set_setting(_SETTINGS_WORKER_MAINTENANCE_MODE, "1" if bool(enabled) else "0")
 
 
 def _hash_token(token: str) -> str:
@@ -223,3 +237,22 @@ def get_ip_access_stats(limit: int = 200) -> List[Dict]:
     for row in rows:
         row["ip_info"] = describe_ip(row.get("client_ip") or "")
     return rows
+
+
+def cancel_task(task_id: str, reason: str = "已取消（管理员操作）") -> Dict:
+    safe_task_id = str(task_id or "").strip()
+    if not safe_task_id:
+        raise ValueError("task_id is required")
+
+    task = db_core.get_task(safe_task_id)
+    if not task:
+        raise ValueError("task not found")
+
+    status = str(task.get("status") or "").upper()
+    if status in {"COMPLETED", "FAILED"}:
+        return task
+
+    db_core.request_task_cancel(safe_task_id, reason=reason)
+    db_core.update_task_status(safe_task_id, "FAILED", progress=task.get("progress") or 0, message=reason)
+    latest = db_core.get_task(safe_task_id)
+    return latest or task

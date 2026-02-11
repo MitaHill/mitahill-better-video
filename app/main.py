@@ -11,6 +11,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.src.Config.logging_setup import configure_logging
+from app.src.Services.gpu_sampler_service import GpuSamplerService
 from app.src.Services.worker_service import WorkerService
 from flask_socketio import SocketIO, join_room
 from app.src.Api.services.form_constraints import ensure_form_constraints_config
@@ -21,6 +22,10 @@ logger = logging.getLogger("MAIN")
 
 def _build_worker_service():
     return WorkerService()
+
+
+def _build_gpu_sampler_service():
+    return GpuSamplerService(interval_sec=1.0, retention_hours=24)
 
 
 def main():
@@ -40,9 +45,13 @@ def main():
     worker_service = _build_worker_service()
     worker_service.start()
     logger.info("Worker status: %s", worker_service.status())
+    gpu_sampler_service = _build_gpu_sampler_service()
+    gpu_sampler_service.start()
+    logger.info("GPU sampler status: %s", gpu_sampler_service.status())
 
     def shutdown_handler(*_args):
         logger.info("Shutting down services...")
+        gpu_sampler_service.stop()
         worker_service.stop()
         sys.exit(0)
 

@@ -718,7 +718,8 @@ button:hover {
   scrollbar-gutter: stable both-edges;
   border: 1px solid var(--border);
   box-sizing: border-box;
-  padding-right: 12px;
+  padding-right: 16px;
+  padding-bottom: 2px;
 }
 
 .admin-table {
@@ -726,7 +727,7 @@ button:hover {
   min-width: 100%;
   border-collapse: collapse;
   table-layout: auto;
-  margin-right: 8px;
+  margin-right: 12px;
 }
 
 .admin-table td.mono {
@@ -747,7 +748,7 @@ button:hover {
 
 .admin-table th:last-child,
 .admin-table td:last-child {
-  padding-right: 18px;
+  padding-right: 20px;
 }
 
 .admin-table th {
@@ -758,6 +759,61 @@ button:hover {
 .mono {
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
+}
+
+.admin-gpu-chart-wrap {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  position: relative;
+  min-height: 300px;
+}
+
+.admin-gpu-chart {
+  display: block;
+  width: 100%;
+  height: 280px;
+}
+
+.admin-gpu-grid-line {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.admin-gpu-series-line {
+  fill: none;
+  stroke-width: 2;
+}
+
+.admin-gpu-y-labels {
+  position: absolute;
+  left: 6px;
+  top: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.admin-gpu-legend {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.admin-gpu-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-gpu-legend-dot {
+  width: 10px;
+  height: 10px;
 }
 
 @media (max-width: 900px) {
