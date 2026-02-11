@@ -38,6 +38,17 @@ _LANGUAGE_NAME_MAP = {
 }
 
 
+def _line_to_text(line) -> str:
+    if line is None:
+        return ""
+    if isinstance(line, bytes):
+        try:
+            return line.decode("utf-8", errors="ignore").strip()
+        except Exception:
+            return ""
+    return str(line).strip()
+
+
 class BaseTranslator:
     label = "base"
 
@@ -198,7 +209,7 @@ class OllamaTranslator(BaseTranslator):
             for line in response.iter_lines(decode_unicode=True):
                 if not line:
                     continue
-                safe_line = str(line).strip()
+                safe_line = _line_to_text(line)
                 if not safe_line:
                     continue
                 try:
@@ -212,6 +223,8 @@ class OllamaTranslator(BaseTranslator):
                         stream_callback(delta)
                 if packet.get("done") is True:
                     break
+        if not raw_parts:
+            raise RuntimeError("ollama stream returned no content")
         return "".join(raw_parts).strip()
 
     def _translate_non_stream(self, endpoint: str, payload: dict, stream_callback=None) -> str:
@@ -271,7 +284,7 @@ class OpenAICompatibleTranslator(BaseTranslator):
             for line in response.iter_lines(decode_unicode=True):
                 if not line:
                     continue
-                safe_line = str(line).strip()
+                safe_line = _line_to_text(line)
                 if not safe_line.startswith("data:"):
                     continue
                 data_text = safe_line[5:].strip()
@@ -290,6 +303,8 @@ class OpenAICompatibleTranslator(BaseTranslator):
                     raw_parts.append(piece)
                     if stream_callback:
                         stream_callback(piece)
+        if not raw_parts:
+            raise RuntimeError("openai stream returned no content")
         return "".join(raw_parts).strip()
 
     def _translate_non_stream(self, endpoint: str, headers: dict, payload: dict, stream_callback=None) -> str:
