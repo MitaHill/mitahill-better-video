@@ -1,5 +1,5 @@
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 from .model_checks import (
     resolve_model_entry,
@@ -50,24 +50,28 @@ def _append_cross_backend_hint(message: str, backend: str, model_id: str) -> str
     return f"{message}{hint}。请切换后端或下载当前后端对应模型。"
 
 
-def run_transcription_model_test(mode: str = "full") -> Dict:
+def run_transcription_model_test(
+    mode: str = "full",
+    backend: Optional[str] = None,
+    model_id: Optional[str] = None,
+) -> Dict:
     safe_mode = str(mode or "full").strip().lower()
     if safe_mode not in {"full", "hash", "warmup"}:
         safe_mode = "full"
 
     current = get_transcription_config()
     transcription = current.get("transcription") or {}
-    backend = str(transcription.get("backend") or "whisper").strip().lower()
-    model_id = str(transcription.get("active_model") or "medium").strip().lower()
+    chosen_backend = str(backend or transcription.get("backend") or "whisper").strip().lower()
+    chosen_model_id = str(model_id or transcription.get("active_model") or "medium").strip().lower()
 
     result = {
         "ok": False,
-        "backend": backend,
-        "model_id": model_id,
+        "backend": chosen_backend,
+        "model_id": chosen_model_id,
         "mode": safe_mode,
         "steps": [],
     }
-    installed_variants = get_installed_variants(model_id)
+    installed_variants = get_installed_variants(chosen_model_id)
 
     result["steps"].append(
         {
@@ -77,7 +81,7 @@ def run_transcription_model_test(mode: str = "full") -> Dict:
                 {
                     "name": "target",
                     "status": "passed",
-                    "message": f"当前测试目标: {backend}/{model_id}",
+                    "message": f"当前测试目标: {chosen_backend}/{chosen_model_id}",
                 },
                 {
                     "name": "installed_variants",
@@ -97,7 +101,7 @@ def run_transcription_model_test(mode: str = "full") -> Dict:
         }
     )
 
-    if not model_is_supported_by_backend(backend, model_id):
+    if not model_is_supported_by_backend(chosen_backend, chosen_model_id):
         result["steps"].append(
             {
                 "name": "hash",
@@ -106,17 +110,17 @@ def run_transcription_model_test(mode: str = "full") -> Dict:
                     {
                         "name": "hash",
                         "status": "failed",
-                        "message": _build_backend_mismatch_error(backend, model_id),
+                        "message": _build_backend_mismatch_error(chosen_backend, chosen_model_id),
                     }
                 ],
             }
         )
-        result["error"] = _build_backend_mismatch_error(backend, model_id)
-        logger.error("Model/backend mismatch: %s/%s", backend, model_id)
+        result["error"] = _build_backend_mismatch_error(chosen_backend, chosen_model_id)
+        logger.error("Model/backend mismatch: %s/%s", chosen_backend, chosen_model_id)
         return result
 
     try:
-        model_entry = resolve_model_entry(backend, model_id)
+        model_entry = resolve_model_entry(chosen_backend, chosen_model_id)
     except Exception as exc:
         logger.error("Model resolve failed: %s", exc)
         result["error"] = str(exc)
@@ -125,8 +129,12 @@ def run_transcription_model_test(mode: str = "full") -> Dict:
     hash_res = verify_model_hashes(model_entry)
     result["steps"].append({"name": "hash", **hash_res})
     if not hash_res.get("ok"):
-        result["error"] = _append_cross_backend_hint(_pick_hash_error_message(hash_res), backend, model_id)
-        logger.error("Model hash validation failed: %s/%s (%s)", backend, model_id, result["error"])
+        result["error"] = _append_cross_backend_hint(
+            _pick_hash_error_message(hash_res),
+            chosen_backend,
+            chosen_model_id,
+        )
+        logger.error("Model hash validation failed: %s/%s (%s)", chosen_backend, chosen_model_id, result["error"])
         return result
 
     if safe_mode == "hash":

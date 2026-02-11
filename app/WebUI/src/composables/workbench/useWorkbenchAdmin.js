@@ -587,14 +587,19 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     }
   };
 
-  const _requestTranscriptionModelTest = async (mode) => {
+  const _requestTranscriptionModelTest = async (mode, target = null) => {
+    const payloadBody = { mode };
+    if (target && target.backend && target.modelId) {
+      payloadBody.backend = String(target.backend || "").trim().toLowerCase();
+      payloadBody.model_id = String(target.modelId || "").trim().toLowerCase();
+    }
     const res = await fetch("/api/admin/debug/test-transcription-model", {
       method: "POST",
       headers: {
         ..._authHeaders(),
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ mode }),
+      body: JSON.stringify(payloadBody),
     });
     const payload = await parseJsonSafe(res);
     if (!res.ok) {
@@ -606,7 +611,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     };
   };
 
-  const testTranscriptionModel = async () => {
+  const testTranscriptionModel = async (target = null) => {
     if (!auth.token) return;
     debugTools.loadingModelTest = true;
     debugTools.modelTestError = "";
@@ -614,9 +619,13 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     debugTools.modelTestSteps = _createModelTestSteps();
 
     try {
+      const targetLabel =
+        target && target.backend && target.modelId
+          ? `${String(target.backend).toLowerCase()}/${String(target.modelId).toLowerCase()}`
+          : "管理配置中的当前目标";
+      _updateModelTestStep("resolve", { status: "running", message: `正在解析测试目标：${targetLabel}` });
       _updateModelTestStep("hash", { status: "running", message: "正在校验模型 HASH..." });
-      _updateModelTestStep("resolve", { status: "running", message: "正在解析当前测试目标..." });
-      const hashRes = await _requestTranscriptionModelTest("hash");
+      const hashRes = await _requestTranscriptionModelTest("hash", target);
       _applyModelTestPayload(hashRes.payload);
       debugTools.modelTestResult = hashRes.payload;
       if (!hashRes.ok || !hashRes.payload.ok) {
@@ -625,7 +634,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       }
 
       _updateModelTestStep("warmup", { status: "running", message: "正在进行 GPU 热身识别..." });
-      const warmupRes = await _requestTranscriptionModelTest("warmup");
+      const warmupRes = await _requestTranscriptionModelTest("warmup", target);
       _applyModelTestPayload(warmupRes.payload);
       debugTools.modelTestResult = warmupRes.payload;
       if (!warmupRes.ok || !warmupRes.payload.ok) {

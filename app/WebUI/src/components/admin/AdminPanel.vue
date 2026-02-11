@@ -147,6 +147,8 @@
             :model-error="debugTools.modelTestError"
             :model-result="debugTools.modelTestResult"
             :model-steps="debugTools.modelTestSteps"
+            :transcription-models="transcriptionModels.items"
+            :transcription-config="transcriptionConfig.data || {}"
             :loading-translation="debugTools.loadingTranslationTest"
             :translation-error="debugTools.translationTestError"
             :translation-result="debugTools.translationTestResult"
@@ -454,6 +456,11 @@ const loadByMenuKey = async (value) => {
   }
   if (value === "transcribe_cfg_catalog") {
     await refreshTranscriptionCatalog();
+    return;
+  }
+  if (value === "debug_model") {
+    await fetchTranscriptionConfig();
+    await fetchTranscriptionModels();
     return;
   }
   if (value === "logs_warn") {

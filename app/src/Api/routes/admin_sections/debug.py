@@ -13,7 +13,9 @@ def admin_test_transcription_model():
         return jsonify({"error": err}), 401
     payload = request.get_json(silent=True) or {}
     mode = payload.get("mode")
-    result = run_transcription_model_test(mode=mode)
+    backend = payload.get("backend")
+    model_id = payload.get("model_id")
+    result = run_transcription_model_test(mode=mode, backend=backend, model_id=model_id)
     status_code = 200 if result.get("ok") else 400
     return jsonify(result), status_code
 

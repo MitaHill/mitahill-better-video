@@ -302,10 +302,15 @@ Header:
 
 Request (optional):
 ```json
-{ "mode": "hash" }
+{
+  "mode": "hash",
+  "backend": "faster_whisper",
+  "model_id": "large-v3"
+}
 ```
 - `mode=hash`：执行到 HASH 校验即返回
 - `mode=warmup` / `mode=full`：执行完整链路
+- 不传 `backend/model_id` 时，使用管理页当前配置中的目标模型
 
 ### POST /api/admin/debug/test-translation-provider
 Header:
