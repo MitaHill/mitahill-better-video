@@ -1,5 +1,5 @@
 import logging
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import requests
 
@@ -7,11 +7,19 @@ import requests
 logger = logging.getLogger("TRANSCRIBE_TRANSLATION")
 
 
-def translate_segments(segments, translator, target_language, progress_callback: Optional[Callable[[int, int], None]] = None):
+def translate_segments(
+    segments,
+    translator,
+    target_language,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+    cached_text_map: Optional[Dict[int, str]] = None,
+    checkpoint_callback: Optional[Callable[[int, str, str, str, str], None]] = None,
+):
     payload = segments or []
     if not translator:
         return list(payload)
 
+    cache = cached_text_map or {}
     translated: List[dict] = []
     total = len(payload)
     timeout_circuit_open = False
@@ -19,22 +27,34 @@ def translate_segments(segments, translator, target_language, progress_callback:
         current = dict(segment or {})
         text = " ".join(str(current.get("text", "")).split())
 
+        if idx in cache:
+            current["text"] = " ".join(str(cache.get(idx) or "").split())
+            translated.append(current)
+            if progress_callback:
+                progress_callback(idx, total)
+            continue
+
         if not text:
             current["text"] = text
             translated.append(current)
+            if checkpoint_callback:
+                checkpoint_callback(idx, text, text, "skipped", "empty segment")
             if progress_callback:
                 progress_callback(idx, total)
             continue
 
         if timeout_circuit_open:
-            current["text"] = translator.fallback_text(text)
+            fallback = translator.fallback_text(text)
+            current["text"] = fallback
             translated.append(current)
+            if checkpoint_callback:
+                checkpoint_callback(idx, text, fallback, "fallback", "timeout circuit open")
             if progress_callback:
                 progress_callback(idx, total)
             continue
 
         try:
-            current["text"] = translator.translate_text(text, target_language)
+            translated_text = translator.translate_text(text, target_language)
         except requests.exceptions.ReadTimeout as exc:
             timeout_circuit_open = True
             logger.warning(
@@ -43,7 +63,10 @@ def translate_segments(segments, translator, target_language, progress_callback:
                 total,
                 exc,
             )
-            current["text"] = translator.fallback_text(text)
+            fallback = translator.fallback_text(text)
+            current["text"] = fallback
+            if checkpoint_callback:
+                checkpoint_callback(idx, text, fallback, "fallback", str(exc))
         except Exception as exc:
             logger.warning(
                 "Translation failed at segment %s/%s, use fallback text: %s",
@@ -51,9 +74,14 @@ def translate_segments(segments, translator, target_language, progress_callback:
                 total,
                 exc,
             )
-            current["text"] = translator.fallback_text(text)
+            fallback = translator.fallback_text(text)
+            current["text"] = fallback
+            if checkpoint_callback:
+                checkpoint_callback(idx, text, fallback, "fallback", str(exc))
         else:
-            current["text"] = " ".join(str(current.get("text", "")).split())
+            current["text"] = " ".join(str(translated_text or "").split())
+            if checkpoint_callback:
+                checkpoint_callback(idx, text, current["text"], "translated", "")
         translated.append(current)
         if progress_callback:
             progress_callback(idx, total)

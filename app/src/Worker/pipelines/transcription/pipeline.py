@@ -5,7 +5,19 @@ import traceback
 
 from app.src.Database import core as db
 from app.src.Notifications.events import send_event
+from app.src.Utils.http import ffprobe_info
 
+from .checkpoints import (
+    build_asr_signature,
+    build_media_signature,
+    build_translation_signature,
+    load_cached_source_segments,
+    load_cached_translation_map,
+    mark_media_completed,
+    save_source_segments,
+    save_translated_segments,
+    save_translation_segment,
+)
 from .io_ops import (
     extract_transcribe_audio,
     render_subtitled_video,
@@ -57,6 +69,9 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
     text_dir = output_root / "texts"
     json_dir = output_root / "json"
     video_dir = output_root / "video"
+    media_signature = build_media_signature(media_path)
+    asr_signature = build_asr_signature(options)
+    translation_signature = build_translation_signature(options)
 
     emit_progress(
         task_id,
@@ -65,32 +80,57 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
         file_index=index,
         file_count=total,
     )
-    audio_path, info, created_temp_audio = extract_transcribe_audio(media_path, run_dir)
+    info = ffprobe_info(media_path)
+    created_temp_audio = False
+    audio_path = media_path
 
     try:
-        emit_progress(
+        source_segments = load_cached_source_segments(
             task_id,
-            _build_item_progress(index, total, 0.25),
-            f"转录文件 {index}/{total}: 语音识别中",
-            file_index=index,
-            file_count=total,
+            stem,
+            media_signature=media_signature,
+            asr_signature=asr_signature,
         )
-        result = ENGINE.transcribe(
-            audio_path,
-            backend=options.get("transcription_backend", "whisper"),
-            model_name=options.get("whisper_model", "medium"),
-            language=options.get("language", "auto"),
-            temperature=options.get("temperature", 0.0),
-            beam_size=options.get("beam_size", 5),
-            best_of=options.get("best_of", 5),
-            runtime_mode=options.get("transcribe_runtime_mode", "parallel"),
-            task_id=task_id,
-        )
-        source_segments = _extract_segments(result)
-        if not source_segments:
-            raise RuntimeError(f"no transcript segments extracted from {media_item.get('filename')}")
-
-        ENGINE.after_transcription_step(runtime_mode=options.get("transcribe_runtime_mode", "parallel"))
+        if source_segments:
+            emit_progress(
+                task_id,
+                _build_item_progress(index, total, 0.25),
+                f"转录文件 {index}/{total}: 复用已保存转录结果",
+                file_index=index,
+                file_count=total,
+            )
+        else:
+            emit_progress(
+                task_id,
+                _build_item_progress(index, total, 0.25),
+                f"转录文件 {index}/{total}: 语音识别中",
+                file_index=index,
+                file_count=total,
+            )
+            audio_path, _audio_info, created_temp_audio = extract_transcribe_audio(media_path, run_dir)
+            result = ENGINE.transcribe(
+                audio_path,
+                backend=options.get("transcription_backend", "whisper"),
+                model_name=options.get("whisper_model", "medium"),
+                language=options.get("language", "auto"),
+                temperature=options.get("temperature", 0.0),
+                beam_size=options.get("beam_size", 5),
+                best_of=options.get("best_of", 5),
+                runtime_mode=options.get("transcribe_runtime_mode", "parallel"),
+                task_id=task_id,
+            )
+            source_segments = _extract_segments(result)
+            if not source_segments:
+                raise RuntimeError(f"no transcript segments extracted from {media_item.get('filename')}")
+            save_source_segments(
+                task_id,
+                stem,
+                source_path=str(media_path),
+                media_signature=media_signature,
+                asr_signature=asr_signature,
+                source_segments=source_segments,
+            )
+            ENGINE.after_transcription_step(runtime_mode=options.get("transcribe_runtime_mode", "parallel"))
 
         subtitle_ext = _subtitle_suffix(options.get("subtitle_format", "srt"))
         text_outputs = []
@@ -127,6 +167,13 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
         translated_segments = None
         translated_subtitle = None
         if translator and (options.get("translate_to") or "").strip():
+            cached_translation_map = load_cached_translation_map(
+                task_id,
+                stem,
+                source_segments,
+                media_signature=media_signature,
+                translation_signature=translation_signature,
+            )
             emit_progress(
                 task_id,
                 _build_item_progress(index, total, 0.58),
@@ -134,6 +181,17 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 file_index=index,
                 file_count=total,
             )
+            if cached_translation_map:
+                emit_progress(
+                    task_id,
+                    _build_item_progress(index, total, 0.60),
+                    (
+                        f"转录文件 {index}/{total}: 翻译断点恢复 "
+                        f"{len(cached_translation_map)}/{len(source_segments)}"
+                    ),
+                    file_index=index,
+                    file_count=total,
+                )
 
             def _translation_progress(done, total_count):
                 if total_count <= 0:
@@ -147,11 +205,31 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                     file_count=total,
                 )
 
+            def _translation_checkpoint(seg_idx, source_text, translated_text, status, message):
+                save_translation_segment(
+                    task_id,
+                    stem,
+                    seg_idx,
+                    source_text,
+                    translated_text,
+                    status=status,
+                    message=message,
+                )
+
             translated_segments = translate_segments(
                 source_segments,
                 translator,
                 options.get("translate_to", ""),
                 progress_callback=_translation_progress,
+                cached_text_map=cached_translation_map,
+                checkpoint_callback=_translation_checkpoint,
+            )
+            save_translated_segments(
+                task_id,
+                stem,
+                media_signature=media_signature,
+                translation_signature=translation_signature,
+                translated_segments=translated_segments,
             )
 
             translated_subtitle = write_subtitle_file(
@@ -217,10 +295,18 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                     "transcription_backend": options.get("transcription_backend", "whisper"),
                     "whisper_model": options.get("whisper_model", "medium"),
                     "translate_to": options.get("translate_to", ""),
+                    "resume_checkpoint_enabled": True,
                     "subtitle_format": options.get("subtitle_format", "srt"),
                     "transcribe_mode": options.get("transcribe_mode", "subtitle_zip"),
                 },
             )
+        )
+        mark_media_completed(
+            task_id,
+            stem,
+            media_signature=media_signature,
+            asr_signature=asr_signature,
+            translation_signature=translation_signature,
         )
 
         if mode == "subtitled_video":

@@ -64,9 +64,21 @@
 - Run scratch: `/workspace/storage/output/run_<task_id>/`
 - Uploads: `/workspace/storage/upload/run_<task_id>/`
 - Task categories in unified queue: `enhance` / `convert` / `transcribe`
+- DB core module directory: `app/src/Database/core/` (single-responsibility split by schema/tasks/progress/control/transcription-state)
 - Transcription model cache roots:
   - `whisper`: `/workspace/storage/models/transcription/whisper-openai`
   - `faster_whisper`: `/workspace/storage/models/transcription/faster-whisper/<model_id>`
+
+## Transcription Resume
+- Resume state is persisted per task + media item in SQLite, not in-memory.
+- Source ASR checkpoint table:
+  - `transcription_media_state`: stores media signature, ASR signature, saved source segments.
+- Translation sentence-level checkpoint table:
+  - `transcription_translation_state`: stores per-segment translated/fallback/skipped text with source hash.
+- Resume behavior:
+  - If media signature + ASR signature match, ASR stage is skipped and cached segments are reused.
+  - Translation stage resumes by segment index and source text hash, then only translates missing segments.
+  - If translation config changes (provider/model/prompt/target/timeout/fallback mode), old sentence checkpoints are invalidated for that media item.
 
 ## Admin & Real IP
 - 管理入口通过顶部菜单 `后端管理` 访问，采用密码登录，密码哈希保存在 SQLite `app_settings`。

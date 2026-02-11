@@ -68,6 +68,8 @@ def _subtitle_filter_arg(subtitle_path):
 
 
 def render_subtitled_video(video_path, subtitle_path, output_path, codec_key, audio_bitrate_k):
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     gpu_codec = "h264_nvenc"
     cpu_codec = "libx264"
     if (codec_key or "").lower() in {"h265", "hevc"}:
