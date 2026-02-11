@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  better_video:
+    image: kindmitaishere/mitahill-better-video:260110-1140
+    container_name: better_video
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+      - PYTHONUNBUFFERED=1
+    command: python3 app/main.py
+    ports:
+      - "8501:8501"
+    volumes:
+      # Mount storage root for outputs, uploads, data, logs
+      - ../../storage:/workspace/storage
+      # Mount the env file for configuration
+      - ../../config/.env:/workspace/config/.env
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
