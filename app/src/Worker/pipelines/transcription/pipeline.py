@@ -1,6 +1,7 @@
 import json
 import logging
 from pathlib import Path
+import time
 import traceback
 
 from app.src.Database import core as db
@@ -109,7 +110,43 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 file_index=index,
                 file_count=total,
             )
-            audio_path, _audio_info, created_temp_audio = extract_transcribe_audio(media_path, run_dir)
+            audio_path, audio_info, created_temp_audio = extract_transcribe_audio(media_path, run_dir)
+            media_duration = max(
+                float((info or {}).get("duration", 0.0) or 0.0),
+                float((audio_info or {}).get("duration", 0.0) or 0.0),
+            )
+            asr_state = {"last_ratio": -1.0, "last_emit_ts": 0.0}
+
+            def _asr_progress(done_sec, total_sec):
+                safe_done = max(0.0, float(done_sec or 0.0))
+                safe_total = max(
+                    float(total_sec or 0.0),
+                    media_duration,
+                    safe_done,
+                )
+                if safe_total <= 0:
+                    return
+                ratio = max(0.0, min(1.0, safe_done / safe_total))
+                now = time.time()
+                if ratio < 1.0:
+                    ratio_delta = ratio - float(asr_state["last_ratio"])
+                    elapsed = now - float(asr_state["last_emit_ts"])
+                    if ratio_delta < 0.008 and elapsed < 0.6:
+                        return
+                asr_state["last_ratio"] = ratio
+                asr_state["last_emit_ts"] = now
+                progress_percent = int(round(ratio * 100))
+                emit_progress(
+                    task_id,
+                    _build_item_progress(index, total, 0.25 + ratio * 0.18),
+                    (
+                        f"转录文件 {index}/{total}: 语音识别中 {progress_percent}% "
+                        f"({safe_done:.1f}s/{safe_total:.1f}s)"
+                    ),
+                    file_index=index,
+                    file_count=total,
+                )
+
             result = ENGINE.transcribe(
                 audio_path,
                 backend=options.get("transcription_backend", "whisper"),
@@ -120,6 +157,8 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 best_of=options.get("best_of", 5),
                 runtime_mode=options.get("transcribe_runtime_mode", "parallel"),
                 task_id=task_id,
+                progress_callback=_asr_progress,
+                expected_duration_sec=media_duration,
             )
             source_segments = _extract_segments(result)
             if not source_segments:

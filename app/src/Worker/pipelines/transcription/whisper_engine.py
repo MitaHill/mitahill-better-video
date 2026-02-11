@@ -2,7 +2,7 @@ import logging
 import threading
 import time
 from pathlib import Path
-from typing import Dict, Iterable, List
+from typing import Callable, Dict, Iterable, List, Optional
 
 import torch
 
@@ -125,19 +125,47 @@ class WhisperEngine:
             return
         self._offload_to_cpu()
 
-    def _faster_segments_to_dict(self, segments: Iterable) -> Dict:
+    @staticmethod
+    def _safe_float(value, default=0.0):
+        try:
+            return float(value)
+        except Exception:
+            return float(default)
+
+    def _faster_segments_to_dict(
+        self,
+        segments: Iterable,
+        *,
+        progress_callback: Optional[Callable[[float, float], None]] = None,
+        total_duration_sec: float = 0.0,
+    ) -> Dict:
         out_segments: List[Dict] = []
+        safe_total = max(0.0, self._safe_float(total_duration_sec, 0.0))
+        last_reported = 0.0
         for seg in segments:
             try:
+                start_sec = self._safe_float(getattr(seg, "start", 0.0), 0.0)
+                end_sec = self._safe_float(getattr(seg, "end", 0.0), 0.0)
                 out_segments.append(
                     {
-                        "start": float(getattr(seg, "start", 0.0) or 0.0),
-                        "end": float(getattr(seg, "end", 0.0) or 0.0),
+                        "start": start_sec,
+                        "end": end_sec,
                         "text": str(getattr(seg, "text", "") or "").strip(),
                     }
                 )
+                if progress_callback:
+                    done_sec = max(last_reported, end_sec)
+                    if safe_total > 0:
+                        done_sec = min(done_sec, safe_total)
+                    last_reported = done_sec
+                    progress_callback(done_sec, safe_total)
             except Exception:
                 continue
+        if progress_callback:
+            if safe_total > 0:
+                progress_callback(safe_total, safe_total)
+            else:
+                progress_callback(last_reported, last_reported)
         return {"segments": out_segments}
 
     def transcribe(
@@ -152,6 +180,8 @@ class WhisperEngine:
         best_of=5,
         runtime_mode="parallel",
         task_id="",
+        progress_callback: Optional[Callable[[float, float], None]] = None,
+        expected_duration_sec: float = 0.0,
     ):
         safe_backend = (backend or "whisper").strip().lower()
         safe_model = (model_name or "medium").strip().lower()
@@ -180,7 +210,11 @@ class WhisperEngine:
             }
             if language_value and language_value != "auto":
                 options["language"] = language_value
-            return model.transcribe(str(media_path), **options)
+            result = model.transcribe(str(media_path), **options)
+            if progress_callback:
+                safe_expected = max(0.0, self._safe_float(expected_duration_sec, 0.0))
+                progress_callback(safe_expected, safe_expected)
+            return result
 
         if safe_backend == "faster_whisper":
             options = {
@@ -190,8 +224,14 @@ class WhisperEngine:
             }
             if language_value and language_value != "auto":
                 options["language"] = language_value
-            segments, _info = model.transcribe(str(media_path), **options)
-            return self._faster_segments_to_dict(segments)
+            segments, info = model.transcribe(str(media_path), **options)
+            info_duration = self._safe_float(getattr(info, "duration", 0.0), 0.0)
+            total_duration_sec = max(info_duration, self._safe_float(expected_duration_sec, 0.0))
+            return self._faster_segments_to_dict(
+                segments,
+                progress_callback=progress_callback,
+                total_duration_sec=total_duration_sec,
+            )
 
         raise ValueError(f"unsupported transcription backend: {safe_backend}")
 
