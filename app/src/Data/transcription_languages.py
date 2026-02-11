@@ -110,6 +110,34 @@ TRANSCRIPTION_LANGUAGE_CODES = [
 
 # Target translation language options:
 # first value "" means "no translation"
-TRANSCRIPTION_TARGET_LANGUAGE_CODES = [""] + [
-    item for item in TRANSCRIPTION_LANGUAGE_CODES if item != "auto"
+# Keep target languages focused on mainstream options for better UX.
+TRANSCRIPTION_TARGET_LANGUAGE_CODES = [
+    "",
+    "zh",
+    "en",
+    "ja",
+    "ko",
+    "es",
+    "fr",
+    "de",
+    "ru",
+    "ar",
+    "pt",
+    "it",
+    "nl",
+    "pl",
+    "tr",
+    "uk",
+    "cs",
+    "sv",
+    "no",
+    "da",
+    "fi",
+    "el",
+    "he",
+    "hi",
+    "id",
+    "ms",
+    "vi",
+    "th",
 ]

@@ -106,10 +106,40 @@ export const TRANSCRIPTION_LANGUAGE_CODES = Object.freeze(
   TRANSCRIPTION_LANGUAGE_OPTIONS.map((item) => item.value)
 );
 
-export const TRANSCRIPTION_TARGET_LANGUAGE_OPTIONS = Object.freeze(
-  TRANSCRIPTION_LANGUAGE_OPTIONS.filter((item) => item.value !== "auto")
+export const TRANSCRIPTION_TARGET_LANGUAGE_CODES = Object.freeze([
+  "zh",
+  "en",
+  "ja",
+  "ko",
+  "es",
+  "fr",
+  "de",
+  "ru",
+  "ar",
+  "pt",
+  "it",
+  "nl",
+  "pl",
+  "tr",
+  "uk",
+  "cs",
+  "sv",
+  "no",
+  "da",
+  "fi",
+  "el",
+  "he",
+  "hi",
+  "id",
+  "ms",
+  "vi",
+  "th",
+]);
+
+const _languageOptionByCode = Object.freeze(
+  Object.fromEntries(TRANSCRIPTION_LANGUAGE_OPTIONS.map((item) => [item.value, item]))
 );
 
-export const TRANSCRIPTION_TARGET_LANGUAGE_CODES = Object.freeze(
-  TRANSCRIPTION_TARGET_LANGUAGE_OPTIONS.map((item) => item.value)
+export const TRANSCRIPTION_TARGET_LANGUAGE_OPTIONS = Object.freeze(
+  TRANSCRIPTION_TARGET_LANGUAGE_CODES.map((code) => _languageOptionByCode[code]).filter(Boolean)
 );
