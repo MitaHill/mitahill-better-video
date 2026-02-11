@@ -8,7 +8,7 @@ COPY app/WebUI/src ./src
 RUN npm install
 RUN npm run build
 
-FROM realesrgan-base:20260210-2330
+FROM base_better_video:20260210-2330
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
