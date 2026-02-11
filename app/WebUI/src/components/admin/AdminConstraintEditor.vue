@@ -55,6 +55,11 @@
               <template v-else-if="row.field.kind === 'number'">
                 <input :value="row.field.default_value" type="number" :disabled="loading" @input="updateNumber(row.fieldKey, 'default_value', $event.target.value)" />
               </template>
+              <template v-else-if="_usePresetSelector(row.fieldKey, row.field)">
+                <select :value="row.field.default_value" :disabled="loading" @change="updateText(row.fieldKey, 'default_value', $event.target.value)">
+                  <option v-for="item in _fieldOptionList(row.fieldKey, row.field)" :key="item" :value="item">{{ item }}</option>
+                </select>
+              </template>
               <template v-else>
                 <input :value="row.field.default_value" :disabled="loading" @input="updateText(row.fieldKey, 'default_value', $event.target.value)" />
               </template>
@@ -68,6 +73,11 @@
               </template>
               <template v-else-if="row.field.kind === 'number'">
                 <input :value="row.field.fixed_value" type="number" :disabled="loading" @input="updateNumber(row.fieldKey, 'fixed_value', $event.target.value)" />
+              </template>
+              <template v-else-if="_usePresetSelector(row.fieldKey, row.field)">
+                <select :value="row.field.fixed_value" :disabled="loading" @change="updateText(row.fieldKey, 'fixed_value', $event.target.value)">
+                  <option v-for="item in _fieldOptionList(row.fieldKey, row.field)" :key="item" :value="item">{{ item }}</option>
+                </select>
               </template>
               <template v-else>
                 <input :value="row.field.fixed_value" :disabled="loading" @input="updateText(row.fieldKey, 'fixed_value', $event.target.value)" />
@@ -87,12 +97,31 @@
             </td>
             <td>
               <template v-if="row.field.kind === 'enum' || row.field.kind === 'string'">
-                <input
-                  :value="(row.field.allowed_values || []).join(',')"
-                  :disabled="loading"
-                  placeholder="逗号分隔，例如: zh,en,ja"
-                  @input="updateAllowed(row.fieldKey, $event.target.value)"
-                />
+                <template v-if="_usePresetSelector(row.fieldKey, row.field)">
+                  <select
+                    class="constraint-multi-select"
+                    multiple
+                    :disabled="loading"
+                    @change="updateAllowedFromMultiSelect(row.fieldKey, $event.target.options)"
+                  >
+                    <option
+                      v-for="item in _fieldOptionList(row.fieldKey, row.field)"
+                      :key="item"
+                      :value="item"
+                      :selected="(row.field.allowed_values || []).includes(item)"
+                    >
+                      {{ item }}
+                    </option>
+                  </select>
+                </template>
+                <template v-else>
+                  <input
+                    :value="(row.field.allowed_values || []).join(',')"
+                    :disabled="loading"
+                    placeholder="逗号分隔，例如: zh,en,ja"
+                    @input="updateAllowed(row.fieldKey, $event.target.value)"
+                  />
+                </template>
               </template>
               <template v-else>
                 <span class="notice">-</span>
@@ -146,6 +175,10 @@ const props = defineProps({
     type: Function,
     required: true,
   },
+  fieldOptionPresets: {
+    type: Object,
+    default: () => ({}),
+  },
 });
 
 const localCategory = reactive({
@@ -190,6 +223,28 @@ const kindText = (kind) => {
 };
 
 const boolToText = (value) => (value ? "true" : "false");
+
+const _normalizeOptionList = (values) =>
+  Array.from(
+    new Set(
+      (Array.isArray(values) ? values : [])
+        .map((item) => String(item ?? "").trim())
+        .filter((item) => item.length > 0)
+    )
+  );
+
+const _fieldPresetBase = (fieldKey) => _normalizeOptionList(props.fieldOptionPresets?.[fieldKey]);
+
+const _fieldOptionList = (fieldKey, field) => {
+  const preset = _fieldPresetBase(fieldKey);
+  const sticky = _normalizeOptionList([field?.default_value, field?.fixed_value, ...(field?.allowed_values || [])]);
+  return _normalizeOptionList([...preset, ...sticky]);
+};
+
+const _usePresetSelector = (fieldKey, field) => {
+  if (!field || (field.kind !== "enum" && field.kind !== "string")) return false;
+  return _fieldPresetBase(fieldKey).length > 0;
+};
 
 const updateField = (fieldKey, updater) => {
   if (!localCategory.fields[fieldKey]) return;
@@ -238,6 +293,15 @@ const updateAllowed = (fieldKey, value) => {
   });
 };
 
+const updateAllowedFromMultiSelect = (fieldKey, htmlOptions) => {
+  updateField(fieldKey, (field) => {
+    field.allowed_values = Array.from(htmlOptions || [])
+      .filter((item) => item && item.selected)
+      .map((item) => String(item.value ?? "").trim())
+      .filter((item) => item.length > 0);
+  });
+};
+
 const save = async () => {
   await props.onSave(props.categoryKey, cloneCategory(localCategory));
 };
@@ -246,3 +310,10 @@ const resetLocal = () => {
   setLocalFromProps();
 };
 </script>
+
+<style scoped>
+.constraint-multi-select {
+  min-width: 220px;
+  min-height: 112px;
+}
+</style>

@@ -82,6 +82,7 @@
             category-key="enhance"
             category-label="视频增强"
             :category-config="categoryConstraint('enhance')"
+            :field-option-presets="{}"
             :loading="formConstraints.loading"
             :error="formConstraints.error"
             :message="formConstraints.message"
@@ -93,6 +94,7 @@
             category-key="convert"
             category-label="视频转换"
             :category-config="categoryConstraint('convert')"
+            :field-option-presets="{}"
             :loading="formConstraints.loading"
             :error="formConstraints.error"
             :message="formConstraints.message"
@@ -104,6 +106,7 @@
             category-key="transcribe"
             category-label="视频转录"
             :category-config="categoryConstraint('transcribe')"
+            :field-option-presets="transcribeConstraintFieldPresets"
             :loading="formConstraints.loading"
             :error="formConstraints.error"
             :message="formConstraints.message"
@@ -339,6 +342,22 @@ const filteredMenuGroups = computed(() => {
   return out;
 });
 
+const transcribeReadyModelOptions = computed(() =>
+  Array.from(
+    new Set(
+      (Array.isArray(transcriptionModels.items) ? transcriptionModels.items : [])
+        .filter((item) => Boolean(item?.installed))
+        .map((item) => String(item?.model_id || "").trim().toLowerCase())
+        .filter((item) => item.length > 0)
+    )
+  )
+);
+
+const transcribeConstraintFieldPresets = computed(() => ({
+  whisper_model: transcribeReadyModelOptions.value,
+  translator_provider: ["none", "ollama", "openai_compatible"],
+}));
+
 let timer = null;
 
 const stopTimer = () => {
@@ -448,6 +467,9 @@ const loadByMenuKey = async (value) => {
   }
   if (String(value).startsWith("constraints_")) {
     await fetchFormConstraintsConfig();
+    if (value === "constraints_transcribe") {
+      await fetchTranscriptionModels();
+    }
     return;
   }
   if (value === "transcribe_cfg_model" || value === "transcribe_cfg_translation") {

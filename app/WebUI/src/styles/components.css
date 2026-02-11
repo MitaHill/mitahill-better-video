@@ -717,6 +717,8 @@ button:hover {
   overflow-y: hidden;
   scrollbar-gutter: stable both-edges;
   border: 1px solid var(--border);
+  box-sizing: border-box;
+  padding-right: 12px;
 }
 
 .admin-table {
@@ -724,6 +726,7 @@ button:hover {
   min-width: 100%;
   border-collapse: collapse;
   table-layout: auto;
+  margin-right: 8px;
 }
 
 .admin-table td.mono {
@@ -740,6 +743,11 @@ button:hover {
   vertical-align: top;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.admin-table th:last-child,
+.admin-table td:last-child {
+  padding-right: 18px;
 }
 
 .admin-table th {
