@@ -15,6 +15,11 @@ _VALID_BACKENDS = {"whisper", "faster_whisper"}
 _VALID_TRANSLATORS = {"none", "ollama", "openai_compatible"}
 _VALID_TRANSLATION_FALLBACK_MODES = {"model_full_text", "source_text"}
 
+_DEFAULT_MODEL_BY_BACKEND = {
+    "whisper": "medium",
+    "faster_whisper": "large-v3",
+}
+
 
 def default_transcription_config() -> Dict[str, Any]:
     return {
@@ -98,11 +103,13 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
         compatible_from_allowed = [
             item for item in merged["transcription"]["allowed_models"] if item in backend_supported_set
         ]
-        fallback_model = (
-            compatible_from_allowed[0]
-            if compatible_from_allowed
-            else (backend_supported[0] if backend_supported else "medium")
-        )
+        preferred = _DEFAULT_MODEL_BY_BACKEND.get(backend, "medium")
+        if preferred in backend_supported_set:
+            fallback_model = preferred
+        elif compatible_from_allowed:
+            fallback_model = compatible_from_allowed[0]
+        else:
+            fallback_model = backend_supported[0] if backend_supported else "medium"
         merged["transcription"]["active_model"] = fallback_model
 
     provider = str(merged["translation"].get("provider") or "none").strip().lower()
