@@ -18,12 +18,23 @@
       </div>
     </div>
 
-    <label class="check-inline" style="margin: 8px 0 4px 0;">
-      <input v-model="local.enableThinking" :disabled="loading" type="checkbox" />
-      开启翻译模型 Thinking
-    </label>
-    <p class="notice" style="margin-top: 0;">
-      该开关当前主要对 Ollama 生效（请求中附带 <code>think=true/false</code>）；OpenAI 兼容端是否生效取决于上游实现。
+    <div class="inline-grid three" style="margin-top: 8px;">
+      <div class="field compact">
+        <label>上下文裁剪窗（轮次）</label>
+        <input v-model.number="local.contextWindowSize" :disabled="loading" type="number" min="1" max="50" />
+      </div>
+      <div class="field compact">
+        <label>单次发送滑动窗（句）</label>
+        <input v-model.number="local.batchWindowSize" :disabled="loading" type="number" min="1" max="50" />
+      </div>
+      <div class="field compact">
+        <label>单批最大字符数</label>
+        <input v-model.number="local.batchMaxChars" :disabled="loading" type="number" min="500" max="20000" />
+      </div>
+    </div>
+    <p class="notice" style="margin-top: 6px;">
+      小模型建议调小上下文裁剪窗与单次发送滑动窗（例如 2~4 / 4~8），可降低幻觉与解析失败风险。
+      上下文超窗时固定保留第一轮对话，从第二轮开始裁剪。
     </p>
 
     <div class="field compact">
@@ -161,7 +172,9 @@ const local = reactive({
   model: "",
   apiKey: "",
   timeoutSec: 120,
-  enableThinking: false,
+  contextWindowSize: 6,
+  batchWindowSize: 10,
+  batchMaxChars: 2500,
   prompt: "",
   fallbackMode: "model_full_text",
   previewTargetLanguage: "zh",
@@ -266,7 +279,9 @@ const applyFromProps = () => {
   local.model = translation.model || "";
   local.apiKey = translation.api_key || "";
   local.timeoutSec = Number(translation.timeout_sec ?? 120);
-  local.enableThinking = Boolean(translation.enable_thinking);
+  local.contextWindowSize = Number(translation.context_window_size ?? 6);
+  local.batchWindowSize = Number(translation.batch_window_size ?? 10);
+  local.batchMaxChars = Number(translation.batch_max_chars ?? 2500);
   local.prompt = translation.prompt || "";
   local.fallbackMode = translation.fallback_mode || "model_full_text";
 };
@@ -293,7 +308,9 @@ const save = async () => {
       model: String(local.model || "").trim(),
       api_key: String(local.apiKey || "").trim(),
       timeout_sec: Number(local.timeoutSec || 120),
-      enable_thinking: Boolean(local.enableThinking),
+      context_window_size: Number(local.contextWindowSize || 6),
+      batch_window_size: Number(local.batchWindowSize || 10),
+      batch_max_chars: Number(local.batchMaxChars || 2500),
       prompt: String(local.prompt || "").trim(),
       fallback_mode: String(local.fallbackMode || "model_full_text").trim().toLowerCase(),
     },

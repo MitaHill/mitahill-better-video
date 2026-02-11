@@ -102,16 +102,30 @@ def normalize_transcription_options(raw):
             or config.TRANSCRIPTION_TRANSLATOR_API_KEY
             or ""
         ).strip(),
-        "translator_enable_thinking": _to_bool(
-            options.get("translator_enable_thinking"),
-            config.TRANSCRIPTION_TRANSLATOR_ENABLE_THINKING,
-        ),
         "translator_prompt": (
             options.get("translator_prompt")
             or config.TRANSCRIPTION_TRANSLATOR_PROMPT
             or ""
         ).strip(),
         "translator_fallback_mode": fallback_mode,
+        "translator_context_window_size": _to_int(
+            options.get("translator_context_window_size"),
+            6,
+            min_value=1,
+            max_value=50,
+        ),
+        "translator_batch_window_size": _to_int(
+            options.get("translator_batch_window_size"),
+            10,
+            min_value=1,
+            max_value=50,
+        ),
+        "translator_batch_max_chars": _to_int(
+            options.get("translator_batch_max_chars"),
+            2500,
+            min_value=500,
+            max_value=20000,
+        ),
         "transcribe_runtime_mode": runtime_mode,
         "translator_timeout_sec": _to_float(
             options.get("translator_timeout_sec"),

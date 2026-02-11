@@ -48,7 +48,22 @@ def build_asr_signature(options: Dict) -> str:
     )
 
 
-def _translation_signature_payload(options: Dict, *, include_thinking_flag: bool) -> Dict:
+def _translation_signature_payload(options: Dict) -> Dict:
+    return {
+        "target": str(options.get("translate_to") or "").strip().lower(),
+        "provider": str(options.get("translator_provider") or "none").strip().lower(),
+        "base_url": str(options.get("translator_base_url") or "").strip(),
+        "model": str(options.get("translator_model") or "").strip(),
+        "prompt": str(options.get("translator_prompt") or "").strip(),
+        "fallback_mode": str(options.get("translator_fallback_mode") or "model_full_text").strip().lower(),
+        "timeout_sec": float(options.get("translator_timeout_sec") or 120.0),
+        "context_window_size": int(options.get("translator_context_window_size") or 6),
+        "batch_window_size": int(options.get("translator_batch_window_size") or 10),
+        "batch_max_chars": int(options.get("translator_batch_max_chars") or 2500),
+    }
+
+
+def _translation_signature_payload_legacy(options: Dict, *, include_thinking_flag: bool) -> Dict:
     payload = {
         "target": str(options.get("translate_to") or "").strip().lower(),
         "provider": str(options.get("translator_provider") or "none").strip().lower(),
@@ -64,20 +79,17 @@ def _translation_signature_payload(options: Dict, *, include_thinking_flag: bool
 
 
 def build_translation_signature(options: Dict) -> str:
-    # Canonical (backward compatible):
-    # include `enable_thinking` only when enabled to keep old checkpoints resumable.
-    include_thinking = bool(options.get("translator_enable_thinking"))
-    return _stable_hash(_translation_signature_payload(options, include_thinking_flag=include_thinking))
+    return _stable_hash(_translation_signature_payload(options))
 
 
 def build_translation_signature_legacy(options: Dict) -> str:
-    # Legacy signature (before thinking flag was introduced).
-    return _stable_hash(_translation_signature_payload(options, include_thinking_flag=False))
+    # Legacy signature (before batch/context translation windows were introduced).
+    return _stable_hash(_translation_signature_payload_legacy(options, include_thinking_flag=False))
 
 
 def build_translation_signature_with_explicit_thinking(options: Dict) -> str:
     # Transitional signature used by previous implementation that always included thinking flag.
-    return _stable_hash(_translation_signature_payload(options, include_thinking_flag=True))
+    return _stable_hash(_translation_signature_payload_legacy(options, include_thinking_flag=True))
 
 
 def load_cached_source_segments(

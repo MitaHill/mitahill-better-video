@@ -34,6 +34,13 @@ def _to_bool(value: Any, default: bool = False) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on", "enabled"}
 
 
+def _to_int(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return int(default)
+
+
 def default_transcription_config() -> Dict[str, Any]:
     return {
         "version": 1,
@@ -65,9 +72,11 @@ def default_transcription_config() -> Dict[str, Any]:
             "model": config.TRANSCRIPTION_TRANSLATOR_MODEL,
             "api_key": config.TRANSCRIPTION_TRANSLATOR_API_KEY,
             "timeout_sec": config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS,
-            "enable_thinking": bool(config.TRANSCRIPTION_TRANSLATOR_ENABLE_THINKING),
             "prompt": config.TRANSCRIPTION_TRANSLATOR_PROMPT,
             "fallback_mode": "model_full_text",
+            "context_window_size": 6,
+            "batch_window_size": 10,
+            "batch_max_chars": 2500,
         },
         "download": {
             "aria2": {
@@ -145,10 +154,6 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     merged["translation"]["base_url"] = str(merged["translation"].get("base_url") or "").strip()
     merged["translation"]["model"] = str(merged["translation"].get("model") or "").strip()
     merged["translation"]["api_key"] = str(merged["translation"].get("api_key") or "").strip()
-    merged["translation"]["enable_thinking"] = _to_bool(
-        merged["translation"].get("enable_thinking"),
-        bool(config.TRANSCRIPTION_TRANSLATOR_ENABLE_THINKING),
-    )
     merged["translation"]["prompt"] = str(merged["translation"].get("prompt") or "").strip()
     fallback_mode = str(merged["translation"].get("fallback_mode") or "model_full_text").strip().lower()
     if fallback_mode not in _VALID_TRANSLATION_FALLBACK_MODES:
@@ -159,6 +164,18 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     except (TypeError, ValueError):
         timeout_sec = 120.0
     merged["translation"]["timeout_sec"] = max(1.0, min(timeout_sec, 1200.0))
+    merged["translation"]["context_window_size"] = max(
+        1,
+        min(_to_int(merged["translation"].get("context_window_size"), 6), 50),
+    )
+    merged["translation"]["batch_window_size"] = max(
+        1,
+        min(_to_int(merged["translation"].get("batch_window_size"), 10), 50),
+    )
+    merged["translation"]["batch_max_chars"] = max(
+        500,
+        min(_to_int(merged["translation"].get("batch_max_chars"), 2500), 20000),
+    )
 
     aria2 = merged["download"].get("aria2") or {}
     try:
@@ -237,10 +254,12 @@ def get_parser_defaults() -> Dict[str, Any]:
         "translator_base_url": str(translation.get("base_url") or "").strip(),
         "translator_model": str(translation.get("model") or "").strip(),
         "translator_api_key": str(translation.get("api_key") or "").strip(),
-        "translator_enable_thinking": _to_bool(translation.get("enable_thinking")),
         "translator_prompt": str(translation.get("prompt") or "").strip(),
         "translator_fallback_mode": str(translation.get("fallback_mode") or "model_full_text").strip().lower(),
         "translator_timeout_sec": float(translation.get("timeout_sec") or 120.0),
+        "translator_context_window_size": _to_int(translation.get("context_window_size"), 6),
+        "translator_batch_window_size": _to_int(translation.get("batch_window_size"), 10),
+        "translator_batch_max_chars": _to_int(translation.get("batch_max_chars"), 2500),
         "transcribe_runtime_mode": str((current.get("runtime") or {}).get("transcribe_runtime_mode") or "parallel").strip().lower(),
     }
 

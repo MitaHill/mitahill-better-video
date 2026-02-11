@@ -55,9 +55,6 @@ def parse_transcription_task_params(form):
             defaults.get("translator_api_key", config.TRANSCRIPTION_TRANSLATOR_API_KEY)
             or ""
         ).strip(),
-        "translator_enable_thinking": bool(
-            defaults.get("translator_enable_thinking", config.TRANSCRIPTION_TRANSLATOR_ENABLE_THINKING)
-        ),
         "translator_prompt": (
             defaults.get("translator_prompt", config.TRANSCRIPTION_TRANSLATOR_PROMPT)
             or ""
@@ -75,6 +72,21 @@ def parse_transcription_task_params(form):
             form,
             "translator_timeout_sec",
             defaults.get("translator_timeout_sec", config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS),
+        ),
+        "translator_context_window_size": int_from_form(
+            form,
+            "translator_context_window_size",
+            defaults.get("translator_context_window_size", 6),
+        ),
+        "translator_batch_window_size": int_from_form(
+            form,
+            "translator_batch_window_size",
+            defaults.get("translator_batch_window_size", 10),
+        ),
+        "translator_batch_max_chars": int_from_form(
+            form,
+            "translator_batch_max_chars",
+            defaults.get("translator_batch_max_chars", 2500),
         ),
         "generate_bilingual": bool_from_form(form, "generate_bilingual", True),
         "export_json": bool_from_form(form, "export_json", False),

@@ -24,6 +24,9 @@ export const useWorkbenchController = () => {
       provider: "none",
       model: "",
       base_url: "",
+      context_window_size: 6,
+      batch_window_size: 10,
+      batch_max_chars: 2500,
       enabled: false,
     },
   });

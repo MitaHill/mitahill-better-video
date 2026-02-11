@@ -337,7 +337,6 @@ def test_translation_provider(translation_config: Dict) -> Dict:
     base_url = str(translation_config.get("base_url") or "").strip().rstrip("/")
     model = str(translation_config.get("model") or "").strip()
     api_key = str(translation_config.get("api_key") or "").strip()
-    enable_thinking = bool(translation_config.get("enable_thinking"))
     timeout_sec = float(translation_config.get("timeout_sec") or 60.0)
 
     if provider == "none":
@@ -346,7 +345,7 @@ def test_translation_provider(translation_config: Dict) -> Dict:
         return {"ok": False, "provider": provider, "error": "未配置翻译服务地址"}
 
     if provider == "ollama":
-        return _test_ollama(base_url=base_url, model=model, enable_thinking=enable_thinking)
+        return _test_ollama(base_url=base_url, model=model)
     if provider == "openai_compatible":
         return _test_openai_compatible(
             base_url=base_url,
@@ -358,7 +357,7 @@ def test_translation_provider(translation_config: Dict) -> Dict:
     return {"ok": False, "provider": provider, "error": f"不支持的翻译提供器: {provider}"}
 
 
-def _test_ollama(base_url: str, model: str, enable_thinking: bool = False) -> Dict:
+def _test_ollama(base_url: str, model: str) -> Dict:
     parsed = urlparse(base_url)
     host = parsed.hostname or ""
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
@@ -405,19 +404,11 @@ def _test_ollama(base_url: str, model: str, enable_thinking: bool = False) -> Di
 
     try:
         started = time.time()
-        steps.append(
-            {
-                "step": "thinking",
-                "status": "passed",
-                "enabled": bool(enable_thinking),
-            }
-        )
         resp = requests.post(
             f"{base_url}/api/chat",
             json={
                 "model": model,
                 "stream": False,
-                "think": bool(enable_thinking),
                 "messages": [{"role": "user", "content": "Hello.What's Your Name"}],
             },
             timeout=60,

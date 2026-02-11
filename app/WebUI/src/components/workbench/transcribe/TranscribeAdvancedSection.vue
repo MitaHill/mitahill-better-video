@@ -103,7 +103,9 @@
     </p>
     <p v-else class="notice">
       当前后台翻译源（只读）：{{ translatorProviderLabel }} / {{ transcribeRuntime.translation?.model || "-" }}
-      （{{ transcribeRuntime.translation?.enabled ? "可用" : "未就绪" }}，Thinking: {{ transcribeRuntime.translation?.enable_thinking ? "开启" : "关闭" }}）
+      （{{ transcribeRuntime.translation?.enabled ? "可用" : "未就绪" }}，上下文窗:
+      {{ transcribeRuntime.translation?.context_window_size || "-" }}，批次窗:
+      {{ transcribeRuntime.translation?.batch_window_size || "-" }}）
     </p>
 
     <label class="check-inline">
