@@ -613,15 +613,21 @@ button:hover {
 
 .admin-sidebar-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .admin-nav-group {
   display: grid;
-  gap: 8px;
-  padding: 8px;
+  gap: 10px;
+  padding: 10px;
   border: 1px solid var(--border);
   background: var(--surface-strong);
+  border-left: 3px solid color-mix(in srgb, var(--text-muted) 38%, transparent);
+}
+
+.admin-nav-group.is-active-branch {
+  border-left-color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .admin-nav-group-toggle {
@@ -632,15 +638,24 @@ button:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 32px;
-  padding: 6px 8px;
+  min-height: 36px;
+  padding: 8px 10px;
+}
+
+.admin-nav-group-toggle.is-active-branch {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
 }
 
 .admin-nav-group-title {
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--text-muted);
-  letter-spacing: 0.3px;
+  letter-spacing: 0.45px;
+}
+
+.admin-nav-group-toggle.is-active-branch .admin-nav-group-title {
+  color: var(--text-strong);
 }
 
 .admin-nav-group-chevron {
@@ -660,9 +675,14 @@ button:hover {
 .admin-nav-subgroup {
   display: grid;
   gap: 6px;
-  padding: 6px;
+  padding: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
+  border-left: 2px solid color-mix(in srgb, var(--text-muted) 35%, transparent);
+}
+
+.admin-nav-subgroup.is-active-branch {
+  border-left-color: color-mix(in srgb, var(--accent) 80%, transparent);
 }
 
 .admin-nav-subgroup-toggle {
@@ -673,12 +693,17 @@ button:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 32px;
-  padding: 6px 8px;
+  min-height: 34px;
+  padding: 7px 9px;
+}
+
+.admin-nav-subgroup-toggle.is-active-branch {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-strong));
 }
 
 .admin-nav-subgroup-title {
-  font-size: 0.8rem;
+  font-size: 0.84rem;
   font-weight: 700;
   color: var(--text);
 }
@@ -686,6 +711,8 @@ button:hover {
 .admin-nav-third-list {
   display: grid;
   gap: 6px;
+  padding-left: 8px;
+  border-left: 1px dashed color-mix(in srgb, var(--text-muted) 28%, transparent);
 }
 
 .admin-nav-item {
@@ -696,13 +723,16 @@ button:hover {
   color: var(--text);
   border: 1px solid var(--border);
   min-height: 34px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   font-size: 0.88rem;
+  position: relative;
 }
 
 .admin-nav-item.is-active {
   background: var(--accent);
   color: var(--btn-text);
+  border-color: color-mix(in srgb, var(--accent) 75%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 .admin-card h2 {
