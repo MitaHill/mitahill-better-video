@@ -5,6 +5,7 @@ VALID_TRANSCRIBE_MODES = {"subtitle_zip", "subtitled_video", "subtitle_and_video
 VALID_SUBTITLE_FORMATS = {"srt", "vtt"}
 VALID_TRANSLATOR_PROVIDERS = {"none", "ollama", "openai_compatible"}
 VALID_TRANSLATOR_FALLBACK_MODES = {"model_full_text", "source_text"}
+VALID_TRANSLATOR_MODES = {"window_batch", "single_sentence"}
 VALID_TRANSCRIPTION_BACKENDS = {"whisper", "faster_whisper"}
 VALID_TRANSCRIBE_RUNTIME_MODES = {"parallel", "memory_saving"}
 
@@ -68,6 +69,9 @@ def normalize_transcription_options(raw):
     fallback_mode = (options.get("translator_fallback_mode") or "source_text").strip().lower()
     if fallback_mode not in VALID_TRANSLATOR_FALLBACK_MODES:
         fallback_mode = "source_text"
+    translator_mode = (options.get("translator_mode") or "window_batch").strip().lower()
+    if translator_mode not in VALID_TRANSLATOR_MODES:
+        translator_mode = "window_batch"
     runtime_mode = (options.get("transcribe_runtime_mode") or "parallel").strip().lower()
     if runtime_mode not in VALID_TRANSCRIBE_RUNTIME_MODES:
         runtime_mode = "parallel"
@@ -108,6 +112,7 @@ def normalize_transcription_options(raw):
             or ""
         ).strip(),
         "translator_fallback_mode": fallback_mode,
+        "translator_mode": translator_mode,
         "translator_context_window_size": _to_int(
             options.get("translator_context_window_size"),
             6,

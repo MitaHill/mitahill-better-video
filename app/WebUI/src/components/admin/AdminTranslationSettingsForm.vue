@@ -3,13 +3,20 @@
     <h2>翻译源设置</h2>
     <p class="notice" style="margin-bottom: 10px;">用于配置转录后的翻译链路，调试菜单可直接测试当前配置。</p>
 
-    <div class="inline-grid two">
+    <div class="inline-grid three">
       <div class="field compact">
         <label>翻译提供器</label>
         <select v-model="local.provider" :disabled="loading">
           <option value="none">不启用</option>
           <option value="ollama">Ollama</option>
           <option value="openai_compatible">OpenAI Compatible</option>
+        </select>
+      </div>
+      <div class="field compact">
+        <label>翻译执行模式</label>
+        <select v-model="local.mode" :disabled="loading">
+          <option value="window_batch">滑动窗口（批量）</option>
+          <option value="single_sentence">单句翻译</option>
         </select>
       </div>
       <div class="field compact">
@@ -36,6 +43,9 @@
       小模型建议调小上下文裁剪窗与单次发送滑动窗（例如 2~4 / 4~8），可降低幻觉与解析失败风险。
       上下文超窗时固定保留第一轮对话，从第二轮开始裁剪。
     </p>
+    <p class="notice" style="margin-top: 6px;">
+      模式说明：滑动窗口适合保持上下文一致性；单句翻译更稳健但请求次数更多、耗时更长。
+    </p>
 
     <div class="field compact">
       <label>极端情况回退策略</label>
@@ -56,7 +66,7 @@
     <div class="inline-grid two">
       <div class="field compact">
         <label>模型名</label>
-        <input v-model="local.model" :disabled="loading" placeholder="例如: qwen2.5:7b / gpt-4o-mini" />
+        <input v-model="local.model" :disabled="loading" placeholder="例如: qwen3:8b / gpt-4o-mini" />
       </div>
       <div class="field compact">
         <label>API Key</label>
@@ -172,6 +182,7 @@ const local = reactive({
   model: "",
   apiKey: "",
   timeoutSec: 120,
+  mode: "window_batch",
   contextWindowSize: 6,
   batchWindowSize: 10,
   batchMaxChars: 2500,
@@ -279,6 +290,7 @@ const applyFromProps = () => {
   local.model = translation.model || "";
   local.apiKey = translation.api_key || "";
   local.timeoutSec = Number(translation.timeout_sec ?? 120);
+  local.mode = translation.mode || "window_batch";
   local.contextWindowSize = Number(translation.context_window_size ?? 6);
   local.batchWindowSize = Number(translation.batch_window_size ?? 10);
   local.batchMaxChars = Number(translation.batch_max_chars ?? 2500);
@@ -308,6 +320,7 @@ const save = async () => {
       model: String(local.model || "").trim(),
       api_key: String(local.apiKey || "").trim(),
       timeout_sec: Number(local.timeoutSec || 120),
+      mode: String(local.mode || "window_batch").trim().toLowerCase(),
       context_window_size: Number(local.contextWindowSize || 6),
       batch_window_size: Number(local.batchWindowSize || 10),
       batch_max_chars: Number(local.batchMaxChars || 2500),

@@ -62,6 +62,7 @@ class BaseTranslator:
         timeout_sec: float,
         fallback_mode: str = "source_text",
         runtime_mode: str = "parallel",
+        translation_mode: str = "window_batch",
         context_window_size: int = 6,
         batch_window_size: int = 10,
         batch_max_chars: int = 2500,
@@ -75,6 +76,8 @@ class BaseTranslator:
         self.fallback_mode = mode if mode in {"model_full_text", "source_text"} else "source_text"
         safe_runtime_mode = str(runtime_mode or "parallel").strip().lower()
         self.runtime_mode = safe_runtime_mode if safe_runtime_mode in {"parallel", "memory_saving"} else "parallel"
+        safe_translation_mode = str(translation_mode or "window_batch").strip().lower()
+        self.translation_mode = safe_translation_mode if safe_translation_mode in {"window_batch", "single_sentence"} else "window_batch"
         self.context_window_size = max(1, min(int(context_window_size or 6), 50))
         self.batch_window_size = max(1, min(int(batch_window_size or 10), 50))
         self.batch_max_chars = max(500, min(int(batch_max_chars or 2500), 20000))
@@ -579,6 +582,7 @@ def create_translator(options) -> Optional[BaseTranslator]:
         "fallback_mode": options.get("translator_fallback_mode", "source_text"),
         "timeout_sec": options.get("translator_timeout_sec", 120.0),
         "runtime_mode": options.get("transcribe_runtime_mode", "parallel"),
+        "translation_mode": options.get("translator_mode", "window_batch"),
         "context_window_size": options.get("translator_context_window_size", 6),
         "batch_window_size": options.get("translator_batch_window_size", 10),
         "batch_max_chars": options.get("translator_batch_max_chars", 2500),

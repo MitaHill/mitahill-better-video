@@ -103,7 +103,8 @@
     </p>
     <p v-else class="notice">
       当前后台翻译源（只读）：{{ translatorProviderLabel }} / {{ transcribeRuntime.translation?.model || "-" }}
-      （{{ transcribeRuntime.translation?.enabled ? "可用" : "未就绪" }}，上下文窗:
+      （{{ transcribeRuntime.translation?.enabled ? "可用" : "未就绪" }}，模式:
+      {{ translatorModeLabel }}，上下文窗:
       {{ transcribeRuntime.translation?.context_window_size || "-" }}，批次窗:
       {{ transcribeRuntime.translation?.batch_window_size || "-" }}）
     </p>
@@ -162,5 +163,11 @@ const translatorProviderLabel = computed(() => {
   if (provider === "ollama") return "Ollama";
   if (provider === "openai_compatible") return "OpenAI兼容";
   return "不启用";
+});
+
+const translatorModeLabel = computed(() => {
+  const mode = String(props.transcribeRuntime?.translation?.mode || "window_batch").trim().toLowerCase();
+  if (mode === "single_sentence") return "单句翻译";
+  return "滑动窗口";
 });
 </script>

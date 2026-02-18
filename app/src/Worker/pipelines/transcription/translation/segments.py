@@ -101,33 +101,39 @@ def translate_segments(
     translated: List[Optional[dict]] = [None] * total
     done_count = 0
     timeout_circuit_open = False
+    translation_mode = str(getattr(translator, "translation_mode", "window_batch") or "window_batch").strip().lower()
+    if translation_mode not in {"window_batch", "single_sentence"}:
+        translation_mode = "window_batch"
     max_batch = max(1, int(getattr(translator, "batch_window_size", 10) or 10))
     max_chars = max(500, int(getattr(translator, "batch_max_chars", 2500) or 2500))
-    planned_windows = _plan_translation_windows(payload, max_batch=max_batch, max_chars=max_chars)
-    window_total = len(planned_windows)
+    planned_windows: List[List[int]] = []
+    window_total = 0
     window_meta_by_segment: Dict[int, tuple] = {}
-    for win_idx, indices in enumerate(planned_windows, start=1):
-        if not indices:
-            continue
-        win_start = int(indices[0])
-        win_end = int(indices[-1])
-        for seg_idx in indices:
-            window_meta_by_segment[int(seg_idx)] = (win_idx, window_total, win_start, win_end)
+    if translation_mode == "window_batch":
+        planned_windows = _plan_translation_windows(payload, max_batch=max_batch, max_chars=max_chars)
+        window_total = len(planned_windows)
+        for win_idx, indices in enumerate(planned_windows, start=1):
+            if not indices:
+                continue
+            win_start = int(indices[0])
+            win_end = int(indices[-1])
+            for seg_idx in indices:
+                window_meta_by_segment[int(seg_idx)] = (win_idx, window_total, win_start, win_end)
 
-    window_resume_info = _enforce_window_resume(
-        payload,
-        cache,
-        windows=planned_windows,
-        max_batch=max_batch,
-        max_chars=max_chars,
-    )
-    if window_resume_info.get("restart_window", 0) > 0:
-        logger.info(
-            "Window-resume activated: restart from window %s/%s, dropped cached segments=%s",
-            window_resume_info.get("restart_window", 0),
-            window_resume_info.get("window_total", 0),
-            window_resume_info.get("dropped_cache_segments", 0),
+        window_resume_info = _enforce_window_resume(
+            payload,
+            cache,
+            windows=planned_windows,
+            max_batch=max_batch,
+            max_chars=max_chars,
         )
+        if window_resume_info.get("restart_window", 0) > 0:
+            logger.info(
+                "Window-resume activated: restart from window %s/%s, dropped cached segments=%s",
+                window_resume_info.get("restart_window", 0),
+                window_resume_info.get("window_total", 0),
+                window_resume_info.get("dropped_cache_segments", 0),
+            )
 
     def _tick_progress():
         if progress_callback:
@@ -151,6 +157,76 @@ def translate_segments(
             checkpoint_callback(idx, source_text, safe_translated, status, message)
         done_count += 1
         _tick_progress()
+
+    if translation_mode == "single_sentence":
+        i = 1
+        while i <= total:
+            if should_cancel and should_cancel():
+                raise TaskCancelledError("任务已取消")
+
+            current = dict(payload[i - 1] or {})
+            source_text = _normalize_text(current.get("text", ""))
+
+            if i in cache:
+                _commit(
+                    i,
+                    current,
+                    source_text,
+                    _normalize_text(cache.get(i) or ""),
+                    save_checkpoint=False,
+                )
+                i += 1
+                continue
+
+            if not source_text:
+                _commit(i, current, source_text, source_text, status="skipped", message="empty segment")
+                i += 1
+                continue
+
+            if timeout_circuit_open:
+                fallback = translator.fallback_text(source_text)
+                _commit(i, current, source_text, fallback, status="fallback", message="timeout circuit open")
+                i += 1
+                continue
+
+            if status_callback:
+                status_callback(f"翻译生成中（单句 {i}/{total}）")
+
+            def _on_raw_delta(delta_text: str):
+                if raw_stream_callback:
+                    raw_stream_callback(i, str(delta_text or ""))
+
+            try:
+                translated_text = translator.translate_text(
+                    source_text,
+                    target_language,
+                    stream_callback=_on_raw_delta,
+                )
+                _commit(i, current, source_text, translated_text, status="translated", message="")
+            except TaskCancelledError:
+                raise
+            except requests.exceptions.ReadTimeout as exc:
+                timeout_circuit_open = True
+                logger.warning(
+                    "Translation timeout at segment %s/%s, switch to fallback for remaining segments: %s",
+                    i,
+                    total,
+                    exc,
+                )
+                fallback = translator.fallback_text(source_text)
+                _commit(i, current, source_text, fallback, status="fallback", message=str(exc))
+            except Exception as exc:
+                logger.warning(
+                    "Translation failed at segment %s/%s, use fallback text: %s",
+                    i,
+                    total,
+                    exc,
+                )
+                fallback = translator.fallback_text(source_text)
+                _commit(i, current, source_text, fallback, status="fallback", message=str(exc))
+            i += 1
+
+        return [dict(item or {}) for item in translated]
 
     i = 1
     while i <= total:

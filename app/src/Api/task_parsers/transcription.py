@@ -64,6 +64,10 @@ def parse_transcription_task_params(form):
             or defaults.get("translator_fallback_mode", "source_text")
             or "source_text"
         ).strip().lower(),
+        "translator_mode": (
+            defaults.get("translator_mode", "window_batch")
+            or "window_batch"
+        ).strip().lower(),
         "transcribe_runtime_mode": (
             defaults.get("transcribe_runtime_mode", "parallel")
             or "parallel"

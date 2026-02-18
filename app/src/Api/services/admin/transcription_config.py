@@ -18,6 +18,7 @@ from .transcription_catalog import get_models_for_backend
 _VALID_BACKENDS = {"whisper", "faster_whisper"}
 _VALID_TRANSLATORS = {"none", "ollama", "openai_compatible"}
 _VALID_TRANSLATION_FALLBACK_MODES = {"model_full_text", "source_text"}
+_VALID_TRANSLATION_MODES = {"window_batch", "single_sentence"}
 _VALID_RUNTIME_MODES = {"parallel", "memory_saving"}
 
 _DEFAULT_MODEL_BY_BACKEND = {
@@ -69,11 +70,12 @@ def default_transcription_config() -> Dict[str, Any]:
         "translation": {
             "provider": config.TRANSCRIPTION_TRANSLATOR_PROVIDER or "none",
             "base_url": config.TRANSCRIPTION_TRANSLATOR_BASE_URL,
-            "model": config.TRANSCRIPTION_TRANSLATOR_MODEL,
+            "model": config.TRANSCRIPTION_TRANSLATOR_MODEL or "qwen3:8b",
             "api_key": config.TRANSCRIPTION_TRANSLATOR_API_KEY,
             "timeout_sec": config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS,
             "prompt": config.TRANSCRIPTION_TRANSLATOR_PROMPT,
             "fallback_mode": "source_text",
+            "mode": "window_batch",
             "context_window_size": 6,
             "batch_window_size": 10,
             "batch_max_chars": 2500,
@@ -152,13 +154,22 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
         provider = "none"
     merged["translation"]["provider"] = provider
     merged["translation"]["base_url"] = str(merged["translation"].get("base_url") or "").strip()
-    merged["translation"]["model"] = str(merged["translation"].get("model") or "").strip()
+    model = str(merged["translation"].get("model") or "").strip()
+    if model.lower() == "qwen3:4b":
+        model = "qwen3:8b"
+    if provider == "ollama" and not model:
+        model = "qwen3:8b"
+    merged["translation"]["model"] = model
     merged["translation"]["api_key"] = str(merged["translation"].get("api_key") or "").strip()
     merged["translation"]["prompt"] = str(merged["translation"].get("prompt") or "").strip()
     fallback_mode = str(merged["translation"].get("fallback_mode") or "source_text").strip().lower()
     if fallback_mode not in _VALID_TRANSLATION_FALLBACK_MODES:
         fallback_mode = "source_text"
     merged["translation"]["fallback_mode"] = fallback_mode
+    mode = str(merged["translation"].get("mode") or "window_batch").strip().lower()
+    if mode not in _VALID_TRANSLATION_MODES:
+        mode = "window_batch"
+    merged["translation"]["mode"] = mode
     try:
         timeout_sec = float(merged["translation"].get("timeout_sec") or 120.0)
     except (TypeError, ValueError):
@@ -256,6 +267,7 @@ def get_parser_defaults() -> Dict[str, Any]:
         "translator_api_key": str(translation.get("api_key") or "").strip(),
         "translator_prompt": str(translation.get("prompt") or "").strip(),
         "translator_fallback_mode": str(translation.get("fallback_mode") or "source_text").strip().lower(),
+        "translator_mode": str(translation.get("mode") or "window_batch").strip().lower(),
         "translator_timeout_sec": float(translation.get("timeout_sec") or 120.0),
         "translator_context_window_size": _to_int(translation.get("context_window_size"), 6),
         "translator_batch_window_size": _to_int(translation.get("batch_window_size"), 10),

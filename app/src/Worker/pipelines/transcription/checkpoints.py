@@ -56,6 +56,7 @@ def _translation_signature_payload(options: Dict) -> Dict:
         "model": str(options.get("translator_model") or "").strip(),
         "prompt": str(options.get("translator_prompt") or "").strip(),
         "fallback_mode": str(options.get("translator_fallback_mode") or "source_text").strip().lower(),
+        "mode": str(options.get("translator_mode") or "window_batch").strip().lower(),
         "timeout_sec": float(options.get("translator_timeout_sec") or 120.0),
         "context_window_size": int(options.get("translator_context_window_size") or 6),
         "batch_window_size": int(options.get("translator_batch_window_size") or 10),

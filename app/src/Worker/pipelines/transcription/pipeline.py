@@ -451,6 +451,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                     "transcription_backend": options.get("transcription_backend", "whisper"),
                     "whisper_model": options.get("whisper_model", "medium"),
                     "translate_to": options.get("translate_to", ""),
+                    "translator_mode": options.get("translator_mode", "window_batch"),
                     "translator_context_window_size": options.get("translator_context_window_size", 6),
                     "translator_batch_window_size": options.get("translator_batch_window_size", 10),
                     "translator_batch_max_chars": options.get("translator_batch_max_chars", 2500),

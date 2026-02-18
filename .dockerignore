@@ -1,0 +1,16 @@
+.git
+.git/**
+
+pre-run/storage
+pre-run/storage/**
+storage
+storage/**
+
+app/WebUI/node_modules
+app/WebUI/dist
+
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+*.log
