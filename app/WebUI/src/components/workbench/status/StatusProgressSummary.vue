@@ -2,6 +2,7 @@
   <div>
     <div class="progress" style="margin: 12px 0;"><span :style="{ width: `${status.progress || 0}%` }"></span></div>
     <p class="notice">{{ status.message }}</p>
+    <p v-if="translationProgressText" class="notice">翻译进度：{{ translationProgressText }}</p>
     <p v-if="progressDetails" class="notice">{{ progressDetails }}</p>
 
     <div class="panel" style="margin-top: 16px; background: rgba(255,255,255,0.05);">
@@ -25,6 +26,10 @@ const props = defineProps({
   progressDetails: {
     type: String,
     required: true,
+  },
+  translationProgressText: {
+    type: String,
+    default: "",
   },
   resolution: {
     type: String,

@@ -38,6 +38,7 @@
           :status="status"
           :status-class="statusClass"
           :progress-details="progressDetails"
+          :translation-progress-text="translationProgressText"
           :stream-lines="streamLines"
           :resolution="resolution"
           :task-ids="taskIds"
@@ -90,6 +91,7 @@ const {
   paramRows,
   statusClass,
   progressDetails,
+  translationProgressText,
   streamLines,
   onEnhanceFileChange,
   onConvertMediaChange,

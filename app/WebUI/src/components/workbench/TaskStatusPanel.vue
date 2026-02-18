@@ -13,7 +13,12 @@
     />
 
     <div v-if="status" style="margin-top: 16px;">
-      <StatusProgressSummary :status="status" :progress-details="progressDetails" :resolution="resolution" />
+      <StatusProgressSummary
+        :status="status"
+        :progress-details="progressDetails"
+        :resolution="resolution"
+        :translation-progress-text="translationProgressText"
+      />
       <StatusRawStreamPanel
         v-if="String(status?.task_params?.task_category || '').trim().toLowerCase() === 'transcribe'"
         :lines="streamLines"
@@ -79,6 +84,10 @@ defineProps({
   statusError: {
     type: String,
     required: true,
+  },
+  translationProgressText: {
+    type: String,
+    default: "",
   },
   fetchStatus: {
     type: Function,

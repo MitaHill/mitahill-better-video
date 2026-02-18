@@ -7,6 +7,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   const statusQuery = ref("");
   const status = ref(null);
   const statusError = ref("");
+  const translationProgressText = ref("");
 
   const preview = reactive({
     original: "",
@@ -83,6 +84,9 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     const activeLineIndex = new Map();
     const out = [];
     for (const event of stream.events) {
+      if (String(event.channel || "").trim().toLowerCase() === "translation_progress") {
+        continue;
+      }
       const mode = String(event.mode || "").trim().toLowerCase();
       const key = buildLineKey(event);
       if (mode === "commit") {
@@ -124,6 +128,18 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     stream.lines = out.length > maxLines ? out.slice(out.length - maxLines) : out;
   };
 
+  const refreshTranslationProgressText = () => {
+    translationProgressText.value = "";
+    for (let i = stream.events.length - 1; i >= 0; i -= 1) {
+      const event = stream.events[i];
+      if (String(event?.channel || "").trim().toLowerCase() !== "translation_progress") continue;
+      const text = String(event?.text || "").trim();
+      if (!text) continue;
+      translationProgressText.value = text;
+      return;
+    }
+  };
+
   const replaceStreamEvents = (events) => {
     const normalized = [];
     streamSeenIds = new Set();
@@ -137,6 +153,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     }
     stream.events = normalized;
     rebuildStreamLines();
+    refreshTranslationProgressText();
   };
 
   const appendStreamEvent = (event) => {
@@ -153,6 +170,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
       );
     }
     rebuildStreamLines();
+    refreshTranslationProgressText();
   };
 
   const swapPreview = (kind, url) => {
@@ -202,6 +220,12 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
 
       status.value = await parseJsonSafe(res);
       replaceStreamEvents(status.value.stream_events || []);
+      if (!translationProgressText.value) {
+        const fallbackMessage = String(status.value?.message || "").trim();
+        if (fallbackMessage.includes("翻译")) {
+          translationProgressText.value = fallbackMessage;
+        }
+      }
       if (lastPreviewId.value !== statusQuery.value) {
         preview.original = "";
         preview.upscaled = "";
@@ -236,6 +260,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
 
   const setStatusQuery = (value) => {
     statusQuery.value = String(value || "");
+    translationProgressText.value = "";
   };
 
   const onFrame = (payload) => {
@@ -243,13 +268,6 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
 
     if (String(payload.event_type || "").trim().toLowerCase() === "task_stream") {
       appendStreamEvent(payload);
-      const streamChannel = String(payload.stream_channel || payload.channel || "").trim().toLowerCase();
-      if (streamChannel === "translation_progress" && status.value) {
-        const text = String(payload.stream_text || payload.text || "").trim();
-        if (text) {
-          status.value.message = text;
-        }
-      }
       return;
     }
 
@@ -299,6 +317,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     statusQuery,
     status,
     statusError,
+    translationProgressText,
     preview,
     isPreviewSupported,
     resolution,
