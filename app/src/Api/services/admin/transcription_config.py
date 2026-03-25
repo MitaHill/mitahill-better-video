@@ -84,6 +84,8 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     merged = _deep_merge(default_transcription_config(), raw or {})
 
     backend = str(merged["transcription"].get("backend") or "faster_whisper").strip().lower()
+    # 后台配置层面也只允许 faster-whisper。
+    # 这里做二次收口，避免数据库残留旧值时把普通 whisper 又放回来。
     if backend not in _VALID_BACKENDS:
         backend = "faster_whisper"
     merged["transcription"]["backend"] = backend
@@ -104,6 +106,8 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     ]
     active_model = str(merged["transcription"].get("active_model") or "").strip().lower()
     if active_model not in backend_supported_set:
+        # 如果当前活动模型已经不兼容，就按“默认模型 -> 允许列表 -> 后端首选”顺序回退。
+        # 目的不是保留原值，而是保证任何时候都能落到一个可运行模型。
         compatible_from_allowed = [
             item for item in merged["transcription"]["allowed_models"] if item in backend_supported_set
         ]
@@ -255,6 +259,8 @@ def _sync_transcription_constraints(current: Dict[str, Any]):
         compatible_allowed.append(active_model)
     if not compatible_allowed:
         compatible_allowed = backend_supported or [active_model or "large-v3"]
+    # 这里把后台配置同步回前端约束层。
+    # 否则管理员明明在后台禁用了某些模型，前端下拉框仍可能继续显示旧值。
     whisper_field["label"] = "Fast-Whisper模型"
     whisper_field["allowed_values"] = compatible_allowed
     whisper_field["default_value"] = active_model or whisper_field.get("default_value", "large-v3")

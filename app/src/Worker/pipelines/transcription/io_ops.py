@@ -64,6 +64,8 @@ def write_json_file(path, payload):
 
 def _subtitle_filter_arg(subtitle_path):
     escaped = str(subtitle_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+    # 之前容器里缺 CJK 字体时，中文字幕烧录会直接变成方块。
+    # 这里明确指定一个稳定存在的中文字体名，避免 ffmpeg/libass 自己乱选 fallback。
     force_style = "FontName=Noto Sans CJK SC"
     return f"subtitles='{escaped}':force_style='{force_style}'"
 

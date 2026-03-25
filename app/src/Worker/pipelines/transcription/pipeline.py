@@ -60,6 +60,9 @@ def _resolve_result_bundle(mode, media_results):
     video_outputs = _flatten_result_outputs(media_results, "video_outputs")
     preferred_outputs = _flatten_result_outputs(media_results, "preferred_outputs")
 
+    # 这里把“业务模式”翻译成一个明确的出包策略。
+    # 之前的问题不是转录失败，而是单文件/批量、字幕/视频混在一起后，
+    # 最外层打包规则过于隐式，最后容易出现拿错结果、误打包的情况。
     if mode == "subtitled_video":
         bundle_kind = "batch_subtitled_video" if multi_media else "single_subtitled_video"
         outputs = preferred_outputs
@@ -218,6 +221,8 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 )
             )
             if options.get("generate_bilingual"):
+                # 双语字幕始终基于“原文段落 + 已翻译段落”重新配对生成，
+                # 不复用单语写出的字幕文本，避免中间格式化差异把双语行宽搞乱。
                 bilingual_segments = build_bilingual_segments(source_segments, translated_segments)
                 text_outputs.append(
                     write_subtitle_file(
@@ -276,6 +281,8 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
         return {
             "subtitle_outputs": text_outputs,
             "video_outputs": video_outputs,
+            # preferred_outputs 给最外层一个“默认交付物”的概念。
+            # 单视频嵌入模式优先交视频；没有视频时，再优雅退回字幕文本。
             "preferred_outputs": video_outputs or text_outputs,
         }
     finally:
@@ -330,6 +337,7 @@ def process_transcription_task(task):
                 result_outputs,
                 result_path,
                 base_dir=run_dir / "results",
+                # root_prefix 直接带上 bundle_kind，解压后目录名就能看出这是哪一类结果。
                 root_prefix=result_name,
             )
         else:

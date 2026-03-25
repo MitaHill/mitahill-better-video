@@ -100,6 +100,8 @@ export const useWorkbenchController = () => {
     const fallbackSizeMb = Number(downloadForm.probeSizeMb || probeData?.size_mb || 0);
 
     if (downloadForm.downloadMode !== "video") {
+      // 只有视频模式才需要跟随清晰度选项切换分辨率。
+      // 音频/字幕模式保持 probe 的原始元数据即可，状态页仍然能显示来源信息。
       downloadForm.sourceWidth = fallbackWidth;
       downloadForm.sourceHeight = fallbackHeight;
       downloadForm.sourceFps = fallbackFps;
@@ -111,6 +113,8 @@ export const useWorkbenchController = () => {
       ? downloadForm.qualityOptions.find((item) => item.value === downloadForm.qualitySelector)
       : null;
 
+    // 视频模式下，任务状态面板展示的是“当前选中清晰度”的信息，
+    // 而不是 probe 出来的一个笼统最高值。这样用户改档位后右侧数据会同步变化。
     downloadForm.sourceWidth = Number(selected?.width || fallbackWidth || 0);
     downloadForm.sourceHeight = Number(selected?.height || fallbackHeight || 0);
     downloadForm.sourceFps = Number(selected?.fps || fallbackFps || 0);

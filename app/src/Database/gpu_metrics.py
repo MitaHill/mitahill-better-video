@@ -111,6 +111,8 @@ def get_current_gpu_usage(max_age_seconds: int = 5) -> Dict:
     freshness_window = max(int(max_age_seconds or 5), 1)
     fresh_after = _now() - datetime.timedelta(seconds=freshness_window)
 
+    # 优先吃采样服务写入的最新样本。管理页折线图和状态页如果走同一份数据，
+    # 两边就不会出现“管理页有值，任务页却是 0%”的割裂情况。
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
@@ -128,6 +130,8 @@ def get_current_gpu_usage(max_age_seconds: int = 5) -> Dict:
     if rows:
         latest_ts = rows[0].get("collected_at")
         same_moment = [row for row in rows if row.get("collected_at") == latest_ts]
+        # 多卡时状态面板只展示一个简洁数字，这里取当下最忙的那张卡。
+        # 任务页的目标是“机器现在有没有在吃 GPU”，不是完整显卡面板。
         top = max(same_moment, key=lambda row: float(row.get("utilization_gpu") or 0.0))
         return {
             "source": "sampler",
@@ -142,6 +146,8 @@ def get_current_gpu_usage(max_age_seconds: int = 5) -> Dict:
         }
 
     direct_value = get_gpu_utilization()
+    # 如果采样线程暂时没写进库，最后再直接走一次 nvidia-smi。
+    # 这样即使 sampler 发生短暂中断，查询状态页也不会长期卡在 0。
     if direct_value is None:
         return {
             "source": "unavailable",

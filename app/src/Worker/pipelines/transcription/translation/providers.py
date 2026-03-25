@@ -85,6 +85,9 @@ class BaseTranslator:
         return ""
 
     def _resolve_fallback_text(self, *, model_raw_text: str, source_text: str) -> str:
+        # 这里的 fallback 是“翻译阶段失败后最终落什么文本”，
+        # 不是网络重试。策略保持可配置，便于在“宁可保留原文”和
+        # “尽量保留模型输出”两种取舍之间切换。
         if self.fallback_mode == "source_text":
             return str(source_text or "")
         sanitized = self._sanitize_model_text(model_raw_text)
@@ -136,6 +139,8 @@ class BaseTranslator:
             "If the source text is empty, return an empty string."
         )
         if resolved_custom:
+            # 自定义 prompt 放前面，但后面仍强接一段硬约束。
+            # 这样既保留用户定制空间，又尽量防止 prompt 把返回格式带跑偏。
             return f"{resolved_custom}\n\n{strict_rules}"
         return strict_rules
 
@@ -153,6 +158,8 @@ class OllamaTranslator(BaseTranslator):
             return None
         try:
             endpoint = f"{self.base_url.rstrip('/')}/api/generate"
+            # 这里做的不是“测试翻译”，而是把模型预热并保持常驻，
+            # 避免第一段字幕就把超时时间花在模型冷启动上。
             requests.post(
                 endpoint,
                 json={
@@ -191,6 +198,7 @@ class OllamaTranslator(BaseTranslator):
         payload = {
             "model": self.model,
             "stream": False,
+            # qwen 系列默认可能输出较长思考过程；翻译场景里这只会拖慢首段响应。
             "think": False,
             "messages": [
                 {"role": "system", "content": self._system_prompt(target_language, self.prompt)},
@@ -203,6 +211,8 @@ class OllamaTranslator(BaseTranslator):
         response.raise_for_status()
         data = response.json()
         content = ((data.get("message") or {}).get("content") or "").strip()
+        # 如果模型喜欢把结果包在代码块里，优先拆代码块内容。
+        # 拆不到时再走 sanitize + fallback，尽量避免把解释性废话写进字幕文件。
         parsed = self._extract_code_block_content(content)
         if parsed:
             return parsed
@@ -249,6 +259,7 @@ class OpenAICompatibleTranslator(BaseTranslator):
 def create_translator(options) -> Optional[BaseTranslator]:
     provider = (options.get("translator_provider") or "none").strip().lower()
     if provider == "none" or not (options.get("translate_to") or "").strip():
+        # 没有翻译目标语言时，哪怕 provider 配了也视为关闭。
         return None
 
     kwargs = {

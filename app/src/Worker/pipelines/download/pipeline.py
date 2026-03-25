@@ -41,6 +41,9 @@ def _update_download_video_info(task, result_path: Path, mode: str) -> None:
     current = json.loads(task.get("video_info") or "{}")
     info = ffprobe_info(result_path) if result_path.exists() else {}
     stat_size_mb = round((result_path.stat().st_size / (1024 * 1024)), 2) if result_path.exists() else 0
+    # 下载任务分两阶段维护 video_info：
+    # 1. 创建任务时先写 probe 元数据，让状态页立刻有分辨率/大小
+    # 2. 真正下载完成后再用结果文件覆盖，拿到更准确的最终值
     video_info = {
         **current,
         "filename": result_path.name,
@@ -136,6 +139,8 @@ def _run_yt_dlp(task_id: str, cmd: list[str], stage: str = "下载中") -> None:
         match = _PROGRESS_RE.search(text)
         if match:
             pct = float(match.group(1))
+            # 把 yt-dlp 的 0-100% 压缩到任务整体进度的中段。
+            # 头尾留给初始化、封装、结果回填这些不在 yt-dlp 百分比里的步骤。
             progress = int(5 + pct * 0.9)
             progress = max(5, min(95, progress))
             if progress != last_progress:
@@ -143,6 +148,8 @@ def _run_yt_dlp(task_id: str, cmd: list[str], stage: str = "下载中") -> None:
                 _emit_progress(task_id, progress, f"{stage} {pct:.1f}%", stage="download")
             continue
         if "[Merger]" in text or "[ExtractAudio]" in text:
+            # yt-dlp 进入合并/抽音轨时，原始下载百分比通常已经不再变化。
+            # 这里手动把状态切到 package，前端看起来就不会像是“卡住 95%”。
             _emit_progress(task_id, 97, "封装处理中...", stage="package")
 
     code = proc.wait()
@@ -248,6 +255,8 @@ def _run_subtitle_download(task_id: str, source_url: str, params: dict, results_
     )
     if not subtitle_files:
         raise RuntimeError("未检测到可用字幕文件")
+    # 单字幕直接返回文件，多个语言时再打包。
+    # 这样用户选一种语言时不会多绕一层 zip。
     if len(subtitle_files) == 1:
         return subtitle_files[0]
     return _zip_subtitles(task_id, subtitle_files, results_dir)

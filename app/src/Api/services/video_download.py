@@ -125,6 +125,9 @@ def _build_quality_options(formats: List[Dict]) -> tuple[list, str]:
         tbr = item.get("tbr")
         filesize_bytes = _to_int(item.get("filesize") or item.get("filesize_approx") or 0)
         acodec = str(item.get("acodec") or "").strip().lower()
+        # 这里故意把“纯视频流”也保留下来，并预先改写成 merge selector。
+        # 前端展示的是用户可直接提交的值，避免用户选了一个无音轨 format_id 后
+        # 后端再临时改写，导致界面展示和实际下载行为对不上。
         needs_audio_merge = acodec in {"", "none"}
         selector = f"{format_id}+bestaudio/best" if needs_audio_merge else format_id
         if selector in seen:
@@ -184,6 +187,8 @@ def _pick_best_video_format(formats: List[Dict]) -> Dict:
         width = _to_int(item.get("width"))
         fps = _to_int(item.get("fps"))
         bitrate = _to_int(item.get("tbr"))
+        # 这里不用“第一个可用格式”，而是按分辨率、宽度、帧率、码率做一个稳定排序。
+        # yt-dlp 源数据在不同站点上的顺序并不总是可靠，显式排序后前端显示更稳定。
         candidate_key = (height, width, fps, bitrate)
         if candidate_key > best_key:
             best_key = candidate_key
@@ -193,6 +198,8 @@ def _pick_best_video_format(formats: List[Dict]) -> Dict:
 
 def _resolve_source_metrics(payload: Dict) -> Dict:
     best = _pick_best_video_format(payload.get("formats") or [])
+    # 外层 payload 有时直接给 width/height/filesize，有时只在 formats 里有。
+    # 这里统一做一层归并，后面的任务创建和状态面板就不需要再猜来源了。
     width = _to_int(payload.get("width")) or _to_int(best.get("width"))
     height = _to_int(payload.get("height")) or _to_int(best.get("height"))
     fps = _to_float(payload.get("fps")) or _to_float(best.get("fps"))
@@ -247,6 +254,9 @@ def probe_download_source(url: str) -> Dict:
         payload.get("subtitles") or {},
         payload.get("automatic_captions") or {},
     )
+    # probe 阶段就把任务状态面板需要的元数据一并返回。
+    # 这样下载任务刚创建时，右侧状态查询区就能显示非 0 的分辨率和大小，
+    # 不必等真正下载完成后再回填。
     return {
         "ok": True,
         "url": normalize_download_url(url),

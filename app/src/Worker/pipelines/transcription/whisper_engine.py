@@ -27,6 +27,8 @@ class WhisperEngine:
     def _resolve_faster_model_ref(self, model_name: str):
         safe_model = (model_name or "large-v3").strip().lower()
         local_dir = _FASTER_ROOT / safe_model
+        # 管理后台允许把模型预下载到本地目录。
+        # 如果本地已经存在，就优先走本地路径，避免任务执行时再去远端拉权重。
         if local_dir.exists():
             return str(local_dir)
         return safe_model
@@ -41,6 +43,8 @@ class WhisperEngine:
         from faster_whisper import WhisperModel
 
         model_ref = self._resolve_faster_model_ref(safe_model)
+        # 这里不再保留普通 whisper 的分支，整个系统只接受 faster-whisper。
+        # compute_type 也按设备显式切分，GPU 走 float16，CPU 才退到 int8。
         compute_type = "float16" if self._device == "cuda" else "int8"
         self._model = WhisperModel(model_ref, device=self._device, compute_type=compute_type)
         self._model_backend_device = self._device
@@ -57,6 +61,8 @@ class WhisperEngine:
                 return
             if time.time() >= deadline:
                 raise TimeoutError(f"waiting for idle processing tasks timed out ({processing} active)")
+            # memory_saving 模式的目标不是“快”，而是主动串行化 GPU 占用。
+            # 因此这里会等待其他任务让出显存，而不是硬上导致多个大模型互相挤爆。
             time.sleep(max(0.2, float(poll_sec or 1.0)))
 
     def _offload_to_cpu(self):
@@ -116,9 +122,12 @@ class WhisperEngine:
         safe_runtime_mode = str(runtime_mode or "parallel").strip().lower()
 
         if safe_runtime_mode == "memory_saving":
+            # 只有在显存节约模式下，任务才会在开跑前主动等队列清空。
             self._wait_until_no_other_processing(task_id=task_id, timeout_sec=1800.0, poll_sec=1.0)
 
         with self._lock:
+            # 模型按 backend + model 维度做缓存。
+            # 同模型复用实例，不同模型切换时才重载，避免每段任务都重新初始化。
             if self._model is None or self._model_name != safe_model or self._backend != safe_backend:
                 self._load(safe_backend, safe_model)
             model = self._model
@@ -134,6 +143,8 @@ class WhisperEngine:
         }
         if language_value and language_value != "auto":
             options["language"] = language_value
+        # faster-whisper 返回的是 segment 迭代器，这里统一转成纯 dict，
+        # 后面的字幕、翻译、导出链路就不用再关心底层 SDK 的对象类型。
         segments, _info = model.transcribe(str(media_path), **options)
         return self._faster_segments_to_dict(segments)
 

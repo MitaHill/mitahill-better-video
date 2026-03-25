@@ -37,6 +37,8 @@ export const resolveStageLabel = (stage, category = "") => {
   if (safeStage && STAGE_LABELS[safeStage]) {
     return STAGE_LABELS[safeStage];
   }
+  // stage 为空时，根据任务类别兜底一个大类标签。
+  // 这样旧任务或非实时事件来源仍然能显示一条可读状态，而不是直接空白。
   const safeCategory = String(category || "").trim().toLowerCase();
   if (safeCategory === "enhance") return "增强处理中";
   if (safeCategory === "convert") return "处理中";
@@ -47,6 +49,8 @@ export const resolveStageLabel = (stage, category = "") => {
 
 export const buildParamRows = (status) => {
   const params = status?.task_params || {};
+  // 这里刻意做成“每类任务一张独立表”，而不是把所有字段平铺到一个超长列表。
+  // 状态页的目标是快速回忆任务配置，不是复刻提交表单。
   if (params.task_category === "convert") {
     return [
       { label: "任务类别", value: "视频转换" },
@@ -146,6 +150,8 @@ export const buildProgressDetails = (status, live, nowMs = Date.now()) => {
   const stageLabel = resolveStageLabel(live.stage, category);
 
   const parts = [];
+  // 这串文字是状态页顶部那一行“高密度摘要”，因此只拼最关键的信息：
+  // 当前阶段、当前项、子进度、GPU 和更新时间。再多就会变成噪音。
   if (stageLabel) parts.push(stageLabel);
   if (itemCount && itemLabel) parts.push(`${itemLabel} ${itemIndex}/${itemCount}`);
   if (unitTotal && unitLabel) parts.push(`${unitLabel} ${unitDone}/${unitTotal}`);

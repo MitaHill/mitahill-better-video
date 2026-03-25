@@ -100,6 +100,9 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     live.totalFrames = toNumber(taskProgress.total_frames, live.totalFrames);
     const polledGpu = toNullableNumber(gpuLive.utilization_gpu);
     if (polledGpu !== null) {
+      // 任务页现在不再完全依赖 socket 事件里的 gpu_util。
+      // 轮询接口每次都会带一个当前 GPU 快照，因此就算事件流里没有 GPU 字段，
+      // 状态板也能维持一个接近实时的数值。
       live.gpu = polledGpu;
       live.updatedAtMs = parseUpdatedAtMs(gpuLive.collected_at) || live.updatedAtMs;
     }
@@ -234,6 +237,8 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     const category = String(payload.task_category || status.value?.task_params?.task_category || "").trim().toLowerCase();
     const nextGpu = toNullableNumber(payload.gpu_util);
     if (nextGpu !== null) {
+      // 事件流仍然保留优先级更高的“瞬时值”。
+      // 轮询值解决兜底问题，事件值解决刷新更快的问题，两者并存最稳。
       live.gpu = nextGpu;
     }
     live.stage = String(payload.stage || "").trim().toLowerCase() || live.stage;
