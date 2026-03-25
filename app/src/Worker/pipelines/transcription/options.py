@@ -2,7 +2,7 @@ from app.src.Config import settings as config
 
 VALID_TRANSCRIBE_MODES = {"subtitle_zip", "subtitled_video", "subtitle_and_video_zip"}
 VALID_SUBTITLE_FORMATS = {"srt", "vtt"}
-VALID_TRANSLATOR_PROVIDERS = {"none", "ollama", "openai_compatible"}
+VALID_TRANSLATOR_PROVIDERS = {"none", "ollama", "openai", "openai_compatible"}
 VALID_TRANSLATOR_FALLBACK_MODES = {"model_full_text", "source_text"}
 VALID_TRANSCRIPTION_BACKENDS = {"faster_whisper"}
 VALID_TRANSCRIBE_RUNTIME_MODES = {"parallel", "memory_saving"}
@@ -68,6 +68,14 @@ def normalize_transcription_options(raw):
     if runtime_mode not in VALID_TRANSCRIBE_RUNTIME_MODES:
         runtime_mode = "parallel"
 
+    translator_base_url = (
+        options.get("translator_base_url")
+        or config.TRANSCRIPTION_TRANSLATOR_BASE_URL
+        or ""
+    ).strip()
+    if provider == "openai" and not translator_base_url:
+        translator_base_url = "https://api.openai.com/v1"
+
     normalized = {
         "transcription_backend": backend,
         "transcribe_mode": mode,
@@ -83,11 +91,7 @@ def normalize_transcription_options(raw):
         "output_audio_bitrate_k": _to_int(options.get("output_audio_bitrate_k"), 192, min_value=32, max_value=1024),
         "translate_to": translate_to,
         "translator_provider": provider,
-        "translator_base_url": (
-            options.get("translator_base_url")
-            or config.TRANSCRIPTION_TRANSLATOR_BASE_URL
-            or ""
-        ).strip(),
+        "translator_base_url": translator_base_url,
         "translator_model": (
             options.get("translator_model")
             or config.TRANSCRIPTION_TRANSLATOR_MODEL

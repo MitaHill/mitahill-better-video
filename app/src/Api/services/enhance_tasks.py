@@ -3,18 +3,14 @@ from pathlib import Path
 from app.src.Database import core as db
 from app.src.Utils.http import ffprobe_info, is_filename_safe, secure_filename
 
+from .uploads import new_task_dirs
+
 
 def create_enhance_task(upload, params, client_ip, output_root, upload_root, max_video_mb, max_image_mb, logger):
     if not upload.filename or not is_filename_safe(upload.filename):
         return None, "invalid filename"
 
-    import uuid
-
-    task_id = uuid.uuid4().hex
-    run_dir = output_root / f"run_{task_id}"
-    run_dir.mkdir(parents=True, exist_ok=True)
-    upload_dir = upload_root / f"run_{task_id}"
-    upload_dir.mkdir(parents=True, exist_ok=True)
+    task_id, run_dir, upload_dir = new_task_dirs(output_root, upload_root)
 
     filename = secure_filename(upload.filename)
     input_path = upload_dir / filename

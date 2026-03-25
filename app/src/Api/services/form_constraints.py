@@ -3,6 +3,7 @@ import json
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.src.Database import admin as db_admin
+from app.src.Utils.text_safety import validate_nested_text_payload
 from app.src.Data.transcription_languages import (
     TRANSCRIPTION_LANGUAGE_CODES,
     TRANSCRIPTION_TARGET_LANGUAGE_CODES,
@@ -616,7 +617,7 @@ def _default_constraints() -> Dict[str, Any]:
                         "lock": "free",
                         "default_value": "none",
                         "fixed_value": "none",
-                        "allowed_values": ["none", "ollama", "openai_compatible"],
+                        "allowed_values": ["none", "ollama", "openai", "openai_compatible"],
                     },
                     "translator_base_url": {
                         "label": "翻译服务地址",
@@ -1016,5 +1017,9 @@ def apply_constraints_to_params(category: str, params: Dict[str, Any]) -> Tuple[
 
         raw_value = out.get(field_key, field.get("default_value"))
         out[field_key] = _sanitize_one_value(raw_value, field, effective_lock)
+
+    text_safety_error = validate_nested_text_payload(out)
+    if text_safety_error:
+        return out, text_safety_error
 
     return out, None

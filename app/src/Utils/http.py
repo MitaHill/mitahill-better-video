@@ -2,6 +2,8 @@ import json
 import subprocess
 from pathlib import Path
 
+from .text_safety import validate_filename_text
+
 
 def ffprobe_info(file_path: Path):
     try:
@@ -89,14 +91,11 @@ def ffprobe_info(file_path: Path):
 
 def secure_filename(name: str) -> str:
     safe = name.replace("/", "_").replace("\\", "_").strip()
+    safe = safe.replace("..", "_")
+    for ch in '<>:"|?*':
+        safe = safe.replace(ch, "_")
+    safe = safe.rstrip(" .")
     return safe or "upload.bin"
 
 def is_filename_safe(name: str, max_len: int = 180) -> bool:
-    if not name or len(name) > max_len:
-        return False
-    for ch in name:
-        if ord(ch) < 32 or ord(ch) == 127:
-            return False
-    if "/" in name or "\\" in name:
-        return False
-    return True
+    return validate_filename_text(name, max_len=max_len) is None

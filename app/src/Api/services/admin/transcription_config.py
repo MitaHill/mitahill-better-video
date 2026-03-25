@@ -12,7 +12,7 @@ from .transcription_catalog import get_models_for_backend
 
 
 _VALID_BACKENDS = {"faster_whisper"}
-_VALID_TRANSLATORS = {"none", "ollama", "openai_compatible"}
+_VALID_TRANSLATORS = {"none", "ollama", "openai", "openai_compatible"}
 _VALID_TRANSLATION_FALLBACK_MODES = {"model_full_text", "source_text"}
 _VALID_RUNTIME_MODES = {"parallel", "memory_saving"}
 
@@ -125,6 +125,8 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
         provider = "none"
     merged["translation"]["provider"] = provider
     merged["translation"]["base_url"] = str(merged["translation"].get("base_url") or "").strip()
+    if provider == "openai" and not merged["translation"]["base_url"]:
+        merged["translation"]["base_url"] = "https://api.openai.com/v1"
     merged["translation"]["model"] = str(merged["translation"].get("model") or "").strip()
     merged["translation"]["api_key"] = str(merged["translation"].get("api_key") or "").strip()
     merged["translation"]["prompt"] = str(merged["translation"].get("prompt") or "").strip()
@@ -239,6 +241,12 @@ def _sync_transcription_constraints(current: Dict[str, Any]):
     whisper_field = fields.get("whisper_model") or {}
     language_field = fields.get("language") or {}
     translate_to_field = fields.get("translate_to") or {}
+    translator_provider_field = fields.get("translator_provider") or {}
+    translator_base_url_field = fields.get("translator_base_url") or {}
+    translator_model_field = fields.get("translator_model") or {}
+    translator_api_key_field = fields.get("translator_api_key") or {}
+    translator_prompt_field = fields.get("translator_prompt") or {}
+    translator_timeout_field = fields.get("translator_timeout_sec") or {}
 
     transcription = current.get("transcription") or {}
     backend = str(transcription.get("backend") or "faster_whisper").strip().lower()
@@ -292,6 +300,48 @@ def _sync_transcription_constraints(current: Dict[str, Any]):
         fixed_target = default_target
     translate_to_field["fixed_value"] = fixed_target
     fields["translate_to"] = translate_to_field
+
+    translation = current.get("translation") or {}
+    provider = str(translation.get("provider") or "none").strip().lower()
+    if provider not in _VALID_TRANSLATORS:
+        provider = "none"
+    translator_provider_field["kind"] = "enum"
+    translator_provider_field["allowed_values"] = ["none", "ollama", "openai", "openai_compatible"]
+    translator_provider_field["default_value"] = provider
+    if translator_provider_field.get("lock") == "fixed":
+        translator_provider_field["fixed_value"] = provider
+    fields["translator_provider"] = translator_provider_field
+
+    current_base_url = str(translation.get("base_url") or "").strip()
+    current_model = str(translation.get("model") or "").strip()
+    current_api_key = str(translation.get("api_key") or "").strip()
+    current_prompt = str(translation.get("prompt") or "").strip()
+    current_timeout = float(translation.get("timeout_sec") or 120.0)
+
+    translator_base_url_field["default_value"] = current_base_url
+    if translator_base_url_field.get("lock") == "fixed":
+        translator_base_url_field["fixed_value"] = current_base_url
+    fields["translator_base_url"] = translator_base_url_field
+
+    translator_model_field["default_value"] = current_model
+    if translator_model_field.get("lock") == "fixed":
+        translator_model_field["fixed_value"] = current_model
+    fields["translator_model"] = translator_model_field
+
+    translator_api_key_field["default_value"] = current_api_key
+    if translator_api_key_field.get("lock") == "fixed":
+        translator_api_key_field["fixed_value"] = current_api_key
+    fields["translator_api_key"] = translator_api_key_field
+
+    translator_prompt_field["default_value"] = current_prompt
+    if translator_prompt_field.get("lock") == "fixed":
+        translator_prompt_field["fixed_value"] = current_prompt
+    fields["translator_prompt"] = translator_prompt_field
+
+    translator_timeout_field["default_value"] = current_timeout
+    if translator_timeout_field.get("lock") == "fixed":
+        translator_timeout_field["fixed_value"] = current_timeout
+    fields["translator_timeout_sec"] = translator_timeout_field
 
     update_form_constraints_config(
         {

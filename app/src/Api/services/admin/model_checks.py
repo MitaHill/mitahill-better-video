@@ -15,6 +15,7 @@ import requests
 from .transcription_catalog import fetch_hf_model_files, get_model_entry, get_storage_roots
 
 logger = logging.getLogger("ADMIN_MODEL_CHECKS")
+_OPENAI_BASE_URL = "https://api.openai.com/v1"
 
 
 def _digest_of_file(path: Path, algo: str) -> str:
@@ -80,6 +81,19 @@ def _speed_grade(latency_sec: float) -> str:
     if latency_sec <= 30.0:
         return "较慢"
     return "很慢"
+
+
+def _extract_error_detail(resp) -> str:
+    try:
+        payload = resp.json() or {}
+    except Exception:
+        return (resp.text or "").strip()[:180]
+    error = payload.get("error")
+    if isinstance(error, dict):
+        message = str(error.get("message") or "").strip()
+        if message:
+            return message
+    return str(error or "").strip() or (resp.text or "").strip()[:180]
 
 
 def verify_model_hashes(model_entry: Dict) -> Dict:
@@ -275,6 +289,13 @@ def test_translation_provider(translation_config: Dict) -> Dict:
 
     if provider == "none":
         return {"ok": False, "provider": provider, "error": "翻译提供器未启用"}
+    if provider == "openai":
+        return _test_openai(
+            base_url=base_url or _OPENAI_BASE_URL,
+            model=model,
+            api_key=api_key,
+            timeout_sec=max(1.0, min(timeout_sec, 60.0)),
+        )
     if not base_url:
         return {"ok": False, "provider": provider, "error": "未配置翻译服务地址"}
 
@@ -289,6 +310,15 @@ def test_translation_provider(translation_config: Dict) -> Dict:
         )
 
     return {"ok": False, "provider": provider, "error": f"不支持的翻译提供器: {provider}"}
+
+
+def _normalize_openai_base_url(base_url: str) -> str:
+    raw = str(base_url or "").strip().rstrip("/")
+    if raw.endswith("/responses"):
+        raw = raw[: -len("/responses")]
+    if raw.endswith("/chat/completions"):
+        raw = raw[: -len("/chat/completions")]
+    return raw or _OPENAI_BASE_URL
 
 
 def _test_ollama(base_url: str, model: str) -> Dict:
@@ -378,9 +408,8 @@ def _test_ollama(base_url: str, model: str) -> Dict:
 
 
 def _test_openai_compatible(base_url: str, model: str, api_key: str, timeout_sec: float) -> Dict:
-    endpoint = base_url
-    if not endpoint.endswith("/chat/completions"):
-        endpoint = f"{base_url}/chat/completions"
+    endpoint = _normalize_openai_base_url(base_url)
+    endpoint = endpoint if endpoint.endswith("/chat/completions") else f"{endpoint}/chat/completions"
 
     headers = {"Content-Type": "application/json"}
     if api_key:
@@ -400,11 +429,7 @@ def _test_openai_compatible(base_url: str, model: str, api_key: str, timeout_sec
             timeout=timeout_sec,
         )
         if resp.status_code >= 400:
-            detail = ""
-            try:
-                detail = str((resp.json() or {}).get("error") or "")
-            except Exception:
-                detail = (resp.text or "").strip()[:180]
+            detail = _extract_error_detail(resp)
             mapping = {
                 401: "Token 无效或未授权",
                 403: "权限不足",
@@ -453,6 +478,90 @@ def _test_openai_compatible(base_url: str, model: str, api_key: str, timeout_sec
         return {
             "ok": False,
             "provider": "openai_compatible",
+            "error": f"调用失败: {exc}",
+        }
+
+
+def _test_openai(base_url: str, model: str, api_key: str, timeout_sec: float) -> Dict:
+    if not model:
+        return {"ok": False, "provider": "openai", "error": "未配置 OpenAI 模型名"}
+    if not api_key:
+        return {"ok": False, "provider": "openai", "error": "未配置 OpenAI API Key"}
+
+    endpoint = f"{_normalize_openai_base_url(base_url)}/responses"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+
+    started = time.time()
+    try:
+        resp = requests.post(
+            endpoint,
+            headers=headers,
+            json={
+                "model": model,
+                "instructions": "Reply with a very short plain text greeting only.",
+                "input": "Say hello in one short sentence.",
+            },
+            timeout=timeout_sec,
+        )
+        if resp.status_code >= 400:
+            detail = _extract_error_detail(resp)
+            mapping = {
+                400: "请求参数错误",
+                401: "OpenAI API Key 无效或未授权",
+                403: "OpenAI 账户无权访问该模型或接口",
+                404: "接口或模型不存在",
+                429: "触发限流或额度不足",
+                500: "OpenAI 服务端内部错误",
+                502: "OpenAI 上游网关错误",
+                503: "OpenAI 服务暂不可用",
+                504: "OpenAI 网关超时",
+            }
+            return {
+                "ok": False,
+                "provider": "openai",
+                "error": mapping.get(resp.status_code, f"HTTP {resp.status_code}"),
+                "http_status": resp.status_code,
+                "detail": detail,
+            }
+
+        payload = resp.json() or {}
+        content = str(payload.get("output_text") or "").strip()
+        if not content:
+            for item in payload.get("output") or []:
+                for content_item in (item or {}).get("content") or []:
+                    text = str((content_item or {}).get("text") or "").strip()
+                    if text:
+                        content = text
+                        break
+                if content:
+                    break
+        latency = time.time() - started
+        return {
+            "ok": True,
+            "provider": "openai",
+            "elapsed_sec": round(latency, 3),
+            "speed_grade": _speed_grade(latency),
+            "reply_preview": content[:120],
+        }
+    except requests.Timeout:
+        return {
+            "ok": False,
+            "provider": "openai",
+            "error": f"请求超时（>{timeout_sec:.0f}s）",
+        }
+    except requests.ConnectionError as exc:
+        return {
+            "ok": False,
+            "provider": "openai",
+            "error": f"连接失败: {exc}",
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "provider": "openai",
             "error": f"调用失败: {exc}",
         }
 

@@ -51,9 +51,20 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     return Number.isFinite(numeric) ? numeric : null;
   };
 
+  const normalizeTaskId = (value) => String(value || "").replace(/\D+/g, "").slice(0, 4);
+
+  const normalizeServerTimestamp = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    if (/[zZ]$|[+-]\d{2}:\d{2}$/.test(raw)) return raw;
+    if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) return `${raw}Z`;
+    if (/^\d{4}-\d{2}-\d{2} /.test(raw)) return `${raw.replace(" ", "T")}Z`;
+    return raw;
+  };
+
   const parseUpdatedAtMs = (value) => {
     if (!value) return 0;
-    const parsed = Date.parse(String(value));
+    const parsed = Date.parse(normalizeServerTimestamp(value));
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
@@ -104,7 +115,6 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
       // 轮询接口每次都会带一个当前 GPU 快照，因此就算事件流里没有 GPU 字段，
       // 状态板也能维持一个接近实时的数值。
       live.gpu = polledGpu;
-      live.updatedAtMs = parseUpdatedAtMs(gpuLive.collected_at) || live.updatedAtMs;
     }
 
     if (!live.itemCount) {
@@ -177,7 +187,11 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   const fetchStatus = async () => {
     statusError.value = "";
     if (!statusQuery.value) {
-      statusError.value = "请先填写任务 ID。";
+      statusError.value = "请输入 4 位数字任务 ID。";
+      return;
+    }
+    if (statusQuery.value.length !== 4) {
+      statusError.value = "任务 ID 必须是 4 位数字。";
       return;
     }
 
@@ -185,7 +199,10 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
       const res = await fetch(`/api/tasks/${statusQuery.value}`);
       if (!res.ok) {
         const err = await parseJsonSafe(res);
-        throw new Error(err.error || "未找到任务，请确认 ID 是否正确。");
+        if (res.status === 404 || err.error_code === "task_not_found") {
+          throw new Error(err.hint || "没有找到这个任务。请确认 4 位任务 ID 是否正确，或该任务已经被系统清理。");
+        }
+        throw new Error(err.error || "查询任务状态失败，请稍后重试。");
       }
 
       status.value = await parseJsonSafe(res);
@@ -214,6 +231,8 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
         stopPolling();
       }
     } catch (error) {
+      stopPolling();
+      status.value = null;
       statusError.value = error.message;
     }
   };
@@ -223,7 +242,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   };
 
   const setStatusQuery = (value) => {
-    const nextValue = String(value || "");
+    const nextValue = normalizeTaskId(value);
     if (nextValue !== statusQuery.value) {
       resetLive();
       lastPreviewFrame.value = 0;

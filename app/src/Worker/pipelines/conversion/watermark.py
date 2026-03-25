@@ -22,6 +22,11 @@ logger = logging.getLogger("CONVERTER")
 def _load_font(size):
     size = to_int(size, 26, min_value=10, max_value=144)
     for font_path in (
+        # 转换水印这里是 Pillow 先把文字画成透明 PNG，再交给 ffmpeg overlay。
+        # 之前只试了 DejaVu/FreeSans，英文没问题，但中文会退化成同一个缺字方块。
+        # 容器里已经安装了 Noto CJK，因此这里优先命中真正覆盖中日韩字形的字体。
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
     ):

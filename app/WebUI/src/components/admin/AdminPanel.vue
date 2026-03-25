@@ -413,7 +413,7 @@ const transcribeReadyModelOptions = computed(() =>
 
 const transcribeConstraintFieldPresets = computed(() => ({
   whisper_model: transcribeReadyModelOptions.value,
-  translator_provider: ["none", "ollama", "openai_compatible"],
+  translator_provider: ["none", "ollama", "openai", "openai_compatible"],
 }));
 
 let timer = null;

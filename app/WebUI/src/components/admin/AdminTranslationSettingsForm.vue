@@ -9,6 +9,7 @@
         <select v-model="local.provider" :disabled="loading">
           <option value="none">不启用</option>
           <option value="ollama">Ollama</option>
+          <option value="openai">OpenAI Cloud</option>
           <option value="openai_compatible">OpenAI Compatible</option>
         </select>
       </div>
@@ -31,7 +32,7 @@
 
     <div class="field compact">
       <label>服务地址</label>
-      <input v-model="local.baseUrl" :disabled="loading" placeholder="例如: http://127.0.0.1:11434 或 https://api.openai.com/v1" />
+      <input v-model="local.baseUrl" :disabled="loading" placeholder="OpenAI Cloud 可留空，默认 https://api.openai.com/v1" />
     </div>
 
     <div class="inline-grid two">
@@ -41,7 +42,7 @@
       </div>
       <div class="field compact">
         <label>API Key</label>
-        <input v-model="local.apiKey" :disabled="loading" placeholder="可为空" />
+        <input v-model="local.apiKey" :disabled="loading" placeholder="OpenAI Cloud 必填，兼容服务按需填写" />
       </div>
     </div>
 

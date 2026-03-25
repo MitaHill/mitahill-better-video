@@ -38,8 +38,8 @@
 
     <div class="panel" style="margin-top: 16px; background: rgba(255,255,255,0.05);">
       <p class="notice">文件：{{ status.video_info?.filename || "未知" }}</p>
-      <p class="notice">分辨率：{{ resolution }}</p>
-      <p class="notice">大小：{{ sizeText }}</p>
+      <p v-if="showResolutionRow" class="notice">分辨率：{{ resolution }}</p>
+      <p v-if="showSizeRow" class="notice">大小：{{ sizeText }}</p>
       <p class="notice" v-if="status.video_info?.video_count">批量视频：{{ status.video_info.video_count }}</p>
       <p class="notice" v-if="status.video_info?.audio_count !== undefined">批量音频：{{ status.video_info.audio_count }}</p>
     </div>
@@ -128,5 +128,15 @@ const updateText = computed(() => {
 const sizeText = computed(() => {
   const value = Number(props.status?.video_info?.size_mb || 0);
   return value > 0 ? `${value} MB` : "-";
+});
+
+const showResolutionRow = computed(() => {
+  if (category.value !== "download") return true;
+  return props.resolution && props.resolution !== "-" && props.resolution !== "?";
+});
+
+const showSizeRow = computed(() => {
+  if (category.value !== "download") return true;
+  return Number(props.status?.video_info?.size_mb || 0) > 0;
 });
 </script>

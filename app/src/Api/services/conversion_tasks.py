@@ -3,7 +3,7 @@ from pathlib import Path
 from app.src.Database import core as db
 from app.src.Utils.http import ffprobe_info, is_filename_safe, secure_filename
 
-from .uploads import classify_media, save_uploaded_files
+from .uploads import classify_media, new_task_dirs, save_uploaded_files
 
 
 def _collect_conversion_uploads(req):
@@ -49,13 +49,7 @@ def create_conversion_task(
     if not media_files:
         return None, "at least one audio/video media file is required"
 
-    import uuid
-
-    task_id = uuid.uuid4().hex
-    run_dir = output_root / f"run_{task_id}"
-    run_dir.mkdir(parents=True, exist_ok=True)
-    upload_dir = upload_root / f"run_{task_id}"
-    upload_dir.mkdir(parents=True, exist_ok=True)
+    task_id, run_dir, upload_dir = new_task_dirs(output_root, upload_root)
     media_dir = upload_dir / "media"
     media_dir.mkdir(parents=True, exist_ok=True)
 

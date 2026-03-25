@@ -19,6 +19,22 @@ def _load_parser_defaults():
 
 def parse_transcription_task_params(form):
     defaults = _load_parser_defaults()
+    default_provider = (
+        defaults.get("translator_provider", config.TRANSCRIPTION_TRANSLATOR_PROVIDER)
+        or "none"
+    ).strip().lower()
+    requested_provider = (form.get("translator_provider", default_provider) or default_provider).strip().lower()
+    default_base_url = (
+        defaults.get("translator_base_url", config.TRANSCRIPTION_TRANSLATOR_BASE_URL)
+        or ""
+    ).strip()
+    if "translator_base_url" in form:
+        requested_base_url = str(form.get("translator_base_url") or "").strip()
+    else:
+        requested_base_url = default_base_url
+    if requested_provider == "openai":
+        requested_base_url = requested_base_url or "https://api.openai.com/v1"
+
     parsed = {
         "task_category": "transcribe",
         "transcription_backend": "faster_whisper",
@@ -31,24 +47,21 @@ def parse_transcription_task_params(form):
         ).lower(),
         "language": (form.get("language", "auto") or "auto").strip().lower(),
         "translate_to": (form.get("translate_to", "") or "").strip(),
-        "translator_provider": (
-            defaults.get("translator_provider", config.TRANSCRIPTION_TRANSLATOR_PROVIDER)
-            or "none"
-        ).strip().lower(),
-        "translator_base_url": (
-            defaults.get("translator_base_url", config.TRANSCRIPTION_TRANSLATOR_BASE_URL)
-            or ""
-        ).strip(),
+        "translator_provider": requested_provider,
+        "translator_base_url": requested_base_url,
         "translator_model": (
-            defaults.get("translator_model", config.TRANSCRIPTION_TRANSLATOR_MODEL)
+            form.get("translator_model", defaults.get("translator_model", config.TRANSCRIPTION_TRANSLATOR_MODEL))
+            or defaults.get("translator_model", config.TRANSCRIPTION_TRANSLATOR_MODEL)
             or ""
         ).strip(),
         "translator_api_key": (
-            defaults.get("translator_api_key", config.TRANSCRIPTION_TRANSLATOR_API_KEY)
+            form.get("translator_api_key", defaults.get("translator_api_key", config.TRANSCRIPTION_TRANSLATOR_API_KEY))
+            or defaults.get("translator_api_key", config.TRANSCRIPTION_TRANSLATOR_API_KEY)
             or ""
         ).strip(),
         "translator_prompt": (
-            defaults.get("translator_prompt", config.TRANSCRIPTION_TRANSLATOR_PROMPT)
+            form.get("translator_prompt", defaults.get("translator_prompt", config.TRANSCRIPTION_TRANSLATOR_PROMPT))
+            or defaults.get("translator_prompt", config.TRANSCRIPTION_TRANSLATOR_PROMPT)
             or ""
         ).strip(),
         "translator_fallback_mode": (

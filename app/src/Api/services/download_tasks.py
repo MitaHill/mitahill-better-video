@@ -1,6 +1,5 @@
-import uuid
-
 from app.src.Database import core as db
+from .uploads import new_task_id
 from .video_download import normalize_download_url
 
 
@@ -12,7 +11,7 @@ def create_download_task(client_ip, params, output_root):
         mode = "video"
     safe_params["download_mode"] = mode
 
-    task_id = uuid.uuid4().hex
+    task_id = new_task_id(output_root=output_root)
     run_dir = output_root / f"run_{task_id}"
     run_dir.mkdir(parents=True, exist_ok=True)
 

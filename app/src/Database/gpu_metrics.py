@@ -16,7 +16,10 @@ def _isoish(value) -> str | None:
     text = str(value).strip()
     if not text:
         return None
-    return text.replace(" ", "T", 1) if "T" not in text and " " in text else text
+    normalized = text.replace(" ", "T", 1) if "T" not in text and " " in text else text
+    if normalized.endswith("Z") or "+" in normalized[-6:] or "-" in normalized[-6:]:
+        return normalized
+    return f"{normalized}+00:00"
 
 
 def insert_gpu_samples(samples: List[Dict]):
@@ -91,7 +94,7 @@ def list_gpu_usage_series(seconds: int = 60) -> Dict:
             by_gpu[key] = item
         item["samples"].append(
             {
-                "ts": row.get("collected_at"),
+                "ts": _isoish(row.get("collected_at")),
                 "utilization_gpu": float(row.get("utilization_gpu") or 0.0),
                 "utilization_mem": float(row.get("utilization_mem") or 0.0),
                 "memory_used_mb": float(row.get("memory_used_mb") or 0.0),

@@ -1,11 +1,30 @@
-import uuid
+import secrets
 from pathlib import Path
 
+from app.src.Database import core as db
 from app.src.Utils.http import ffprobe_info, is_filename_safe, secure_filename
 
 
+def new_task_id(output_root=None, upload_root=None, max_attempts=128):
+    output_base = Path(output_root) if output_root else None
+    upload_base = Path(upload_root) if upload_root else None
+
+    # 任务 ID 现在收敛成 4 位数字。
+    # 这里不只查数据库，还顺手避开遗留的 run 目录，防止极端情况下撞到半清理状态的旧任务目录。
+    for _ in range(max_attempts):
+        task_id = f"{secrets.randbelow(10_000):04d}"
+        if db.get_task(task_id):
+            continue
+        if output_base and (output_base / f"run_{task_id}").exists():
+            continue
+        if upload_base and (upload_base / f"run_{task_id}").exists():
+            continue
+        return task_id
+    raise RuntimeError("failed to allocate a unique 4-digit task id")
+
+
 def new_task_dirs(output_root, upload_root):
-    task_id = uuid.uuid4().hex
+    task_id = new_task_id(output_root=output_root, upload_root=upload_root)
     run_dir = output_root / f"run_{task_id}"
     run_dir.mkdir(parents=True, exist_ok=True)
     upload_dir = upload_root / f"run_{task_id}"

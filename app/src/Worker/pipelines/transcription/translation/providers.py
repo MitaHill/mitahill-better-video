@@ -1,11 +1,13 @@
 import re
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 
 
 _CODE_BLOCK_RE = re.compile(r"```(?:[a-zA-Z]+)?\s*([\s\S]*?)```", re.MULTILINE)
 _THINK_TAG_RE = re.compile(r"<think>[\s\S]*?</think>", re.IGNORECASE)
+_OPENAI_BASE_URL = "https://api.openai.com/v1"
 _LANGUAGE_NAME_MAP = {
     "zh": "Chinese",
     "en": "English",
@@ -145,6 +147,51 @@ class BaseTranslator:
         return strict_rules
 
 
+def _strip_known_endpoint_suffix(base_url: str) -> str:
+    raw = str(base_url or "").strip().rstrip("/")
+    for suffix in ("/chat/completions", "/responses", "/api/chat", "/api/generate"):
+        if raw.endswith(suffix):
+            return raw[: -len(suffix)]
+    return raw
+
+
+def _normalize_openai_base_url(base_url: str) -> str:
+    raw = _strip_known_endpoint_suffix(base_url)
+    if not raw:
+        return _OPENAI_BASE_URL
+    parsed = urlparse(raw)
+    if not parsed.scheme or not parsed.netloc:
+        raise ValueError("OpenAI translator requires a valid HTTPS base URL or leave it empty for the default endpoint.")
+    return raw
+
+
+def _normalize_openai_compatible_endpoint(base_url: str) -> str:
+    raw = _strip_known_endpoint_suffix(base_url)
+    if not raw:
+        raise ValueError("OpenAI-compatible translator requires translator_base_url.")
+    parsed = urlparse(raw)
+    if not parsed.scheme or not parsed.netloc:
+        raise ValueError("OpenAI-compatible translator requires a valid base URL.")
+    return f"{raw}/chat/completions"
+
+
+def _extract_openai_responses_text(payload: dict) -> str:
+    direct = str(payload.get("output_text") or "").strip()
+    if direct:
+        return direct
+    outputs = payload.get("output") or []
+    for item in outputs:
+        if not isinstance(item, dict):
+            continue
+        for content in item.get("content") or []:
+            if not isinstance(content, dict):
+                continue
+            text = str(content.get("text") or "").strip()
+            if text:
+                return text
+    return ""
+
+
 class OllamaTranslator(BaseTranslator):
     label = "ollama"
 
@@ -223,10 +270,7 @@ class OpenAICompatibleTranslator(BaseTranslator):
     label = "openai_compatible"
 
     def _endpoint(self) -> str:
-        raw = self.base_url.rstrip("/")
-        if raw.endswith("/chat/completions"):
-            return raw
-        return f"{raw}/chat/completions"
+        return _normalize_openai_compatible_endpoint(self.base_url)
 
     def translate_text(self, text: str, target_language: str) -> str:
         if not self.base_url or not self.model:
@@ -256,6 +300,36 @@ class OpenAICompatibleTranslator(BaseTranslator):
         return self._resolve_fallback_text(model_raw_text=content, source_text=text)
 
 
+class OpenAITranslator(BaseTranslator):
+    label = "openai"
+
+    def _endpoint(self) -> str:
+        return f"{_normalize_openai_base_url(self.base_url)}/responses"
+
+    def translate_text(self, text: str, target_language: str) -> str:
+        if not self.model:
+            raise ValueError("OpenAI translator requires translator_model.")
+        if not self.api_key:
+            raise ValueError("OpenAI translator requires translator_api_key.")
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+        }
+        payload = {
+            "model": self.model,
+            "instructions": self._system_prompt(target_language, self.prompt),
+            "input": str(text or ""),
+        }
+        response = requests.post(self._endpoint(), headers=headers, json=payload, timeout=self.timeout_sec)
+        response.raise_for_status()
+        data = response.json() or {}
+        content = _extract_openai_responses_text(data)
+        parsed = self._extract_code_block_content(content)
+        if parsed:
+            return parsed
+        return self._resolve_fallback_text(model_raw_text=content, source_text=text)
+
+
 def create_translator(options) -> Optional[BaseTranslator]:
     provider = (options.get("translator_provider") or "none").strip().lower()
     if provider == "none" or not (options.get("translate_to") or "").strip():
@@ -273,6 +347,8 @@ def create_translator(options) -> Optional[BaseTranslator]:
     }
     if provider == "ollama":
         return OllamaTranslator(**kwargs)
+    if provider == "openai":
+        return OpenAITranslator(**kwargs)
     if provider == "openai_compatible":
         return OpenAICompatibleTranslator(**kwargs)
 

@@ -6,7 +6,8 @@ def build_transcription_runtime_payload():
     provider = str(defaults.get("translator_provider") or "none").strip().lower()
     model = str(defaults.get("translator_model") or "").strip()
     base_url = str(defaults.get("translator_base_url") or "").strip()
-    translation_enabled = provider != "none" and bool(model) and bool(base_url)
+    api_key = str(defaults.get("translator_api_key") or "").strip()
+    translation_enabled = provider != "none" and bool(model) and bool(base_url) and (provider != "openai" or bool(api_key))
     return {
         "ok": True,
         "transcription": {
@@ -17,6 +18,7 @@ def build_transcription_runtime_payload():
             "provider": provider,
             "model": model,
             "base_url": base_url,
+            "requires_api_key": provider == "openai",
             "enabled": translation_enabled,
         },
     }

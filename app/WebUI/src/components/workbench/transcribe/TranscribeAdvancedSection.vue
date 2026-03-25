@@ -110,7 +110,7 @@
         <label>翻译服务地址</label>
         <input
           v-model="transcribeForm.translatorBaseUrl"
-          placeholder="http://127.0.0.1:11434 或 https://api.xxx/v1"
+          :placeholder="transcribeForm.translatorProvider === 'openai' ? '留空则使用 https://api.openai.com/v1' : 'http://127.0.0.1:11434 或 https://api.xxx/v1'"
           :disabled="isDisabled('translatorBaseUrl')"
         />
       </div>
@@ -125,11 +125,11 @@
     </div>
 
     <div v-if="transcribeForm.translateTo && transcribeForm.translatorProvider !== 'none'" class="field compact">
-      <label>翻译 API Key（可选，OpenAI兼容常用）</label>
+      <label>翻译 API Key</label>
       <input
         v-model="transcribeForm.translatorApiKey"
         type="password"
-        placeholder="留空则不带 Authorization 头"
+        :placeholder="transcribeForm.translatorProvider === 'openai' ? 'OpenAI 云端为必填' : '留空则不带 Authorization 头'"
         :disabled="isDisabled('translatorApiKey')"
       />
     </div>
@@ -184,9 +184,18 @@ const outputVideoCodecOptions = computed(() =>
 );
 
 const translatorProviderOptions = computed(() =>
-  allowed("translatorProvider", ["none", "ollama", "openai_compatible"]).map((value) => ({
+  allowed("translatorProvider", ["none", "ollama", "openai", "openai_compatible"]).map((value) => ({
     value,
-    label: value === "none" ? "不启用" : value === "ollama" ? "Ollama" : value === "openai_compatible" ? "OpenAI兼容" : value,
+    label:
+      value === "none"
+        ? "不启用"
+        : value === "ollama"
+          ? "Ollama"
+          : value === "openai"
+            ? "OpenAI 云端"
+            : value === "openai_compatible"
+              ? "OpenAI兼容"
+              : value,
   }))
 );
 </script>

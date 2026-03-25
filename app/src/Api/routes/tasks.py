@@ -18,6 +18,29 @@ from ..services import create_enhance_task, find_result_file
 from ..services.form_constraints import apply_constraints_to_params
 
 bp = Blueprint("api_tasks", __name__)
+_TASK_PARAM_SENSITIVE_KEYS = {"translator_api_key"}
+
+
+def _sanitize_task_params(payload):
+    if not isinstance(payload, dict):
+        return payload
+    out = dict(payload)
+    for key in _TASK_PARAM_SENSITIVE_KEYS:
+        if key in out and str(out.get(key) or "").strip():
+            out[key] = "********"
+    return out
+
+
+def _normalize_utc_timestamp(value):
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    normalized = text.replace(" ", "T", 1) if "T" not in text and " " in text else text
+    if normalized.endswith("Z") or "+" in normalized[-6:] or "-" in normalized[-6:]:
+        return normalized
+    return f"{normalized}+00:00"
 
 
 @bp.errorhandler(RequestEntityTooLarge)
@@ -92,8 +115,16 @@ def create_tasks_batch():
 def get_task(task_id):
     task = db.get_task(task_id)
     if not task:
-        return jsonify({"error": "task not found"}), 404
-    task["task_params"] = json.loads(task.get("task_params", "{}"))
+        return jsonify(
+            {
+                "error": "未找到该任务。",
+                "error_code": "task_not_found",
+                "hint": "请确认输入的是正确的 4 位任务 ID，或者该任务已经被系统清理。",
+            }
+        ), 404
+    task["created_at"] = _normalize_utc_timestamp(task.get("created_at"))
+    task["updated_at"] = _normalize_utc_timestamp(task.get("updated_at"))
+    task["task_params"] = _sanitize_task_params(json.loads(task.get("task_params", "{}")))
     task["video_info"] = json.loads(task.get("video_info", "{}"))
     task["task_progress"] = db.get_task_progress(task_id)
     task["segment_progress"] = db.get_latest_segment_progress(task_id)

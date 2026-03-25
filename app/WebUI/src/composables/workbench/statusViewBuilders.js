@@ -77,6 +77,12 @@ export const buildParamRows = (status) => {
       subtitled_video: "带字幕视频（单视频直出 / 批量 ZIP）",
       subtitle_and_video_zip: "字幕与视频（统一 ZIP）",
     };
+    const providerLabelMap = {
+      none: "不启用",
+      ollama: "Ollama",
+      openai: "OpenAI 云端",
+      openai_compatible: "OpenAI 兼容",
+    };
     return [
       { label: "任务类别", value: "视频转录" },
       { label: "转录类型", value: modeLabelMap[params.transcribe_mode] || params.transcribe_mode || "-" },
@@ -84,7 +90,7 @@ export const buildParamRows = (status) => {
       { label: "Fast-Whisper 模型", value: params.whisper_model || "-" },
       { label: "语言", value: params.language || "auto" },
       { label: "翻译到", value: params.translate_to || "-" },
-      { label: "翻译提供器", value: params.translator_provider || "-" },
+      { label: "翻译提供器", value: providerLabelMap[params.translator_provider] || params.translator_provider || "-" },
       { label: "温度", value: params.temperature ?? "-" },
       { label: "Beam Size", value: params.beam_size ?? "-" },
       { label: "Best Of", value: params.best_of ?? "-" },
