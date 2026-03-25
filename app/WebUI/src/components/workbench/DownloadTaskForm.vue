@@ -22,6 +22,9 @@
       </div>
       <p v-if="downloadForm.probeError" class="notice" style="color: var(--accent-2);">{{ downloadForm.probeError }}</p>
       <p v-if="downloadForm.probeMessage" class="notice">{{ downloadForm.probeMessage }}</p>
+      <p v-if="downloadForm.probeReady" class="notice">
+        源信息：{{ resolveSourceSummary() }}
+      </p>
 
       <div class="inline-grid three">
         <div class="field compact">
@@ -126,10 +129,21 @@ const onProbeSource = () => {
 
 const onModeChange = (event) => {
   props.downloadForm.downloadMode = String(event.target.value || "video");
+  props.downloadForm.sourceWidth = Number(props.downloadForm.probeWidth || 0);
+  props.downloadForm.sourceHeight = Number(props.downloadForm.probeHeight || 0);
+  props.downloadForm.sourceFps = Number(props.downloadForm.probeFps || 0);
+  props.downloadForm.sourceSizeMb = Number(props.downloadForm.probeSizeMb || 0);
 };
 
 const onQualityChange = (event) => {
   props.downloadForm.qualitySelector = String(event.target.value || "bestvideo*+bestaudio/best");
+  const selected = Array.isArray(props.downloadForm.qualityOptions)
+    ? props.downloadForm.qualityOptions.find((item) => item.value === props.downloadForm.qualitySelector)
+    : null;
+  props.downloadForm.sourceWidth = Number(selected?.width || props.downloadForm.probeWidth || 0);
+  props.downloadForm.sourceHeight = Number(selected?.height || props.downloadForm.probeHeight || 0);
+  props.downloadForm.sourceFps = Number(selected?.fps || props.downloadForm.probeFps || 0);
+  props.downloadForm.sourceSizeMb = Number(selected?.size_mb || props.downloadForm.probeSizeMb || 0);
 };
 
 const onVideoFormatChange = (event) => {
@@ -151,5 +165,16 @@ const onIncludeAutoChange = (event) => {
 const onSubtitleLanguagesChange = (event) => {
   const selected = Array.from(event.target.selectedOptions || []).map((item) => String(item.value || ""));
   props.downloadForm.subtitleLanguages = selected.filter(Boolean);
+};
+
+const resolveSourceSummary = () => {
+  const width = Number(props.downloadForm.sourceWidth || 0);
+  const height = Number(props.downloadForm.sourceHeight || 0);
+  const fps = Number(props.downloadForm.sourceFps || 0);
+  const sizeMb = Number(props.downloadForm.sourceSizeMb || 0);
+  const resolution = width && height ? `${width}x${height}` : "分辨率待定";
+  const fpsText = fps > 0 ? ` | ${Math.round(fps * 100) / 100}fps` : "";
+  const sizeText = sizeMb > 0 ? ` | 约 ${sizeMb.toFixed(2)} MB` : "";
+  return `${resolution}${fpsText}${sizeText}`;
 };
 </script>

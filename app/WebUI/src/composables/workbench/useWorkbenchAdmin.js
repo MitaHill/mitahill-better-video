@@ -158,6 +158,18 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     }
   };
 
+  const resolveAdminLoginError = (payload) => {
+    const errorCode = String(payload?.error_code || "").trim().toLowerCase();
+    const rawMessage = String(payload?.error || "").trim();
+    if (errorCode === "invalid_password" || rawMessage.toLowerCase() === "invalid password") {
+      return "管理密码错误，请重新输入。";
+    }
+    if (errorCode === "missing_password") {
+      return "请输入管理密码。";
+    }
+    return rawMessage || "登录失败";
+  };
+
   const loginAdmin = async () => {
     auth.error = "";
     auth.loading = true;
@@ -169,7 +181,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       });
       const payload = await parseJsonSafe(res);
       if (!res.ok) {
-        throw new Error(payload.error || "登录失败");
+        throw new Error(resolveAdminLoginError(payload));
       }
       _saveToken(payload.token || "");
       auth.sessionId = payload.session_id || "";

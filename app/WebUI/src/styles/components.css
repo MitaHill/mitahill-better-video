@@ -2,8 +2,8 @@
   display: flex;
   flex-direction: column;
   gap: 32px;
-  padding: 32px 24px 64px;
-  max-width: 1200px;
+  padding: 32px 28px 72px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 
@@ -102,8 +102,9 @@
 
 .panel-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr);
+  gap: 24px;
+  align-items: start;
 }
 
 .panel {
@@ -111,6 +112,20 @@
   border: 1px solid var(--border);
   border-radius: 0;
   padding: 22px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.workbench-panel {
+  min-width: 0;
+}
+
+.workbench-panel--create {
+  padding-right: 24px;
+}
+
+.workbench-panel--status {
+  padding: 24px 26px 28px;
 }
 
 .param-group {
@@ -425,6 +440,7 @@ button:hover {
 .task-id-item {
   padding: 8px 2px;
   border-bottom: 1px solid var(--border);
+  word-break: break-all;
 }
 
 .task-id-item:last-child {
@@ -528,6 +544,83 @@ button:hover {
 .notice {
   color: var(--text-muted);
   font-size: 0.9rem;
+}
+
+.status-progress-shell {
+  display: grid;
+  gap: 10px;
+}
+
+.status-progress-head {
+  display: flex;
+  justify-content: flex-start;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.status-progress-percent {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.status-progress-sub {
+  height: 6px;
+  opacity: 0.9;
+}
+
+.status-progress-sub span {
+  background: color-mix(in srgb, var(--accent) 60%, white 40%);
+}
+
+.status-live-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 12px;
+}
+
+.status-live-card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 10px 12px;
+  min-height: 68px;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.status-live-card strong {
+  font-size: 0.98rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.status-live-label {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-login-error {
+  margin-top: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-2) 55%, var(--border) 45%);
+  background: color-mix(in srgb, var(--accent-2) 8%, transparent);
+  color: var(--accent-2);
+  padding: 10px 12px;
+  font-size: 0.92rem;
+}
+
+@media (max-width: 1180px) {
+  .panel-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workbench-panel--create,
+  .workbench-panel--status {
+    padding: 22px;
+  }
 }
 
 .admin-layout {

@@ -1,0 +1,7 @@
+.git
+pre-run/storage
+pre-run/.env
+__pycache__
+*.pyc
+app/WebUI/node_modules
+app/WebUI/dist

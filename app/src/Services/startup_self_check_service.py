@@ -200,8 +200,8 @@ class StartupSelfCheckService:
         )
         transcription = self.config_payload.get("transcription") or {}
         runtime = self.config_payload.get("runtime") or {}
-        backend = str(transcription.get("backend") or "whisper").strip().lower()
-        model_name = str(transcription.get("active_model") or "medium").strip().lower()
+        backend = str(transcription.get("backend") or "faster_whisper").strip().lower()
+        model_name = str(transcription.get("active_model") or "large-v3").strip().lower()
         runtime_mode = str(runtime.get("transcribe_runtime_mode") or "parallel").strip().lower()
 
         result = ENGINE.transcribe(

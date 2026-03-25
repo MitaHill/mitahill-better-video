@@ -47,6 +47,8 @@ export const useWorkbenchController = () => {
     status,
     statusError,
     preview,
+    live,
+    liveNowMs,
     isPreviewSupported,
     resolution,
     paramRows,
@@ -91,6 +93,30 @@ export const useWorkbenchController = () => {
 
   const { fetchRecommendations } = useWorkbenchRecommendations({ enhanceForm });
 
+  const syncDownloadSourceMetrics = (probeData = null) => {
+    const fallbackWidth = Number(downloadForm.probeWidth || probeData?.width || 0);
+    const fallbackHeight = Number(downloadForm.probeHeight || probeData?.height || 0);
+    const fallbackFps = Number(downloadForm.probeFps || probeData?.fps || 0);
+    const fallbackSizeMb = Number(downloadForm.probeSizeMb || probeData?.size_mb || 0);
+
+    if (downloadForm.downloadMode !== "video") {
+      downloadForm.sourceWidth = fallbackWidth;
+      downloadForm.sourceHeight = fallbackHeight;
+      downloadForm.sourceFps = fallbackFps;
+      downloadForm.sourceSizeMb = fallbackSizeMb;
+      return;
+    }
+
+    const selected = Array.isArray(downloadForm.qualityOptions)
+      ? downloadForm.qualityOptions.find((item) => item.value === downloadForm.qualitySelector)
+      : null;
+
+    downloadForm.sourceWidth = Number(selected?.width || fallbackWidth || 0);
+    downloadForm.sourceHeight = Number(selected?.height || fallbackHeight || 0);
+    downloadForm.sourceFps = Number(selected?.fps || fallbackFps || 0);
+    downloadForm.sourceSizeMb = Number(selected?.size_mb || fallbackSizeMb || 0);
+  };
+
   const probeDownloadSource = async () => {
     downloadForm.probeError = "";
     downloadForm.probeMessage = "";
@@ -110,6 +136,10 @@ export const useWorkbenchController = () => {
       downloadForm.probeReady = true;
       downloadForm.sourceTitle = String(data.title || "");
       downloadForm.sourceDurationSec = Number(data.duration_sec || 0);
+      downloadForm.probeWidth = Number(data.width || 0);
+      downloadForm.probeHeight = Number(data.height || 0);
+      downloadForm.probeFps = Number(data.fps || 0);
+      downloadForm.probeSizeMb = Number(data.size_mb || 0);
       downloadForm.maxQualityLabel = String(data.max_quality_label || "");
       downloadForm.qualityOptions = Array.isArray(data.quality_options) ? data.quality_options : [];
       const subtitleRows = Array.isArray(data.subtitle_languages) ? data.subtitle_languages : [];
@@ -123,6 +153,7 @@ export const useWorkbenchController = () => {
       if (downloadForm.qualityOptions.length && !downloadForm.qualityOptions.some((item) => item.value === downloadForm.qualitySelector)) {
         downloadForm.qualitySelector = String(downloadForm.qualityOptions[0].value || "bestvideo*+bestaudio/best");
       }
+      syncDownloadSourceMetrics(data);
       downloadForm.probeMessage = `解析完成：${downloadForm.sourceTitle || "未知标题"}`;
       if (!downloadForm.subtitleLanguages.length && downloadForm.subtitleLanguagesOptions.length) {
         downloadForm.subtitleLanguages = ["all"];
@@ -170,6 +201,8 @@ export const useWorkbenchController = () => {
     statusError,
     loading,
     preview,
+    live,
+    liveNowMs,
     isPreviewSupported,
     resolution,
     paramRows,

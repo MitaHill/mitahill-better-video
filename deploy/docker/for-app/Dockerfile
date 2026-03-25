@@ -21,6 +21,10 @@ WORKDIR /workspace
 # --- CACHE BUSTER TO ENSURE SOURCE CODE IS ALWAYS RE-COPIED AND RE-VERIFIED ---
 RUN echo "Triggering Re-build (Force Update 2026-01-08-1051)"
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends fonts-noto-cjk && \
+    rm -rf /var/lib/apt/lists/*
+
 # 1. Copy Source Code (app-only)
 COPY app/ /workspace/app/
 

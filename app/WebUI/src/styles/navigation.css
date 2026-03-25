@@ -15,7 +15,7 @@
   position: absolute;
   left: 0;
   top: 0;
-  width: calc((100% / var(--tab-count)) * 0.62);
+  width: calc(100% / var(--tab-count));
   height: 100%;
   background: var(--tab-slider-bg);
   border-radius: 0;
@@ -28,11 +28,12 @@
 .top-tabs__btn {
   position: relative;
   z-index: 1;
-  min-width: 132px;
+  min-width: 0;
+  width: 100%;
   background: transparent;
   border: none;
   color: var(--tab-text);
-  padding: 10px 14px;
+  padding: 12px 16px;
   transition: color 460ms cubic-bezier(0.2, 0.95, 0.3, 1), text-shadow 320ms ease;
 }
 

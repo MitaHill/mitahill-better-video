@@ -33,7 +33,7 @@
 
     <div class="inline-grid two">
       <div class="field compact">
-        <label>Whisper 模型</label>
+        <label>Fast-Whisper 模型</label>
         <select v-model="transcribeForm.whisperModel" :disabled="isDisabled('whisperModel')">
           <option v-for="model in whisperModelOptions" :key="model" :value="model">{{ model }}</option>
         </select>
@@ -96,11 +96,11 @@ const transcribeModeOptions = computed(() =>
     value,
     label:
       value === "subtitle_zip"
-        ? "字幕与文本（ZIP）"
+        ? "字幕与文本（单文件直出 / 批量 ZIP）"
         : value === "subtitled_video"
-          ? "生成带字幕视频"
+          ? "生成带字幕视频（单视频直出 / 批量 ZIP）"
           : value === "subtitle_and_video_zip"
-            ? "字幕与视频（ZIP）"
+            ? "字幕与视频（统一 ZIP）"
             : value,
   }))
 );
@@ -113,7 +113,7 @@ const subtitleFormatOptions = computed(() =>
 );
 
 const whisperModelOptions = computed(() =>
-  allowed("whisperModel", ["small", "medium", "large-v3", "turbo"])
+  allowed("whisperModel", ["small", "medium", "large-v3", "distil-large-v2", "distil-large-v3"])
 );
 
 const languageOptions = computed(() => {

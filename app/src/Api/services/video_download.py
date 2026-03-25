@@ -7,6 +7,7 @@ from typing import Dict, List
 
 
 DOWNLOAD_ROOT = Path("/workspace/storage/downloads/manual")
+_MB = 1024 * 1024
 
 
 def safe_bool(value) -> bool:
@@ -22,6 +23,20 @@ def safe_output_format(value: str, audio_only: bool) -> str:
         return raw if raw in allowed else "mp3"
     allowed = {"mp4", "webm", "mkv"}
     return raw if raw in allowed else "mp4"
+
+
+def _to_int(value, default=0):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _to_float(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def normalize_download_url(value: str) -> str:
@@ -105,8 +120,10 @@ def _build_quality_options(formats: List[Dict]) -> tuple[list, str]:
         if ext not in {"mp4", "webm", "mkv"}:
             continue
         height = int(item.get("height") or 0)
+        width = int(item.get("width") or 0)
         fps = item.get("fps")
         tbr = item.get("tbr")
+        filesize_bytes = _to_int(item.get("filesize") or item.get("filesize_approx") or 0)
         acodec = str(item.get("acodec") or "").strip().lower()
         needs_audio_merge = acodec in {"", "none"}
         selector = f"{format_id}+bestaudio/best" if needs_audio_merge else format_id
@@ -128,8 +145,12 @@ def _build_quality_options(formats: List[Dict]) -> tuple[list, str]:
                 "value": selector,
                 "label": label,
                 "height": height,
+                "width": width,
                 "ext": ext,
                 "format_id": format_id,
+                "fps": _to_float(fps, 0.0),
+                "filesize_bytes": filesize_bytes,
+                "size_mb": round(filesize_bytes / _MB, 2) if filesize_bytes > 0 else 0,
             }
         )
     options.sort(key=lambda item: (int(item.get("height") or 0), item.get("label") or ""), reverse=True)
@@ -145,6 +166,49 @@ def _build_quality_options(formats: List[Dict]) -> tuple[list, str]:
     )
     max_quality = f"{max_height}p" if max_height else "未知"
     return options, max_quality
+
+
+def _pick_best_video_format(formats: List[Dict]) -> Dict:
+    best = None
+    best_key = (-1, -1, -1, -1)
+    for item in formats or []:
+        if not isinstance(item, dict):
+            continue
+        vcodec = str(item.get("vcodec") or "").strip().lower()
+        if not vcodec or vcodec == "none":
+            continue
+        ext = str(item.get("ext") or "").strip().lower()
+        if ext not in {"mp4", "webm", "mkv"}:
+            continue
+        height = _to_int(item.get("height"))
+        width = _to_int(item.get("width"))
+        fps = _to_int(item.get("fps"))
+        bitrate = _to_int(item.get("tbr"))
+        candidate_key = (height, width, fps, bitrate)
+        if candidate_key > best_key:
+            best_key = candidate_key
+            best = item
+    return best or {}
+
+
+def _resolve_source_metrics(payload: Dict) -> Dict:
+    best = _pick_best_video_format(payload.get("formats") or [])
+    width = _to_int(payload.get("width")) or _to_int(best.get("width"))
+    height = _to_int(payload.get("height")) or _to_int(best.get("height"))
+    fps = _to_float(payload.get("fps")) or _to_float(best.get("fps"))
+    filesize_bytes = (
+        _to_int(payload.get("filesize"))
+        or _to_int(payload.get("filesize_approx"))
+        or _to_int(best.get("filesize"))
+        or _to_int(best.get("filesize_approx"))
+    )
+    return {
+        "width": width,
+        "height": height,
+        "fps": round(fps, 2) if fps > 0 else 0,
+        "filesize_bytes": filesize_bytes,
+        "size_mb": round(filesize_bytes / _MB, 2) if filesize_bytes > 0 else 0,
+    }
 
 
 def _build_subtitle_languages(subtitles: Dict, automatic_captions: Dict) -> list:
@@ -178,6 +242,7 @@ def _build_subtitle_languages(subtitles: Dict, automatic_captions: Dict) -> list
 def probe_download_source(url: str) -> Dict:
     payload = _run_probe_json(url)
     quality_options, max_quality = _build_quality_options(payload.get("formats") or [])
+    source_metrics = _resolve_source_metrics(payload)
     subtitle_languages = _build_subtitle_languages(
         payload.get("subtitles") or {},
         payload.get("automatic_captions") or {},
@@ -192,6 +257,11 @@ def probe_download_source(url: str) -> Dict:
         "thumbnail": payload.get("thumbnail") or "",
         "webpage_url": payload.get("webpage_url") or "",
         "max_quality_label": max_quality,
+        "width": source_metrics["width"],
+        "height": source_metrics["height"],
+        "fps": source_metrics["fps"],
+        "filesize_bytes": source_metrics["filesize_bytes"],
+        "size_mb": source_metrics["size_mb"],
         "quality_options": quality_options,
         "subtitle_languages": subtitle_languages,
     }

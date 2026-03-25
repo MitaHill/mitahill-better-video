@@ -1,4 +1,4 @@
-from .common import bool_from_form, get_list_field, int_from_form, merge_unparsed_form_fields
+from .common import bool_from_form, float_from_form, get_list_field, int_from_form, merge_unparsed_form_fields
 
 
 def _extract_subtitle_languages(form):
@@ -17,6 +17,10 @@ def parse_download_task_params(form):
         "source_url": (form.get("source_url", "") or "").strip(),
         "source_title": (form.get("source_title", "") or "").strip(),
         "source_duration_sec": int_from_form(form, "source_duration_sec", 0),
+        "source_width": int_from_form(form, "source_width", 0),
+        "source_height": int_from_form(form, "source_height", 0),
+        "source_fps": float_from_form(form, "source_fps", 0.0),
+        "source_size_mb": float_from_form(form, "source_size_mb", 0.0),
         "download_mode": (form.get("download_mode", "video") or "video").strip().lower(),
         "quality_selector": (
             form.get("quality_selector", "bestvideo*+bestaudio/best") or "bestvideo*+bestaudio/best"

@@ -9,7 +9,7 @@
     <div class="action-row">
       <button :disabled="loading" @click="onLogin">{{ loading ? "登录中..." : "登录" }}</button>
     </div>
-    <p v-if="error" class="notice" style="color: var(--accent-2); margin-top: 10px;">{{ error }}</p>
+    <div v-if="error" class="admin-login-error" role="alert">{{ error }}</div>
   </div>
 </template>
 

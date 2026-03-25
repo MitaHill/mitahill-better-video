@@ -48,6 +48,7 @@ def render_single_video(task_id, video_path, audio_paths, options, run_dir, inde
         f"转换视频 {index}/{total}: 编码准备",
         file_index=index,
         file_count=total,
+        stage="prepare",
     )
 
     hwaccel = ["-hwaccel", "cuda"] if config.FFMPEG_USE_GPU else []
@@ -142,6 +143,7 @@ def render_single_video(task_id, video_path, audio_paths, options, run_dir, inde
         f"转换视频 {index}/{total}: 音频处理中",
         file_index=index,
         file_count=total,
+        stage="audio",
     )
 
     if not map_audio_from_video and not map_audio_uploaded:
@@ -232,6 +234,7 @@ def render_single_video(task_id, video_path, audio_paths, options, run_dir, inde
         f"转换视频 {index}/{total}: 水印与元数据",
         file_index=index,
         file_count=total,
+        stage="finalize",
     )
     apply_watermark_and_metadata(source_for_mark, final_path, options, duration, run_dir)
 

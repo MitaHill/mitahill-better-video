@@ -160,7 +160,7 @@ try:
     EVENTS_ENDPOINT = os.getenv("EVENTS_ENDPOINT", "http://127.0.0.1:8501/api/events")
     FALLBACK_VRAM_GB = get_env_float("FALLBACK_VRAM_GB", 4.0)
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-    ADMIN_INITIAL_PASSWORD = os.getenv("ADMIN_INITIAL_PASSWORD", "change_me_please")
+    ADMIN_INITIAL_PASSWORD = os.getenv("ADMIN_INITIAL_PASSWORD", "kindmita")
     ADMIN_SESSION_TTL_HOURS = get_env_float("ADMIN_SESSION_TTL_HOURS", 24.0)
     REAL_IP_TRUSTED_PROXIES_RAW = os.getenv(
         "REAL_IP_TRUSTED_PROXIES",

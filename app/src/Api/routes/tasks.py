@@ -8,6 +8,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 
 from app.src.Config import settings as config
 from app.src.Database import core as db
+from app.src.Database import gpu_metrics as db_gpu
 from app.src.Utils.preview_cache import get_preview as get_cached_preview
 
 from ..constants import OUTPUT_ROOT, UPLOAD_ROOT
@@ -96,6 +97,7 @@ def get_task(task_id):
     task["video_info"] = json.loads(task.get("video_info", "{}"))
     task["task_progress"] = db.get_task_progress(task_id)
     task["segment_progress"] = db.get_latest_segment_progress(task_id)
+    task["gpu_live"] = db_gpu.get_current_gpu_usage()
     return jsonify(task)
 
 

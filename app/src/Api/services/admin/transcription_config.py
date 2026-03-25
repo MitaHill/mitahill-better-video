@@ -11,13 +11,12 @@ from app.src.Database import transcription_admin as db_transcription
 from .transcription_catalog import get_models_for_backend
 
 
-_VALID_BACKENDS = {"whisper", "faster_whisper"}
+_VALID_BACKENDS = {"faster_whisper"}
 _VALID_TRANSLATORS = {"none", "ollama", "openai_compatible"}
 _VALID_TRANSLATION_FALLBACK_MODES = {"model_full_text", "source_text"}
 _VALID_RUNTIME_MODES = {"parallel", "memory_saving"}
 
 _DEFAULT_MODEL_BY_BACKEND = {
-    "whisper": "medium",
     "faster_whisper": "large-v3",
 }
 
@@ -26,8 +25,8 @@ def default_transcription_config() -> Dict[str, Any]:
     return {
         "version": 1,
         "transcription": {
-            "backend": "whisper",
-            "active_model": "medium",
+            "backend": "faster_whisper",
+            "active_model": "large-v3",
             "allowed_models": [
                 "tiny",
                 "tiny.en",
@@ -37,14 +36,11 @@ def default_transcription_config() -> Dict[str, Any]:
                 "small.en",
                 "medium",
                 "medium.en",
-                "large",
                 "large-v1",
                 "large-v2",
                 "large-v3",
-                "turbo",
                 "distil-large-v2",
                 "distil-large-v3",
-                "large-v3-turbo",
             ],
         },
         "translation": {
@@ -87,12 +83,12 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
 def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     merged = _deep_merge(default_transcription_config(), raw or {})
 
-    backend = str(merged["transcription"].get("backend") or "whisper").strip().lower()
+    backend = str(merged["transcription"].get("backend") or "faster_whisper").strip().lower()
     if backend not in _VALID_BACKENDS:
-        backend = "whisper"
+        backend = "faster_whisper"
     merged["transcription"]["backend"] = backend
     merged["transcription"]["active_model"] = str(
-        merged["transcription"].get("active_model") or "medium"
+        merged["transcription"].get("active_model") or "large-v3"
     ).strip().lower()
 
     allowed = merged["transcription"].get("allowed_models") or []
@@ -103,18 +99,21 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     ]
     backend_supported = get_models_for_backend(backend)
     backend_supported_set = {str(item).strip().lower() for item in backend_supported}
+    merged["transcription"]["allowed_models"] = [
+        item for item in merged["transcription"]["allowed_models"] if item in backend_supported_set
+    ]
     active_model = str(merged["transcription"].get("active_model") or "").strip().lower()
     if active_model not in backend_supported_set:
         compatible_from_allowed = [
             item for item in merged["transcription"]["allowed_models"] if item in backend_supported_set
         ]
-        preferred = _DEFAULT_MODEL_BY_BACKEND.get(backend, "medium")
+        preferred = _DEFAULT_MODEL_BY_BACKEND.get(backend, "large-v3")
         if preferred in backend_supported_set:
             fallback_model = preferred
         elif compatible_from_allowed:
             fallback_model = compatible_from_allowed[0]
         else:
-            fallback_model = backend_supported[0] if backend_supported else "medium"
+            fallback_model = backend_supported[0] if backend_supported else "large-v3"
         merged["transcription"]["active_model"] = fallback_model
 
     provider = str(merged["translation"].get("provider") or "none").strip().lower()
@@ -206,8 +205,8 @@ def get_parser_defaults() -> Dict[str, Any]:
     transcription = current.get("transcription") or {}
     translation = current.get("translation") or {}
     return {
-        "transcription_backend": str(transcription.get("backend") or "whisper").strip().lower(),
-        "whisper_model": str(transcription.get("active_model") or "medium").strip().lower(),
+        "transcription_backend": str(transcription.get("backend") or "faster_whisper").strip().lower(),
+        "whisper_model": str(transcription.get("active_model") or "large-v3").strip().lower(),
         "translator_provider": str(translation.get("provider") or "none").strip().lower(),
         "translator_base_url": str(translation.get("base_url") or "").strip(),
         "translator_model": str(translation.get("model") or "").strip(),
@@ -238,7 +237,7 @@ def _sync_transcription_constraints(current: Dict[str, Any]):
     translate_to_field = fields.get("translate_to") or {}
 
     transcription = current.get("transcription") or {}
-    backend = str(transcription.get("backend") or "whisper").strip().lower()
+    backend = str(transcription.get("backend") or "faster_whisper").strip().lower()
     backend_supported = [
         str(item).strip().lower()
         for item in get_models_for_backend(backend)
@@ -251,15 +250,16 @@ def _sync_transcription_constraints(current: Dict[str, Any]):
         if str(item).strip()
     ]
     compatible_allowed = [item for item in allowed if item in backend_supported_set]
-    active_model = str(transcription.get("active_model") or "medium").strip().lower()
+    active_model = str(transcription.get("active_model") or "large-v3").strip().lower()
     if active_model and active_model not in compatible_allowed and active_model in backend_supported_set:
         compatible_allowed.append(active_model)
     if not compatible_allowed:
-        compatible_allowed = backend_supported or [active_model or "medium"]
+        compatible_allowed = backend_supported or [active_model or "large-v3"]
+    whisper_field["label"] = "Fast-Whisper模型"
     whisper_field["allowed_values"] = compatible_allowed
-    whisper_field["default_value"] = active_model or whisper_field.get("default_value", "medium")
+    whisper_field["default_value"] = active_model or whisper_field.get("default_value", "large-v3")
     if whisper_field.get("lock") == "fixed":
-        whisper_field["fixed_value"] = active_model or whisper_field.get("fixed_value", "medium")
+        whisper_field["fixed_value"] = active_model or whisper_field.get("fixed_value", "large-v3")
     fields["whisper_model"] = whisper_field
     language_allowed_set = {str(item).strip().lower() for item in TRANSCRIPTION_LANGUAGE_CODES}
     language_field["kind"] = "enum"

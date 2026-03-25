@@ -86,61 +86,6 @@ def verify_model_hashes(model_entry: Dict) -> Dict:
     backend = str(model_entry.get("backend") or "").strip().lower()
     out = {"ok": True, "checks": []}
 
-    if backend == "whisper":
-        local_path = Path(model_entry.get("local_path") or "")
-        candidate_items = model_entry.get("local_candidates") or []
-        candidate_paths: List[Path] = []
-        for item in candidate_items:
-            safe = str(item or "").strip()
-            if safe:
-                candidate_paths.append(Path(safe))
-        if local_path and str(local_path):
-            if str(local_path) not in {str(path) for path in candidate_paths}:
-                candidate_paths.insert(0, local_path)
-        if not candidate_paths:
-            candidate_paths = [local_path]
-
-        matched_path = next((path for path in candidate_paths if path.exists()), None)
-        if not matched_path:
-            looked_up = ", ".join(str(path) for path in candidate_paths if str(path)) or str(local_path)
-            return {
-                "ok": False,
-                "checks": [
-                    {
-                        "name": "hash",
-                        "status": "failed",
-                        "message": f"模型文件不存在，请先下载模型。已检查路径: {looked_up}",
-                    }
-                ],
-            }
-        expected = str(model_entry.get("expected_sha256") or "").strip().lower()
-        if not expected:
-            return {
-                "ok": False,
-                "checks": [
-                    {
-                        "name": "hash",
-                        "status": "failed",
-                        "file": str(matched_path),
-                        "message": "远程未提供可用 HASH",
-                    }
-                ],
-            }
-        actual = _digest_of_file(matched_path, "sha256")
-        status = actual == expected
-        out["checks"].append(
-            {
-                "name": "hash",
-                "status": "passed" if status else "failed",
-                "file": str(matched_path),
-                "expected": expected,
-                "actual": actual,
-                "message": "SHA256 校验通过" if status else "SHA256 校验失败",
-            }
-        )
-        out["ok"] = bool(status)
-        return out
-
     if backend == "faster_whisper":
         repo_id = str(model_entry.get("repo_id") or "").strip()
         model_id = str(model_entry.get("model_id") or "").strip()
@@ -283,18 +228,7 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
 
     wav_path = _build_silent_wav()
     try:
-        if backend == "whisper":
-            import whisper
-
-            storage = get_storage_roots().get("openai")
-            storage.mkdir(parents=True, exist_ok=True)
-            model_ref = model_id
-            if local_path.exists():
-                model_ref = str(local_path)
-            model = whisper.load_model(model_ref, download_root=str(storage), device=device)
-            _ = model.transcribe(str(wav_path), language="en", temperature=0.0, fp16=(device == "cuda"))
-
-        elif backend == "faster_whisper":
+        if backend == "faster_whisper":
             from faster_whisper import WhisperModel
 
             model_ref = str(local_path) if local_path.exists() else model_id

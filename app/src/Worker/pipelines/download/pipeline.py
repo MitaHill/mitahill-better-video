@@ -4,20 +4,57 @@ import re
 import shutil
 import subprocess
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 from app.src.Database import core as db
 from app.src.Notifications.events import send_event
+from app.src.Utils.http import ffprobe_info
+from app.src.Utils.ffmpeg import get_gpu_utilization
 
 logger = logging.getLogger("DOWNLOAD")
 
 _PROGRESS_RE = re.compile(r"\[download\]\s+(\d+(?:\.\d+)?)%")
 
 
-def _emit_progress(task_id: str, progress: int, message: str):
+def _event_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _emit_progress(task_id: str, progress: int, message: str, *, stage: str = "download"):
     value = max(0, min(100, int(progress)))
     db.update_task_status(task_id, "PROCESSING", value, message)
-    send_event({"task_id": task_id, "progress": value, "message": message})
+    send_event(
+        {
+            "task_id": task_id,
+            "task_category": "download",
+            "progress": value,
+            "message": message,
+            "stage": str(stage or "").strip().lower(),
+            "gpu_util": get_gpu_utilization(),
+            "updated_at": _event_now_iso(),
+        }
+    )
+
+
+def _update_download_video_info(task, result_path: Path, mode: str) -> None:
+    current = json.loads(task.get("video_info") or "{}")
+    info = ffprobe_info(result_path) if result_path.exists() else {}
+    stat_size_mb = round((result_path.stat().st_size / (1024 * 1024)), 2) if result_path.exists() else 0
+    video_info = {
+        **current,
+        "filename": result_path.name,
+        "result_path": str(result_path),
+        "size_mb": stat_size_mb or round(float(current.get("size_mb") or 0), 2),
+        "duration": float(info.get("duration") or current.get("duration") or 0),
+        "width": int(info.get("width") or current.get("width") or 0),
+        "height": int(info.get("height") or current.get("height") or 0),
+        "fps": float(info.get("fps") or current.get("fps") or 0),
+        "has_video": bool(info.get("has_video", mode == "video")),
+        "has_audio": bool(info.get("has_audio", mode in {"video", "audio"})),
+        "download_mode": mode,
+    }
+    db.update_task_video_info(task["task_id"], video_info)
 
 
 def _is_cancelled(task_id: str) -> bool:
@@ -103,10 +140,10 @@ def _run_yt_dlp(task_id: str, cmd: list[str], stage: str = "下载中") -> None:
             progress = max(5, min(95, progress))
             if progress != last_progress:
                 last_progress = progress
-                _emit_progress(task_id, progress, f"{stage} {pct:.1f}%")
+                _emit_progress(task_id, progress, f"{stage} {pct:.1f}%", stage="download")
             continue
         if "[Merger]" in text or "[ExtractAudio]" in text:
-            _emit_progress(task_id, 97, "封装处理中...")
+            _emit_progress(task_id, 97, "封装处理中...", stage="package")
 
     code = proc.wait()
     if code != 0:
@@ -231,7 +268,7 @@ def process_download_task(task):
     results_dir = run_dir / "results"
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    _emit_progress(task_id, 2, "下载任务初始化中...")
+    _emit_progress(task_id, 2, "下载任务初始化中...", stage="prepare")
     mode = _normalize_mode(params)
     if mode == "audio":
         result_path = _run_audio_download(task_id, source_url, params, results_dir)
@@ -243,6 +280,17 @@ def process_download_task(task):
     if _is_cancelled(task_id):
         raise RuntimeError("任务已取消")
 
+    _update_download_video_info(task, result_path, mode)
     db.update_task_result(task_id, result_path)
     db.update_task_status(task_id, "COMPLETED", 100, f"Completed: {Path(result_path).name}")
-    send_event({"task_id": task_id, "progress": 100, "message": "下载任务已完成"})
+    send_event(
+        {
+            "task_id": task_id,
+            "task_category": "download",
+            "progress": 100,
+            "message": "下载任务已完成",
+            "stage": "completed",
+            "gpu_util": get_gpu_utilization(),
+            "updated_at": _event_now_iso(),
+        }
+    )

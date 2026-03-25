@@ -3,6 +3,10 @@ export const buildDownloadTaskFormData = (downloadForm) => {
   data.append("source_url", String(downloadForm.sourceUrl || "").trim());
   data.append("source_title", String(downloadForm.sourceTitle || "").trim());
   data.append("source_duration_sec", String(Number(downloadForm.sourceDurationSec || 0)));
+  data.append("source_width", String(Number(downloadForm.sourceWidth || 0)));
+  data.append("source_height", String(Number(downloadForm.sourceHeight || 0)));
+  data.append("source_fps", String(Number(downloadForm.sourceFps || 0)));
+  data.append("source_size_mb", String(Number(downloadForm.sourceSizeMb || 0)));
   data.append("download_mode", String(downloadForm.downloadMode || "video"));
   data.append("quality_selector", String(downloadForm.qualitySelector || "bestvideo*+bestaudio/best"));
   data.append("video_output_format", String(downloadForm.videoOutputFormat || "mp4"));

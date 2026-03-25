@@ -1,5 +1,5 @@
 <template>
-  <div class="panel">
+  <div class="panel workbench-panel workbench-panel--status">
     <h2>查询状态</h2>
 
     <StatusQueryHeader
@@ -13,7 +13,13 @@
     />
 
     <div v-if="status" style="margin-top: 16px;">
-      <StatusProgressSummary :status="status" :progress-details="progressDetails" :resolution="resolution" />
+      <StatusProgressSummary
+        :status="status"
+        :live="live"
+        :live-now-ms="liveNowMs"
+        :progress-details="progressDetails"
+        :resolution="resolution"
+      />
 
       <StatusPreviewGrid v-if="isPreviewSupported && status.status !== 'PENDING'" :preview="preview" />
 
@@ -57,6 +63,14 @@ defineProps({
   },
   preview: {
     type: Object,
+    required: true,
+  },
+  live: {
+    type: Object,
+    required: true,
+  },
+  liveNowMs: {
+    type: Number,
     required: true,
   },
   isPreviewSupported: {

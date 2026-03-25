@@ -16,6 +16,9 @@ services:
       # Mount the env file for configuration
       - ./.env:/workspace/config/.env
     restart: unless-stopped
+    networks:
+      - default
+      - ai-stack
     deploy:
       resources:
         reservations:
@@ -23,3 +26,7 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+
+networks:
+  ai-stack:
+    external: true

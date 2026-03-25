@@ -1,15 +1,12 @@
 <template>
   <div class="panel admin-card">
     <h2>转录模型设置</h2>
-    <p class="notice" style="margin-bottom: 10px;">用于配置默认转录后端、默认模型、运行模式与 aria2 下载行为。</p>
+    <p class="notice" style="margin-bottom: 10px;">转录链路已固定为 faster-whisper。这里用于配置默认模型、运行模式与 aria2 下载行为。</p>
 
     <div class="inline-grid two">
       <div class="field compact">
         <label>默认后端</label>
-        <select v-model="local.backend" :disabled="loading">
-          <option value="whisper">openai-whisper</option>
-          <option value="faster_whisper">faster-whisper</option>
-        </select>
+        <input :value="'faster-whisper'" disabled />
       </div>
       <div class="field compact">
         <label>默认模型</label>
@@ -17,7 +14,7 @@
           v-model="local.activeModel"
           list="admin-transcribe-active-model-list"
           :disabled="loading"
-          placeholder="例如: medium / large-v3 / distil-large-v3"
+          placeholder="例如: large-v3 / distil-large-v3"
         />
         <datalist id="admin-transcribe-active-model-list">
           <option v-for="item in activeModelOptions" :key="item" :value="item" />
@@ -36,7 +33,7 @@
         @update:model-value="onAllowedModelsChange"
       />
       <p class="notice" style="margin-top: 6px;">
-        候选项会按当前后端过滤并优先展示已安装模型，也可手动输入新模型ID。
+        这里只保留 faster-whisper 兼容模型，优先展示已安装模型，也可手动输入新模型ID。
       </p>
     </div>
 
@@ -46,7 +43,7 @@
         <div class="field compact">
           <label>转录运行模式</label>
           <select v-model="local.runtimeMode" :disabled="loading">
-            <option value="parallel">并行模式（Whisper常驻，响应更快）</option>
+            <option value="parallel">并行模式（Fast-Whisper 常驻，响应更快）</option>
             <option value="memory_saving">节省显存（按阶段卸载/清理）</option>
           </select>
           <p class="notice" style="margin-top: 6px;">
@@ -143,8 +140,8 @@ const props = defineProps({
 });
 
 const local = reactive({
-  backend: "whisper",
-  activeModel: "medium",
+  backend: "faster_whisper",
+  activeModel: "large-v3",
   allowedModels: [],
   aria2: {
     split: 16,
@@ -189,8 +186,8 @@ const applyFromProps = () => {
   const transcription = cfg.transcription || {};
   const download = cfg.download || {};
   const aria2 = download.aria2 || {};
-  local.backend = transcription.backend || "whisper";
-  local.activeModel = transcription.active_model || "medium";
+  local.backend = "faster_whisper";
+  local.activeModel = transcription.active_model || "large-v3";
   local.allowedModels = normalizeModelIds(transcription.allowed_models || []);
   local.aria2.split = Number(aria2.split ?? 16);
   local.aria2.maxConnectionPerServer = Number(aria2.max_connection_per_server ?? 16);

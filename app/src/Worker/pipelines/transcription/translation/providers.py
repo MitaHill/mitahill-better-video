@@ -191,6 +191,7 @@ class OllamaTranslator(BaseTranslator):
         payload = {
             "model": self.model,
             "stream": False,
+            "think": False,
             "messages": [
                 {"role": "system", "content": self._system_prompt(target_language, self.prompt)},
                 {"role": "user", "content": str(text or "")},

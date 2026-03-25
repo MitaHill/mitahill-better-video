@@ -1,5 +1,5 @@
 <template>
-  <div class="panel">
+  <div class="panel workbench-panel workbench-panel--create">
     <h2>{{ panelTitle }}</h2>
 
     <EnhanceTaskForm

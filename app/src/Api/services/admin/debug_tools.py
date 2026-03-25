@@ -61,8 +61,8 @@ def run_transcription_model_test(
 
     current = get_transcription_config()
     transcription = current.get("transcription") or {}
-    chosen_backend = str(backend or transcription.get("backend") or "whisper").strip().lower()
-    chosen_model_id = str(model_id or transcription.get("active_model") or "medium").strip().lower()
+    chosen_backend = str(backend or transcription.get("backend") or "faster_whisper").strip().lower()
+    chosen_model_id = str(model_id or transcription.get("active_model") or "large-v3").strip().lower()
 
     result = {
         "ok": False,

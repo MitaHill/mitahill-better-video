@@ -29,12 +29,14 @@ def admin_login():
     payload = request.get_json(silent=True) or {}
     password = payload.get("password", "")
     if not password:
-        return jsonify({"error": "password is required"}), 400
+        return jsonify({"error": "请输入管理密码。", "error_code": "missing_password"}), 400
     client_ip = resolve_request_client_ip(request)
     user_agent = request.headers.get("User-Agent", "")
     session, err = login(password, client_ip, user_agent)
     if err:
-        return jsonify({"error": err}), 401
+        if err == "invalid password":
+            return jsonify({"error": "管理密码错误，请重新输入。", "error_code": "invalid_password"}), 401
+        return jsonify({"error": err, "error_code": "login_failed"}), 401
     return jsonify(
         {
             "token": session["token"],

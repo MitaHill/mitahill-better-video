@@ -1,5 +1,50 @@
 import { formatBool } from "./utils";
 
+const STAGE_LABELS = {
+  enhance: "增强处理中",
+  prepare: "准备中",
+  encode: "编码中",
+  audio: "音频处理中",
+  finalize: "后处理",
+  transcribe: "语音识别中",
+  write_subtitle: "写入字幕",
+  translate: "翻译中",
+  render_video: "合成字幕视频",
+  download: "下载中",
+  package: "封装处理中",
+  completed: "已完成",
+};
+
+const clampNumber = (value, fallback = 0) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+};
+
+const formatAgeLabel = (updatedAtMs, nowMs) => {
+  const updated = clampNumber(updatedAtMs, 0);
+  const now = clampNumber(nowMs, Date.now());
+  if (updated <= 0) return "";
+  const diffSec = Math.max(0, Math.floor((now - updated) / 1000));
+  if (diffSec <= 1) return "刚刚更新";
+  if (diffSec < 60) return `${diffSec}s前更新`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m前更新`;
+  return `${Math.floor(diffMin / 60)}h前更新`;
+};
+
+export const resolveStageLabel = (stage, category = "") => {
+  const safeStage = String(stage || "").trim().toLowerCase();
+  if (safeStage && STAGE_LABELS[safeStage]) {
+    return STAGE_LABELS[safeStage];
+  }
+  const safeCategory = String(category || "").trim().toLowerCase();
+  if (safeCategory === "enhance") return "增强处理中";
+  if (safeCategory === "convert") return "处理中";
+  if (safeCategory === "transcribe") return "转录处理中";
+  if (safeCategory === "download") return "下载处理中";
+  return "";
+};
+
 export const buildParamRows = (status) => {
   const params = status?.task_params || {};
   if (params.task_category === "convert") {
@@ -24,15 +69,15 @@ export const buildParamRows = (status) => {
   }
   if (params.task_category === "transcribe") {
     const modeLabelMap = {
-      subtitle_zip: "字幕与文本（ZIP）",
-      subtitled_video: "带字幕视频",
-      subtitle_and_video_zip: "字幕与视频（ZIP）",
+      subtitle_zip: "字幕与文本（单文件直出 / 批量 ZIP）",
+      subtitled_video: "带字幕视频（单视频直出 / 批量 ZIP）",
+      subtitle_and_video_zip: "字幕与视频（统一 ZIP）",
     };
     return [
       { label: "任务类别", value: "视频转录" },
       { label: "转录类型", value: modeLabelMap[params.transcribe_mode] || params.transcribe_mode || "-" },
       { label: "字幕格式", value: (params.subtitle_format || "-").toUpperCase() },
-      { label: "Whisper 模型", value: params.whisper_model || "-" },
+      { label: "Fast-Whisper 模型", value: params.whisper_model || "-" },
       { label: "语言", value: params.language || "auto" },
       { label: "翻译到", value: params.translate_to || "-" },
       { label: "翻译提供器", value: params.translator_provider || "-" },
@@ -82,30 +127,32 @@ export const buildParamRows = (status) => {
   ];
 };
 
-export const buildProgressDetails = (status, live) => {
+export const buildProgressDetails = (status, live, nowMs = Date.now()) => {
   if (!status) return "";
 
   const category = String(status?.task_params?.task_category || "").trim().toLowerCase();
   const fallbackProgress = status.task_progress || {};
   const fallbackSegment = status.segment_progress || {};
-  const totalFrames = live.totalFrames || fallbackProgress.total_frames || 0;
-  const segmentCount = live.segmentCount || fallbackProgress.total_segments || 0;
-  const segmentIndex = live.segmentIndex || fallbackSegment.segment_index || 0;
-  const segmentTotal = live.segmentTotal || fallbackSegment.total_frames || 0;
-  const segmentFrame = live.segmentFrame || fallbackSegment.last_done_frame || 0;
-  const totalFrame = live.totalFrame || 0;
+  const totalFrames = clampNumber(live.totalFrames || fallbackProgress.total_frames || 0, 0);
+  const totalFrame = clampNumber(live.totalFrame || 0, 0);
+  const itemCount = clampNumber(live.itemCount || live.segmentCount || fallbackProgress.total_segments || 0, 0);
+  const itemIndex = clampNumber(live.itemIndex || live.segmentIndex || fallbackSegment.segment_index || 0, 0);
+  const itemLabel =
+    String(live.itemLabel || "").trim() ||
+    (itemCount ? (category === "enhance" ? "分段" : category === "download" ? "任务" : "文件") : "");
+  const unitTotal = clampNumber(live.unitTotal || live.segmentTotal || fallbackSegment.total_frames || 0, 0);
+  const unitDone = clampNumber(live.unitDone || live.segmentFrame || fallbackSegment.last_done_frame || 0, 0);
+  const unitLabel = String(live.unitLabel || "").trim() || (unitTotal ? "帧" : "");
+  const stageLabel = resolveStageLabel(live.stage, category);
 
   const parts = [];
+  if (stageLabel) parts.push(stageLabel);
+  if (itemCount && itemLabel) parts.push(`${itemLabel} ${itemIndex}/${itemCount}`);
+  if (unitTotal && unitLabel) parts.push(`${unitLabel} ${unitDone}/${unitTotal}`);
   if (live.gpu !== null) parts.push(`GPU ${live.gpu}%`);
   if (totalFrames) parts.push(`总帧 ${totalFrame}/${totalFrames}`);
-  if (segmentCount) {
-    if (category === "transcribe") {
-      parts.push(`文件 ${segmentIndex}/${segmentCount}`);
-    } else {
-      parts.push(`第${segmentIndex}/${segmentCount}段`);
-    }
-  }
-  if (segmentTotal) parts.push(`分段 ${segmentFrame}/${segmentTotal}`);
+  const ageLabel = formatAgeLabel(live.updatedAtMs, nowMs);
+  if (ageLabel) parts.push(ageLabel);
   return parts.join(" | ");
 };
 

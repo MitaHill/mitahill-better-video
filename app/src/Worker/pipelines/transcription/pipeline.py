@@ -1,7 +1,8 @@
 import json
 import logging
-from pathlib import Path
 import traceback
+from datetime import datetime, timezone
+from pathlib import Path
 
 from app.src.Database import core as db
 from app.src.Notifications.events import send_event
@@ -46,6 +47,46 @@ def _subtitle_suffix(subtitle_format):
     return "vtt" if (subtitle_format or "srt").lower() == "vtt" else "srt"
 
 
+def _flatten_result_outputs(media_results, key):
+    outputs = []
+    for item in media_results:
+        outputs.extend(item.get(key) or [])
+    return outputs
+
+
+def _resolve_result_bundle(mode, media_results):
+    multi_media = len(media_results) > 1
+    subtitle_outputs = _flatten_result_outputs(media_results, "subtitle_outputs")
+    video_outputs = _flatten_result_outputs(media_results, "video_outputs")
+    preferred_outputs = _flatten_result_outputs(media_results, "preferred_outputs")
+
+    if mode == "subtitled_video":
+        bundle_kind = "batch_subtitled_video" if multi_media else "single_subtitled_video"
+        outputs = preferred_outputs
+        return {
+            "bundle_kind": bundle_kind,
+            "outputs": outputs,
+            "should_zip": multi_media or len(outputs) != 1,
+        }
+
+    if mode == "subtitle_and_video_zip":
+        bundle_kind = "batch_subtitle_and_video" if multi_media else "single_subtitle_and_video"
+        outputs = subtitle_outputs + video_outputs
+        return {
+            "bundle_kind": bundle_kind,
+            "outputs": outputs,
+            "should_zip": len(outputs) != 1,
+        }
+
+    bundle_kind = "batch_subtitle_files" if multi_media else "single_subtitle_files"
+    outputs = subtitle_outputs
+    return {
+        "bundle_kind": bundle_kind,
+        "outputs": outputs,
+        "should_zip": multi_media or len(outputs) != 1,
+    }
+
+
 def _process_single_media(task_id, media_item, options, run_dir, index, total, translator):
     media_path = Path(media_item.get("upload_path", ""))
     if not media_path.exists():
@@ -64,6 +105,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
         f"转录文件 {index}/{total}: 准备中",
         file_index=index,
         file_count=total,
+        stage="prepare",
     )
     audio_path, info, created_temp_audio = extract_transcribe_audio(media_path, run_dir)
 
@@ -74,11 +116,12 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
             f"转录文件 {index}/{total}: 语音识别中",
             file_index=index,
             file_count=total,
+            stage="transcribe",
         )
         result = ENGINE.transcribe(
             audio_path,
-            backend=options.get("transcription_backend", "whisper"),
-            model_name=options.get("whisper_model", "medium"),
+            backend=options.get("transcription_backend", "faster_whisper"),
+            model_name=options.get("whisper_model", "large-v3"),
             language=options.get("language", "auto"),
             temperature=options.get("temperature", 0.0),
             beam_size=options.get("beam_size", 5),
@@ -101,6 +144,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
             f"转录文件 {index}/{total}: 写入原文字幕",
             file_index=index,
             file_count=total,
+            stage="write_subtitle",
         )
         original_subtitle = write_subtitle_file(
             subtitle_dir / f"original.{subtitle_ext}",
@@ -133,6 +177,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 f"转录文件 {index}/{total}: 翻译中",
                 file_index=index,
                 file_count=total,
+                stage="translate",
             )
 
             def _translation_progress(done, total_count):
@@ -145,6 +190,10 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                     f"转录文件 {index}/{total}: 翻译中 {done}/{total_count}",
                     file_index=index,
                     file_count=total,
+                    stage="translate",
+                    unit_done=done,
+                    unit_total=total_count,
+                    unit_label="字幕段",
                 )
 
             translated_segments = translate_segments(
@@ -195,6 +244,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 f"转录文件 {index}/{total}: 合成字幕视频",
                 file_index=index,
                 file_count=total,
+                stage="render_video",
             )
             subtitle_for_video = translated_subtitle or original_subtitle
             video_outputs.append(
@@ -214,8 +264,8 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                     "task_id": task_id,
                     "source_file": media_item,
                     "runtime_mode": options.get("transcribe_runtime_mode", "parallel"),
-                    "transcription_backend": options.get("transcription_backend", "whisper"),
-                    "whisper_model": options.get("whisper_model", "medium"),
+                    "transcription_backend": options.get("transcription_backend", "faster_whisper"),
+                    "whisper_model": options.get("whisper_model", "large-v3"),
                     "translate_to": options.get("translate_to", ""),
                     "subtitle_format": options.get("subtitle_format", "srt"),
                     "transcribe_mode": options.get("transcribe_mode", "subtitle_zip"),
@@ -223,13 +273,11 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
             )
         )
 
-        if mode == "subtitled_video":
-            if video_outputs:
-                return video_outputs
-            return text_outputs
-        if mode == "subtitle_and_video_zip":
-            return text_outputs + video_outputs
-        return text_outputs
+        return {
+            "subtitle_outputs": text_outputs,
+            "video_outputs": video_outputs,
+            "preferred_outputs": video_outputs or text_outputs,
+        }
     finally:
         if created_temp_audio and audio_path.exists():
             try:
@@ -263,34 +311,42 @@ def process_transcription_task(task):
             except Exception:
                 logger.warning("Task %s translator prepare failed", task_id, exc_info=True)
 
-        all_outputs = []
+        media_results = []
         total = len(media_files)
         for idx, media_item in enumerate(media_files, start=1):
-            outputs = _process_single_media(task_id, media_item, options, run_dir, idx, total, translator)
-            all_outputs.extend(outputs)
-
-        if not all_outputs:
-            raise RuntimeError("No output generated by transcription pipeline.")
+            media_results.append(_process_single_media(task_id, media_item, options, run_dir, idx, total, translator))
 
         mode = options.get("transcribe_mode", "subtitle_zip")
-        should_zip = len(media_files) > 1 or mode in {"subtitle_zip", "subtitle_and_video_zip"}
-        if mode == "subtitled_video" and not any(str(p).lower().endswith(".mp4") for p in all_outputs):
-            should_zip = True
+        bundle = _resolve_result_bundle(mode, media_results)
+        result_outputs = bundle.get("outputs") or []
 
-        if should_zip:
-            result_path = run_dir / "results" / f"transcribe_{task_id}.zip"
+        if not result_outputs:
+            raise RuntimeError("No output generated by transcription pipeline.")
+
+        if bundle["should_zip"]:
+            result_name = f"{bundle['bundle_kind']}_{task_id}"
+            result_path = run_dir / "results" / f"{result_name}.zip"
             zip_outputs(
-                all_outputs,
+                result_outputs,
                 result_path,
                 base_dir=run_dir / "results",
-                root_prefix=f"transcribe_{task_id}",
+                root_prefix=result_name,
             )
         else:
-            result_path = all_outputs[-1]
+            result_path = result_outputs[0]
 
         db.update_task_result(task_id, result_path)
         db.update_task_status(task_id, "COMPLETED", 100, f"Completed: {Path(result_path).name}")
-        send_event({"task_id": task_id, "progress": 100, "message": "转录任务已完成"})
+        send_event(
+            {
+                "task_id": task_id,
+                "task_category": "transcribe",
+                "progress": 100,
+                "message": "转录任务已完成",
+                "stage": "completed",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
     except Exception:
         logger.error("Task %s transcription pipeline failed.\n%s", task_id, traceback.format_exc())
         raise

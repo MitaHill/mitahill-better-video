@@ -21,17 +21,13 @@ def parse_transcription_task_params(form):
     defaults = _load_parser_defaults()
     parsed = {
         "task_category": "transcribe",
-        "transcription_backend": (
-            form.get("transcription_backend", defaults.get("transcription_backend", "whisper"))
-            or defaults.get("transcription_backend", "whisper")
-            or "whisper"
-        ).strip().lower(),
+        "transcription_backend": "faster_whisper",
         "transcribe_mode": (form.get("transcribe_mode", "subtitle_zip") or "subtitle_zip").lower(),
         "subtitle_format": (form.get("subtitle_format", "srt") or "srt").lower(),
         "whisper_model": (
-            form.get("whisper_model", defaults.get("whisper_model", "medium"))
-            or defaults.get("whisper_model", "medium")
-            or "medium"
+            form.get("whisper_model", defaults.get("whisper_model", "large-v3"))
+            or defaults.get("whisper_model", "large-v3")
+            or "large-v3"
         ).lower(),
         "language": (form.get("language", "auto") or "auto").strip().lower(),
         "translate_to": (form.get("translate_to", "") or "").strip(),

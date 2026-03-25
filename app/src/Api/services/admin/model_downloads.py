@@ -225,9 +225,7 @@ def _run_download_job(job_id: str, model_entry: Dict):
         if _is_cancel_requested(job_id):
             raise RuntimeError("任务已取消")
 
-        if backend == "whisper":
-            _run_openai_download(job_id, model_entry, aria2_cfg)
-        elif backend == "faster_whisper":
+        if backend == "faster_whisper":
             _run_faster_download(job_id, model_entry, aria2_cfg)
         else:
             raise RuntimeError(f"不支持的后端: {backend}")

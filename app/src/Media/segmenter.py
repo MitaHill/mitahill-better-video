@@ -3,6 +3,7 @@ import hashlib
 import os
 import logging
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from app.src.Utils.ffmpeg import run_ffmpeg, get_video_fps, get_gpu_utilization
 from app.src.Utils.preview_cache import set_preview_from_path
@@ -78,7 +79,16 @@ class ProgressRecorder:
             self._last_gpu_check = now
         payload = {
             "task_id": self.task_id,
+            "task_category": "enhance",
+            "stage": "enhance",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
             "segment_key": self.segment_key,
+            "item_index": self.segment_index,
+            "item_count": self.segment_count,
+            "item_label": "分段" if self.segment_count else "",
+            "unit_done": frame_index,
+            "unit_total": self.total_frames,
+            "unit_label": "帧",
             "segment_index": self.segment_index,
             "segment_count": self.segment_count,
             "segment_frame": frame_index,

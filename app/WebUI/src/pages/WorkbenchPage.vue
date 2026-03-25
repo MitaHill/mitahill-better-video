@@ -40,6 +40,8 @@
           :resolution="resolution"
           :task-ids="taskIds"
           :preview="preview"
+          :live="live"
+          :live-now-ms="liveNowMs"
           :is-preview-supported="isPreviewSupported"
           :param-rows="paramRows"
           :status-error="statusError"
@@ -82,6 +84,8 @@ const {
   statusError,
   loading,
   preview,
+  live,
+  liveNowMs,
   isPreviewSupported,
   resolution,
   paramRows,

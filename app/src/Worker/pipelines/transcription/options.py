@@ -4,7 +4,7 @@ VALID_TRANSCRIBE_MODES = {"subtitle_zip", "subtitled_video", "subtitle_and_video
 VALID_SUBTITLE_FORMATS = {"srt", "vtt"}
 VALID_TRANSLATOR_PROVIDERS = {"none", "ollama", "openai_compatible"}
 VALID_TRANSLATOR_FALLBACK_MODES = {"model_full_text", "source_text"}
-VALID_TRANSCRIPTION_BACKENDS = {"whisper", "faster_whisper"}
+VALID_TRANSCRIPTION_BACKENDS = {"faster_whisper"}
 VALID_TRANSCRIBE_RUNTIME_MODES = {"parallel", "memory_saving"}
 
 
@@ -42,9 +42,9 @@ def _to_float(value, default=0.0, min_value=None, max_value=None):
 
 def normalize_transcription_options(raw):
     options = raw or {}
-    backend = (options.get("transcription_backend") or "whisper").strip().lower()
+    backend = (options.get("transcription_backend") or "faster_whisper").strip().lower()
     if backend not in VALID_TRANSCRIPTION_BACKENDS:
-        backend = "whisper"
+        backend = "faster_whisper"
 
     mode = (options.get("transcribe_mode") or "subtitle_zip").strip().lower()
     if mode not in VALID_TRANSCRIBE_MODES:
@@ -54,7 +54,7 @@ def normalize_transcription_options(raw):
     if subtitle_format not in VALID_SUBTITLE_FORMATS:
         subtitle_format = "srt"
 
-    whisper_model = (options.get("whisper_model") or "medium").strip().lower() or "medium"
+    whisper_model = (options.get("whisper_model") or "large-v3").strip().lower() or "large-v3"
     language = (options.get("language") or "auto").strip().lower() or "auto"
 
     translate_to = (options.get("translate_to") or "").strip()

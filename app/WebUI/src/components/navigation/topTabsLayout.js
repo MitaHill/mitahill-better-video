@@ -19,7 +19,7 @@ export const computeActiveIndex = (tabs, activeCategory) => {
 export const computeSliderStyle = (activeIndex, tabCount) => {
   const safeCount = Math.max(1, Number(tabCount) || 1);
   return {
-    width: `calc((100% / ${safeCount}) * 0.62)`,
-    left: `calc(${activeIndex} * (100% / ${safeCount}) + ((100% / ${safeCount}) * 0.19))`,
+    width: `calc(100% / ${safeCount})`,
+    left: `calc(${activeIndex} * (100% / ${safeCount}))`,
   };
 };

@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from datetime import datetime, timezone
 
 from app.src.Database import core as db
 from app.src.Notifications.events import send_event
@@ -46,4 +47,13 @@ def process_conversion_task(task):
 
     db.update_task_result(task_id, result_path)
     db.update_task_status(task_id, "COMPLETED", 100, f"Completed: {Path(result_path).name}")
-    send_event({"task_id": task_id, "progress": 100, "message": "转换任务已完成"})
+    send_event(
+        {
+            "task_id": task_id,
+            "task_category": "convert",
+            "progress": 100,
+            "message": "转换任务已完成",
+            "stage": "completed",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
