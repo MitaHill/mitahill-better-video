@@ -3,6 +3,8 @@
 此目录是默认运行入口。
 
 - 所有启动、重启、联调操作均在 `pre-run/` 下执行。
+- 容器使用 host 网络模式，不依赖外部 `ai-stack` 网络。
+- 服务直接监听宿主机 `8501` 端口，启动前请确认该端口未被占用。
 - 持久化数据固定写入 `pre-run/storage/`：
   - 上传文件
   - 输出文件
@@ -14,6 +16,9 @@
 示例：
 
 ```bash
+cd ..
+docker build -f deploy/docker/base/Dockerfile -t base_better_video:20260210-2330 .
+docker build -f deploy/docker/for-app/Dockerfile -t better_video:latest .
 cd pre-run
 docker compose up -d
 docker compose ps

@@ -1,5 +1,8 @@
 FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
+# Keep this Dockerfile compatible with the legacy docker builder:
+# no BuildKit-only syntax, heredocs, cache mounts, or frontend directives.
+
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -40,14 +43,16 @@ RUN python -m pip install --upgrade pip "setuptools<70" wheel "numpy<2" && \
         voicefixer \
         python-dotenv==1.0.1
 
-# Pre-download weights (huge layer, fixed)
+# Pre-download Real-ESRGAN weights (huge layer, fixed)
 RUN mkdir -p /workspace/app/models/video /workspace/app/models/audio/voicefixer && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/RealESRNet_x4plus.pth && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth && \
-    wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth && \
-    # VoiceFixer weights
+    wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth
+
+# Pre-download VoiceFixer weights.
+RUN mkdir -p /workspace/app/models/audio/voicefixer && \
     wget -q -O /workspace/app/models/audio/voicefixer/analysis_module.ckpt https://huggingface.co/Diogodiogod/voicefixer-models/resolve/main/vf.ckpt && \
     wget -q -O /workspace/app/models/audio/voicefixer/model.ckpt-1490000_trimed.pt https://huggingface.co/Diogodiogod/voicefixer-models/resolve/main/model.ckpt-1490000_trimed.pt

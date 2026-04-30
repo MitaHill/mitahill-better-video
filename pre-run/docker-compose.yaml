@@ -8,17 +8,13 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
       - PYTHONUNBUFFERED=1
     command: python3 app/main.py
-    ports:
-      - "8501:8501"
+    network_mode: host
     volumes:
       # Mount storage root for outputs, uploads, data, logs
       - ./storage:/workspace/storage
       # Mount the env file for configuration
       - ./.env:/workspace/config/.env
     restart: unless-stopped
-    networks:
-      - default
-      - ai-stack
     deploy:
       resources:
         reservations:
@@ -26,7 +22,3 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-
-networks:
-  ai-stack:
-    external: true

@@ -1,11 +1,15 @@
 FROM node:20-alpine AS frontend-build
 
+# Keep this Dockerfile compatible with the legacy docker builder:
+# no BuildKit-only syntax, heredocs, cache mounts, or frontend directives.
+
 WORKDIR /frontend
 COPY app/WebUI/package.json .
+COPY app/WebUI/package-lock.json .
 COPY app/WebUI/vite.config.js .
 COPY app/WebUI/index.html .
 COPY app/WebUI/src ./src
-RUN npm install
+RUN npm ci
 RUN npm run build
 
 FROM base_better_video:20260210-2330
