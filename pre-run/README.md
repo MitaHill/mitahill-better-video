@@ -17,8 +17,8 @@
 
 ```bash
 cd ..
-docker build -f deploy/docker/base/Dockerfile -t base_better_video:20260210-2330 .
-docker build -f deploy/docker/for-app/Dockerfile -t better_video:latest .
+docker compose -f deploy/compose/docker-compose.build.yml build base_image
+docker compose -f deploy/compose/docker-compose.build.yml build app_image
 cd pre-run
 docker compose up -d
 docker compose ps

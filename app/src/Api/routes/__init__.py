@@ -8,7 +8,6 @@ from .admin_sections import (
 from .conversions import bp as conversions_bp
 from .downloads import bp as downloads_bp
 from .events import bp as events_bp
-from .form_constraints import bp as form_constraints_bp
 from .frontend import bp as frontend_bp
 from .health import bp as health_bp
 from .tasks import bp as tasks_bp
@@ -27,5 +26,4 @@ def register_routes(app):
     app.register_blueprint(downloads_bp)
     app.register_blueprint(transcriptions_bp)
     app.register_blueprint(events_bp)
-    app.register_blueprint(form_constraints_bp)
     app.register_blueprint(frontend_bp)

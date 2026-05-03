@@ -15,7 +15,6 @@ from ..constants import OUTPUT_ROOT, UPLOAD_ROOT
 from ..parsers import parse_enhance_task_params
 from ..services.real_ip import resolve_request_client_ip
 from ..services import create_enhance_task, find_result_file
-from ..services.form_constraints import apply_constraints_to_params
 
 bp = Blueprint("api_tasks", __name__)
 _TASK_PARAM_SENSITIVE_KEYS = {"translator_api_key"}
@@ -57,9 +56,6 @@ def create_task():
     if not upload.filename:
         return jsonify({"error": "filename is required"}), 400
     params = parse_enhance_task_params(request.form)
-    params, err = apply_constraints_to_params("enhance", params)
-    if err:
-        return jsonify({"error": err}), 400
     client_ip = resolve_request_client_ip(request)
     task_id, err = create_enhance_task(
         upload,
@@ -85,9 +81,6 @@ def create_tasks_batch():
         return jsonify({"error": "files are required"}), 400
 
     params = parse_enhance_task_params(request.form)
-    params, err = apply_constraints_to_params("enhance", params)
-    if err:
-        return jsonify({"error": err}), 400
     client_ip = resolve_request_client_ip(request)
 
     task_ids = []

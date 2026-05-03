@@ -10,8 +10,7 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
       - PYTHONUNBUFFERED=1
     command: python3 app/main.py
-    ports:
-      - "8501:8501"
+    network_mode: host
     volumes:
       # Mount storage root for outputs, uploads, data, logs
       - ../../storage:/workspace/storage

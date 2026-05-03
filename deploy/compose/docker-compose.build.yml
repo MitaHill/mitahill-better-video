@@ -1,0 +1,14 @@
+services:
+  base_image:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/base/Dockerfile
+    image: base_better_video:20260210-2330
+
+  app_image:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/for-app/Dockerfile
+    image: better_video:latest
+    depends_on:
+      - base_image

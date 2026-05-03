@@ -7,7 +7,6 @@ from ..constants import OUTPUT_ROOT, UPLOAD_ROOT
 from ..parsers import parse_conversion_task_params
 from ..services.real_ip import resolve_request_client_ip
 from ..services import create_conversion_task, probe_uploaded_media
-from ..services.form_constraints import apply_constraints_to_params
 
 bp = Blueprint("api_conversions", __name__)
 
@@ -16,9 +15,6 @@ bp = Blueprint("api_conversions", __name__)
 def create_conversion():
     client_ip = resolve_request_client_ip(request)
     params = parse_conversion_task_params(request.form)
-    params, err = apply_constraints_to_params("convert", params)
-    if err:
-        return jsonify({"error": err}), 400
     task_id, err = create_conversion_task(
         request,
         client_ip,

@@ -112,42 +112,6 @@
             @update:new-password="onNewPasswordInput"
           />
 
-          <AdminConstraintEditor
-            v-if="activeMenuKey === 'constraints_enhance'"
-            category-key="enhance"
-            category-label="视频增强"
-            :category-config="categoryConstraint('enhance')"
-            :field-option-presets="{}"
-            :loading="formConstraints.loading"
-            :error="formConstraints.error"
-            :message="formConstraints.message"
-            :on-save="updateFormConstraintsCategory"
-          />
-
-          <AdminConstraintEditor
-            v-if="activeMenuKey === 'constraints_convert'"
-            category-key="convert"
-            category-label="视频转换"
-            :category-config="categoryConstraint('convert')"
-            :field-option-presets="{}"
-            :loading="formConstraints.loading"
-            :error="formConstraints.error"
-            :message="formConstraints.message"
-            :on-save="updateFormConstraintsCategory"
-          />
-
-          <AdminConstraintEditor
-            v-if="activeMenuKey === 'constraints_transcribe'"
-            category-key="transcribe"
-            category-label="视频转录"
-            :category-config="categoryConstraint('transcribe')"
-            :field-option-presets="transcribeConstraintFieldPresets"
-            :loading="formConstraints.loading"
-            :error="formConstraints.error"
-            :message="formConstraints.message"
-            :on-save="updateFormConstraintsCategory"
-          />
-
           <AdminTranscriptionModelSettingsForm
             v-if="activeMenuKey === 'transcribe_cfg_model'"
             :config-data="transcriptionConfig.data || {}"
@@ -219,7 +183,6 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 
 import { useWorkbenchAdmin } from "../../composables/workbench/useWorkbenchAdmin";
 import { parseJsonSafe } from "../../composables/workbench/utils";
-import AdminConstraintEditor from "./AdminConstraintEditor.vue";
 import AdminDebugToolsPanel from "./AdminDebugToolsPanel.vue";
 import AdminGpuUsageChart from "./AdminGpuUsageChart.vue";
 import AdminIpTable from "./AdminIpTable.vue";
@@ -248,7 +211,6 @@ const {
   gpuUsage,
   passwordForm,
   proxyConfig,
-  formConstraints,
   transcriptionConfig,
   transcriptionModels,
   debugTools,
@@ -263,8 +225,6 @@ const {
   fetchRealIpConfig,
   updateRealIpConfig,
   changeAdminPassword,
-  fetchFormConstraintsConfig,
-  updateFormConstraintsCategory,
   fetchTranscriptionConfig,
   updateTranscriptionConfig,
   fetchTranscriptionModels,
@@ -310,7 +270,7 @@ const menuTree = Object.freeze([
   {
     key: "transcription_center",
     label: "转录中心",
-    keywords: "transcribe whisper faster translation debug constraint 转录 模型 翻译 调试 约束",
+    keywords: "transcribe whisper faster translation debug 转录 模型 翻译 调试",
     children: Object.freeze([
       {
         key: "transcription_sources",
@@ -320,16 +280,6 @@ const menuTree = Object.freeze([
           { key: "transcribe_cfg_model", label: "转录模型设置", keywords: "transcribe whisper faster 模型 设置" },
           { key: "transcribe_cfg_translation", label: "翻译源设置", keywords: "translate ollama openai 翻译 源" },
           { key: "transcribe_cfg_catalog", label: "模型目录与下载", keywords: "model catalog aria2 hash warmup 下载 校验 热身" },
-        ]),
-      },
-      {
-        key: "transcription_constraints",
-        label: "参数约束",
-        keywords: "constraints policy lock 参数 约束 锁 范围",
-        children: Object.freeze([
-          { key: "constraints_transcribe", label: "转录参数约束", keywords: "transcribe constraints 参数 约束 锁 范围 whisper subtitle" },
-          { key: "constraints_enhance", label: "增强参数约束", keywords: "enhance constraints 参数 约束 锁 范围" },
-          { key: "constraints_convert", label: "转换参数约束", keywords: "convert constraints 参数 约束 锁 范围" },
         ]),
       },
       {
@@ -399,22 +349,6 @@ const filteredMenuTree = computed(() => {
   if (!query) return menuTree;
   return menuTree.map((node) => filterTreeNode(node, query)).filter(Boolean);
 });
-
-const transcribeReadyModelOptions = computed(() =>
-  Array.from(
-    new Set(
-      (Array.isArray(transcriptionModels.items) ? transcriptionModels.items : [])
-        .filter((item) => Boolean(item?.installed))
-        .map((item) => String(item?.model_id || "").trim().toLowerCase())
-        .filter((item) => item.length > 0)
-    )
-  )
-);
-
-const transcribeConstraintFieldPresets = computed(() => ({
-  whisper_model: transcribeReadyModelOptions.value,
-  translator_provider: ["none", "ollama", "openai", "openai_compatible"],
-}));
 
 let timer = null;
 
@@ -545,13 +479,6 @@ const loadByMenuKey = async (value) => {
     await fetchRealIpConfig();
     return;
   }
-  if (String(value).startsWith("constraints_")) {
-    await fetchFormConstraintsConfig();
-    if (value === "constraints_transcribe") {
-      await fetchTranscriptionModels();
-    }
-    return;
-  }
   if (value === "transcribe_cfg_model" || value === "transcribe_cfg_translation") {
     await fetchTranscriptionConfig();
     if (value === "transcribe_cfg_model") {
@@ -582,10 +509,6 @@ const loadByMenuKey = async (value) => {
 
 const onMenuSelect = async (value) => {
   activeMenuKey.value = value;
-};
-
-const categoryConstraint = (categoryKey) => {
-  return formConstraints?.data?.categories?.[categoryKey] || { global_lock: "free", fields: {} };
 };
 
 const flattenMenuKeys = (nodes) => {
