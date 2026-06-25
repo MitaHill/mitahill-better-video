@@ -182,9 +182,6 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       adminPassword.value = "";
       await fetchOverview();
       await fetchGpuUsage(60);
-      await fetchTranscriptionConfig();
-      await fetchTranscriptionModels();
-      await fetchModelDownloadJobs();
       await fetchAdminLogs();
     } catch (error) {
       auth.error = error.message;
