@@ -39,38 +39,6 @@ Response:
 { "task_ids": ["<uuid>", "..."], "errors": [{ "filename": "...", "error": "...", "task_id": "<uuid>" }] }
 ```
 
-## POST /api/transcriptions
-**Content-Type**: multipart/form-data
-
-Fields:
-- `media_files` (required, multiple; also兼容 `files` / `file`)
-- `transcription_backend` (`whisper` | `faster_whisper`，可省略；省略时使用管理页当前配置)
-- `transcribe_mode` (`subtitle_zip` | `subtitled_video` | `subtitle_and_video_zip`)
-- `subtitle_format` (`srt` | `vtt`)
-- `whisper_model` (e.g. `small` / `medium` / `large-v3` / `turbo`)
-- `language` (`auto` or language code like `zh`, `en`)
-- `translate_to` (optional, 目标语言；留空表示不翻译)
-- `translator_provider` (`none` | `ollama` | `openai_compatible`)
-- `translator_base_url` (optional)
-- `translator_model` (optional)
-- `translator_api_key` (optional)
-- `translator_prompt` (optional)
-- `translator_timeout_sec` (optional)
-- `generate_bilingual` (true | false)
-- `export_json` (true | false)
-- `prepend_timestamps` (true | false)
-- `max_line_chars`
-- `temperature`
-- `beam_size`
-- `best_of`
-- `output_video_codec` (`h264` | `h265`)
-- `output_audio_bitrate_k`
-
-Response:
-```
-{ "task_id": "<uuid>" }
-```
-
 ## GET /api/tasks/<task_id>
 Response includes:
 - `status` (PENDING/PROCESSING/COMPLETED/FAILED)
@@ -92,29 +60,32 @@ Returns output file if task is completed.
 ## GET /api/health
 Returns `{"status":"ok"}` when backend is alive.
 
-## GET /api/form-constraints
-公开读取任务创建参数约束（前端创建面板使用）。
+## Transcription APIs
+
+Transcription backend APIs are retained, but frontend transcription entry points
+are currently hidden.
+
+### POST /api/transcriptions
+**Content-Type**: multipart/form-data
+
+Fields:
+- `media_files` (required, multiple; also compatible with `files` / `file`)
+- `transcription_backend` (`whisper` | `faster_whisper`)
+- `transcribe_mode` (`subtitle_zip` | `subtitled_video` | `subtitle_and_video_zip`)
+- `subtitle_format` (`srt` | `vtt`)
+- `whisper_model`
+- `language`
+- `translate_to`
+- `translator_provider` (`none` | `ollama` | `openai_compatible`)
+- `translator_base_url`
+- `translator_model`
+- `translator_api_key`
+- `generate_bilingual`
+- `export_json`
 
 Response:
 ```json
-{
-  "version": 1,
-  "categories": {
-    "enhance": {
-      "global_lock": "free",
-      "fields": {
-        "upscale": {
-          "kind": "number",
-          "lock": "range",
-          "default_value": 3,
-          "fixed_value": 3,
-          "min_value": 2,
-          "max_value": 4
-        }
-      }
-    }
-  }
-}
+{ "task_id": "<uuid>" }
 ```
 
 ## Admin APIs (Password Auth)
@@ -178,6 +149,16 @@ Header:
 - `PENDING`/`PROCESSING`：置为 `FAILED`，消息为“已取消（管理员操作）”
 - `COMPLETED`/`FAILED`：返回当前任务状态（幂等）
 
+### DELETE /api/admin/tasks/<task_id>
+Header:
+- `Authorization: Bearer <token>`
+
+删除已结束任务及相关实体文件。
+
+- 仅允许 `COMPLETED` / `FAILED` 任务。
+- 删除数据库中的任务、进度、分段进度、控制记录。
+- 删除对应上传目录、运行临时目录和结果文件。
+
 ### PUT /api/admin/maintenance-mode
 Header:
 - `Authorization: Bearer <token>`
@@ -222,41 +203,6 @@ Header:
 Request:
 ```json
 { "trusted_proxies": "127.0.0.1/32,::1/128,10.0.0.0/8,..." }
-```
-
-### GET /api/admin/config/form-constraints
-Header:
-- `Authorization: Bearer <token>`
-
-读取完整参数约束配置（含增强/转换/转录三类）。
-
-### PUT /api/admin/config/form-constraints
-Header:
-- `Authorization: Bearer <token>`
-
-按类别增量更新参数约束配置。
-
-Request (example):
-```json
-{
-  "categories": {
-    "transcribe": {
-      "global_lock": "free",
-      "fields": {
-        "temperature": {
-          "lock": "range",
-          "min_value": 0.0,
-          "max_value": 0.7,
-          "default_value": 0.2
-        },
-        "whisper_model": {
-          "lock": "fixed",
-          "fixed_value": "large-v3"
-        }
-      }
-    }
-  }
-}
 ```
 
 ### GET /api/admin/config/transcription-sources

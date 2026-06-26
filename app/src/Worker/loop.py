@@ -59,7 +59,7 @@ def worker_loop():
         
         while True:
             try:
-                db.cleanup_old_tasks(config.TASK_TTL_HOURS)
+                # Automatic TTL deletion is temporarily disabled.
                 db.mark_stuck_tasks(config.TASK_TIMEOUT_SECONDS)
             except Exception as e:
                 logger.error(f"Background cleanup failed: {e}")

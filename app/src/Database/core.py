@@ -221,11 +221,16 @@ def update_task_video_info(task_id, video_info):
 def delete_task(task_id):
     logger.warning(f"Deleting task and all associated files: {task_id}")
     task = get_task(task_id)
-    result_filename = None
+    result_paths = []
+    if task and task.get("result_path"):
+        result_paths.append(Path(task["result_path"]))
     if task and task.get('task_params'):
         try:
             params = json.loads(task['task_params'])
-            result_filename = f"sr_{params.get('filename')}"
+            filename = params.get("filename")
+            if filename:
+                output_root = Path("/workspace/storage/output")
+                result_paths.extend(output_root.glob(f"sr_{Path(filename).stem}.*"))
         except: pass
 
     conn = get_connection()
@@ -249,13 +254,11 @@ def delete_task(task_id):
         logger.debug(f"Removing upload dir: {upload_dir}")
         shutil.rmtree(upload_dir, ignore_errors=True)
             
-    if result_filename:
-        stem = Path(result_filename).stem
-        for p in output_root.glob(f"{stem}*"):
-            if p.is_file():
-                logger.debug(f"Removing result file: {p}")
-                try: p.unlink()
-                except: pass
+    for path in set(result_paths):
+        if path.is_file():
+            logger.debug(f"Removing result file: {path}")
+            try: path.unlink()
+            except: pass
 
 def get_next_task_atomic():
     logger.debug("Checking for next pending task...")

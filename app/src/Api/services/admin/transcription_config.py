@@ -194,7 +194,6 @@ def get_transcription_config() -> Dict[str, Any]:
     normalized = _normalize_config(current)
     if normalized != current:
         db_transcription.set_transcription_config(normalized)
-    _sync_transcription_constraints(normalized)
     return normalized
 
 
@@ -202,7 +201,6 @@ def update_transcription_config(payload: Dict[str, Any]) -> Dict[str, Any]:
     merged = _deep_merge(get_transcription_config(), payload or {})
     normalized = _normalize_config(merged)
     db_transcription.set_transcription_config(normalized)
-    _sync_transcription_constraints(normalized)
     return normalized
 
 
@@ -222,133 +220,3 @@ def get_parser_defaults() -> Dict[str, Any]:
         "translator_timeout_sec": float(translation.get("timeout_sec") or 120.0),
         "transcribe_runtime_mode": str((current.get("runtime") or {}).get("transcribe_runtime_mode") or "parallel").strip().lower(),
     }
-
-
-def _sync_transcription_constraints(current: Dict[str, Any]):
-    """Keep transcribe form constraint options aligned with admin transcription config."""
-    try:
-        from app.src.Api.services.form_constraints import (
-            get_form_constraints_config,
-            update_form_constraints_config,
-        )
-    except Exception:
-        return
-
-    config = get_form_constraints_config()
-    categories = config.get("categories") or {}
-    transcribe = categories.get("transcribe") or {}
-    fields = copy.deepcopy(transcribe.get("fields") or {})
-    whisper_field = fields.get("whisper_model") or {}
-    language_field = fields.get("language") or {}
-    translate_to_field = fields.get("translate_to") or {}
-    translator_provider_field = fields.get("translator_provider") or {}
-    translator_base_url_field = fields.get("translator_base_url") or {}
-    translator_model_field = fields.get("translator_model") or {}
-    translator_api_key_field = fields.get("translator_api_key") or {}
-    translator_prompt_field = fields.get("translator_prompt") or {}
-    translator_timeout_field = fields.get("translator_timeout_sec") or {}
-
-    transcription = current.get("transcription") or {}
-    backend = str(transcription.get("backend") or "faster_whisper").strip().lower()
-    backend_supported = [
-        str(item).strip().lower()
-        for item in get_models_for_backend(backend)
-        if str(item).strip()
-    ]
-    backend_supported_set = set(backend_supported)
-    allowed = [
-        str(item).strip().lower()
-        for item in (transcription.get("allowed_models") or [])
-        if str(item).strip()
-    ]
-    compatible_allowed = [item for item in allowed if item in backend_supported_set]
-    active_model = str(transcription.get("active_model") or "large-v3").strip().lower()
-    if active_model and active_model not in compatible_allowed and active_model in backend_supported_set:
-        compatible_allowed.append(active_model)
-    if not compatible_allowed:
-        compatible_allowed = backend_supported or [active_model or "large-v3"]
-    # 这里把后台配置同步回前端约束层。
-    # 否则管理员明明在后台禁用了某些模型，前端下拉框仍可能继续显示旧值。
-    whisper_field["label"] = "Fast-Whisper模型"
-    whisper_field["allowed_values"] = compatible_allowed
-    whisper_field["default_value"] = active_model or whisper_field.get("default_value", "large-v3")
-    if whisper_field.get("lock") == "fixed":
-        whisper_field["fixed_value"] = active_model or whisper_field.get("fixed_value", "large-v3")
-    fields["whisper_model"] = whisper_field
-    language_allowed_set = {str(item).strip().lower() for item in TRANSCRIPTION_LANGUAGE_CODES}
-    language_field["kind"] = "enum"
-    language_field["allowed_values"] = list(TRANSCRIPTION_LANGUAGE_CODES)
-    default_language = str(language_field.get("default_value") or "auto").strip().lower()
-    if default_language not in language_allowed_set:
-        default_language = "auto"
-    language_field["default_value"] = default_language
-    fixed_language = str(language_field.get("fixed_value") or default_language).strip().lower()
-    if fixed_language not in language_allowed_set:
-        fixed_language = default_language
-    language_field["fixed_value"] = fixed_language
-    fields["language"] = language_field
-
-    target_allowed_set = {str(item).strip().lower() for item in TRANSCRIPTION_TARGET_LANGUAGE_CODES}
-    translate_to_field["kind"] = "enum"
-    translate_to_field["allowed_values"] = list(TRANSCRIPTION_TARGET_LANGUAGE_CODES)
-    default_target = str(translate_to_field.get("default_value") or "zh").strip().lower()
-    if default_target not in target_allowed_set:
-        default_target = "zh"
-    translate_to_field["default_value"] = default_target
-    fixed_target = str(translate_to_field.get("fixed_value") or default_target).strip().lower()
-    if fixed_target not in target_allowed_set:
-        fixed_target = default_target
-    translate_to_field["fixed_value"] = fixed_target
-    fields["translate_to"] = translate_to_field
-
-    translation = current.get("translation") or {}
-    provider = str(translation.get("provider") or "none").strip().lower()
-    if provider not in _VALID_TRANSLATORS:
-        provider = "none"
-    translator_provider_field["kind"] = "enum"
-    translator_provider_field["allowed_values"] = ["none", "ollama", "openai", "openai_compatible"]
-    translator_provider_field["default_value"] = provider
-    if translator_provider_field.get("lock") == "fixed":
-        translator_provider_field["fixed_value"] = provider
-    fields["translator_provider"] = translator_provider_field
-
-    current_base_url = str(translation.get("base_url") or "").strip()
-    current_model = str(translation.get("model") or "").strip()
-    current_api_key = str(translation.get("api_key") or "").strip()
-    current_prompt = str(translation.get("prompt") or "").strip()
-    current_timeout = float(translation.get("timeout_sec") or 120.0)
-
-    translator_base_url_field["default_value"] = current_base_url
-    if translator_base_url_field.get("lock") == "fixed":
-        translator_base_url_field["fixed_value"] = current_base_url
-    fields["translator_base_url"] = translator_base_url_field
-
-    translator_model_field["default_value"] = current_model
-    if translator_model_field.get("lock") == "fixed":
-        translator_model_field["fixed_value"] = current_model
-    fields["translator_model"] = translator_model_field
-
-    translator_api_key_field["default_value"] = current_api_key
-    if translator_api_key_field.get("lock") == "fixed":
-        translator_api_key_field["fixed_value"] = current_api_key
-    fields["translator_api_key"] = translator_api_key_field
-
-    translator_prompt_field["default_value"] = current_prompt
-    if translator_prompt_field.get("lock") == "fixed":
-        translator_prompt_field["fixed_value"] = current_prompt
-    fields["translator_prompt"] = translator_prompt_field
-
-    translator_timeout_field["default_value"] = current_timeout
-    if translator_timeout_field.get("lock") == "fixed":
-        translator_timeout_field["fixed_value"] = current_timeout
-    fields["translator_timeout_sec"] = translator_timeout_field
-
-    update_form_constraints_config(
-        {
-            "categories": {
-                "transcribe": {
-                    "fields": fields,
-                }
-            }
-        }
-    )

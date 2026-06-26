@@ -82,6 +82,7 @@
             :error="overview.error"
             :on-refresh="fetchOverview"
             :on-cancel-task="onTaskCancel"
+            :on-delete-task="onTaskDelete"
             :task-action-loading="taskActionLoading"
             @update:status-filter="onStatusFilterChange"
           />
@@ -110,42 +111,6 @@
             :on-change-password="changeAdminPassword"
             @update:old-password="onOldPasswordInput"
             @update:new-password="onNewPasswordInput"
-          />
-
-          <AdminConstraintEditor
-            v-if="activeMenuKey === 'constraints_enhance'"
-            category-key="enhance"
-            category-label="视频增强"
-            :category-config="categoryConstraint('enhance')"
-            :field-option-presets="{}"
-            :loading="formConstraints.loading"
-            :error="formConstraints.error"
-            :message="formConstraints.message"
-            :on-save="updateFormConstraintsCategory"
-          />
-
-          <AdminConstraintEditor
-            v-if="activeMenuKey === 'constraints_convert'"
-            category-key="convert"
-            category-label="视频转换"
-            :category-config="categoryConstraint('convert')"
-            :field-option-presets="{}"
-            :loading="formConstraints.loading"
-            :error="formConstraints.error"
-            :message="formConstraints.message"
-            :on-save="updateFormConstraintsCategory"
-          />
-
-          <AdminConstraintEditor
-            v-if="activeMenuKey === 'constraints_transcribe'"
-            category-key="transcribe"
-            category-label="视频转录"
-            :category-config="categoryConstraint('transcribe')"
-            :field-option-presets="transcribeConstraintFieldPresets"
-            :loading="formConstraints.loading"
-            :error="formConstraints.error"
-            :message="formConstraints.message"
-            :on-save="updateFormConstraintsCategory"
           />
 
           <AdminTranscriptionModelSettingsForm
@@ -219,7 +184,6 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 
 import { useWorkbenchAdmin } from "../../composables/workbench/useWorkbenchAdmin";
 import { parseJsonSafe } from "../../composables/workbench/utils";
-import AdminConstraintEditor from "./AdminConstraintEditor.vue";
 import AdminDebugToolsPanel from "./AdminDebugToolsPanel.vue";
 import AdminGpuUsageChart from "./AdminGpuUsageChart.vue";
 import AdminIpTable from "./AdminIpTable.vue";
@@ -248,7 +212,6 @@ const {
   gpuUsage,
   passwordForm,
   proxyConfig,
-  formConstraints,
   transcriptionConfig,
   transcriptionModels,
   debugTools,
@@ -259,12 +222,11 @@ const {
   fetchOverview,
   setMaintenanceMode,
   cancelTaskById,
+  deleteTaskById,
   fetchGpuUsage,
   fetchRealIpConfig,
   updateRealIpConfig,
   changeAdminPassword,
-  fetchFormConstraintsConfig,
-  updateFormConstraintsCategory,
   fetchTranscriptionConfig,
   updateTranscriptionConfig,
   fetchTranscriptionModels,
@@ -303,42 +265,6 @@ const menuTree = Object.freeze([
         children: Object.freeze([
           { key: "ips", label: "访问IP统计", keywords: "ip ipv6 stats 访问 统计" },
           { key: "logs_warn", label: "系统日志", keywords: "log warn error warning 系统 日志" },
-        ]),
-      },
-    ]),
-  },
-  {
-    key: "transcription_center",
-    label: "转录中心",
-    keywords: "transcribe whisper faster translation debug constraint 转录 模型 翻译 调试 约束",
-    children: Object.freeze([
-      {
-        key: "transcription_sources",
-        label: "转录源设置",
-        keywords: "model source translation catalog download aria2 转录源 模型 翻译 下载",
-        children: Object.freeze([
-          { key: "transcribe_cfg_model", label: "转录模型设置", keywords: "transcribe whisper faster 模型 设置" },
-          { key: "transcribe_cfg_translation", label: "翻译源设置", keywords: "translate ollama openai 翻译 源" },
-          { key: "transcribe_cfg_catalog", label: "模型目录与下载", keywords: "model catalog aria2 hash warmup 下载 校验 热身" },
-        ]),
-      },
-      {
-        key: "transcription_constraints",
-        label: "参数约束",
-        keywords: "constraints policy lock 参数 约束 锁 范围",
-        children: Object.freeze([
-          { key: "constraints_transcribe", label: "转录参数约束", keywords: "transcribe constraints 参数 约束 锁 范围 whisper subtitle" },
-          { key: "constraints_enhance", label: "增强参数约束", keywords: "enhance constraints 参数 约束 锁 范围" },
-          { key: "constraints_convert", label: "转换参数约束", keywords: "convert constraints 参数 约束 锁 范围" },
-        ]),
-      },
-      {
-        key: "transcription_debug",
-        label: "调试工具",
-        keywords: "debug test transcription translator 调试 测试",
-        children: Object.freeze([
-          { key: "debug_model", label: "测试转录模型", keywords: "debug transcribe model whisper 调试 转录 模型" },
-          { key: "debug_translate", label: "测试翻译源", keywords: "debug translate provider 调试 翻译 源" },
         ]),
       },
     ]),
@@ -400,22 +326,6 @@ const filteredMenuTree = computed(() => {
   return menuTree.map((node) => filterTreeNode(node, query)).filter(Boolean);
 });
 
-const transcribeReadyModelOptions = computed(() =>
-  Array.from(
-    new Set(
-      (Array.isArray(transcriptionModels.items) ? transcriptionModels.items : [])
-        .filter((item) => Boolean(item?.installed))
-        .map((item) => String(item?.model_id || "").trim().toLowerCase())
-        .filter((item) => item.length > 0)
-    )
-  )
-);
-
-const transcribeConstraintFieldPresets = computed(() => ({
-  whisper_model: transcribeReadyModelOptions.value,
-  translator_provider: ["none", "ollama", "openai", "openai_compatible"],
-}));
-
 let timer = null;
 
 const stopTimer = () => {
@@ -471,6 +381,10 @@ const onStatusFilterChange = (value) => {
 
 const onTaskCancel = async (taskId) => {
   await cancelTaskById(taskId);
+};
+
+const onTaskDelete = async (taskId) => {
+  await deleteTaskById(taskId);
 };
 
 const taskActionLoading = (taskId) => Boolean(overview.taskActionLoading[String(taskId || "")]);
@@ -545,13 +459,6 @@ const loadByMenuKey = async (value) => {
     await fetchRealIpConfig();
     return;
   }
-  if (String(value).startsWith("constraints_")) {
-    await fetchFormConstraintsConfig();
-    if (value === "constraints_transcribe") {
-      await fetchTranscriptionModels();
-    }
-    return;
-  }
   if (value === "transcribe_cfg_model" || value === "transcribe_cfg_translation") {
     await fetchTranscriptionConfig();
     if (value === "transcribe_cfg_model") {
@@ -582,10 +489,6 @@ const loadByMenuKey = async (value) => {
 
 const onMenuSelect = async (value) => {
   activeMenuKey.value = value;
-};
-
-const categoryConstraint = (categoryKey) => {
-  return formConstraints?.data?.categories?.[categoryKey] || { global_lock: "free", fields: {} };
 };
 
 const flattenMenuKeys = (nodes) => {

@@ -4,10 +4,10 @@ services:
       context: ../..
       dockerfile: deploy/docker/for-app/Dockerfile
     container_name: better_video
-    ports:
-      - "8501:8501"
+    network_mode: host
     volumes:
       - ../../:/workspace
+      - ../../pre-run/.env:/workspace/config/.env
     environment:
       PYTHONPATH: "/workspace/app:${PYTHONPATH}"
       NVIDIA_VISIBLE_DEVICES: all

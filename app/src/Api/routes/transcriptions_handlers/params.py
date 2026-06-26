@@ -1,10 +1,8 @@
 from ...parsers import parse_transcription_task_params
-from ...services.form_constraints import apply_constraints_to_params
 
 
 def apply_transcription_form_params(form):
-    params = parse_transcription_task_params(form)
-    return apply_constraints_to_params("transcribe", params)
+    return parse_transcription_task_params(form), None
 
 
 def validate_translation_provider_guard(params):

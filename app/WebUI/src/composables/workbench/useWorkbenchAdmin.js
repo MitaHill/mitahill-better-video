@@ -57,13 +57,6 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     resolvedClientIp: "",
   });
 
-  const formConstraints = reactive({
-    loading: false,
-    error: "",
-    message: "",
-    data: null,
-  });
-
   const transcriptionConfig = reactive({
     loading: false,
     error: "",
@@ -189,10 +182,6 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       adminPassword.value = "";
       await fetchOverview();
       await fetchGpuUsage(60);
-      await fetchFormConstraintsConfig();
-      await fetchTranscriptionConfig();
-      await fetchTranscriptionModels();
-      await fetchModelDownloadJobs();
       await fetchAdminLogs();
     } catch (error) {
       auth.error = error.message;
@@ -288,6 +277,29 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       if (!res.ok) {
         _handleAuthedError(res);
         throw new Error(payload.error || "取消任务失败");
+      }
+      await fetchOverview();
+    } catch (error) {
+      overview.error = error.message;
+    } finally {
+      overview.taskActionLoading[safeTaskId] = false;
+    }
+  };
+
+  const deleteTaskById = async (taskId) => {
+    const safeTaskId = String(taskId || "").trim();
+    if (!auth.token || !safeTaskId) return;
+    overview.error = "";
+    overview.taskActionLoading[safeTaskId] = true;
+    try {
+      const res = await fetch(`/api/admin/tasks/${encodeURIComponent(safeTaskId)}`, {
+        method: "DELETE",
+        headers: _authHeaders(),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "删除任务失败");
       }
       await fetchOverview();
     } catch (error) {
@@ -402,58 +414,6 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       passwordForm.error = error.message;
     } finally {
       passwordForm.loading = false;
-    }
-  };
-
-  const fetchFormConstraintsConfig = async () => {
-    if (!auth.token) return;
-    formConstraints.loading = true;
-    formConstraints.error = "";
-    formConstraints.message = "";
-    try {
-      const res = await fetch("/api/admin/config/form-constraints", { headers: _authHeaders() });
-      const payload = await parseJsonSafe(res);
-      if (!res.ok) {
-        _handleAuthedError(res);
-        throw new Error(payload.error || "读取参数约束失败");
-      }
-      formConstraints.data = payload || null;
-    } catch (error) {
-      formConstraints.error = error.message;
-    } finally {
-      formConstraints.loading = false;
-    }
-  };
-
-  const updateFormConstraintsCategory = async (categoryKey, categoryPayload) => {
-    if (!auth.token) return;
-    formConstraints.loading = true;
-    formConstraints.error = "";
-    formConstraints.message = "";
-    try {
-      const res = await fetch("/api/admin/config/form-constraints", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ..._authHeaders(),
-        },
-        body: JSON.stringify({
-          categories: {
-            [categoryKey]: categoryPayload,
-          },
-        }),
-      });
-      const payload = await parseJsonSafe(res);
-      if (!res.ok) {
-        _handleAuthedError(res);
-        throw new Error(payload.error || "保存参数约束失败");
-      }
-      formConstraints.data = payload.config || formConstraints.data;
-      formConstraints.message = "参数约束已保存";
-    } catch (error) {
-      formConstraints.error = error.message;
-    } finally {
-      formConstraints.loading = false;
     }
   };
 
@@ -803,7 +763,6 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     gpuUsage,
     passwordForm,
     proxyConfig,
-    formConstraints,
     transcriptionConfig,
     transcriptionModels,
     debugTools,
@@ -814,12 +773,11 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     fetchOverview,
     setMaintenanceMode,
     cancelTaskById,
+    deleteTaskById,
     fetchGpuUsage,
     fetchRealIpConfig,
     updateRealIpConfig,
     changeAdminPassword,
-    fetchFormConstraintsConfig,
-    updateFormConstraintsCategory,
     fetchTranscriptionConfig,
     updateTranscriptionConfig,
     fetchTranscriptionModels,
