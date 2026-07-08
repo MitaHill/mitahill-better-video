@@ -15,6 +15,10 @@ export const useWorkbenchCategory = () => {
 
   const syncCategoryFromPath = () => {
     activeCategory.value = getCategoryByPath(window.location.pathname);
+    const targetPath = CATEGORY_PATH[activeCategory.value] || CATEGORY_PATH.enhance;
+    if (window.location.pathname !== targetPath) {
+      window.history.replaceState({ category: activeCategory.value }, "", targetPath);
+    }
   };
 
   const onPopState = () => {

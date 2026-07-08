@@ -1,7 +1,6 @@
 export const TOP_TAB_FALLBACKS = Object.freeze([
   { key: "enhance", label: "增强" },
   { key: "convert", label: "转换" },
-  { key: "transcribe", label: "转录" },
   { key: "download", label: "下载" },
   { key: "admin", label: "管理" },
 ]);

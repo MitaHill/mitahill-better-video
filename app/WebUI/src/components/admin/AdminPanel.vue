@@ -268,32 +268,6 @@ const menuTree = Object.freeze([
     ]),
   },
   {
-    key: "transcription_center",
-    label: "转录中心",
-    keywords: "transcribe whisper faster translation debug 转录 模型 翻译 调试",
-    children: Object.freeze([
-      {
-        key: "transcription_sources",
-        label: "转录源设置",
-        keywords: "model source translation catalog download aria2 转录源 模型 翻译 下载",
-        children: Object.freeze([
-          { key: "transcribe_cfg_model", label: "转录模型设置", keywords: "transcribe whisper faster 模型 设置" },
-          { key: "transcribe_cfg_translation", label: "翻译源设置", keywords: "translate ollama openai 翻译 源" },
-          { key: "transcribe_cfg_catalog", label: "模型目录与下载", keywords: "model catalog aria2 hash warmup 下载 校验 热身" },
-        ]),
-      },
-      {
-        key: "transcription_debug",
-        label: "调试工具",
-        keywords: "debug test transcription translator 调试 测试",
-        children: Object.freeze([
-          { key: "debug_model", label: "测试转录模型", keywords: "debug transcribe model whisper 调试 转录 模型" },
-          { key: "debug_translate", label: "测试翻译源", keywords: "debug translate provider 调试 翻译 源" },
-        ]),
-      },
-    ]),
-  },
-  {
     key: "system",
     label: "系统设置",
     keywords: "network security proxy password 网络 安全 代理 密码",
