@@ -3,7 +3,6 @@ from flask import Blueprint, jsonify, request
 from ..constants import OUTPUT_ROOT
 from ..parsers import parse_download_task_params
 from ..services import create_download_task
-from ..services.form_constraints import apply_constraints_to_params
 from ..services.real_ip import resolve_request_client_ip
 from ..services.video_download import probe_download_source, run_direct_video_download
 
@@ -29,9 +28,6 @@ def probe_download():
 def create_download_task_route():
     payload = request.get_json(silent=True) or {}
     params = parse_download_task_params(request.form if request.form else payload)
-    params, err = apply_constraints_to_params("download", params)
-    if err:
-        return jsonify({"error": err}), 400
     client_ip = resolve_request_client_ip(request)
     task_id, err = create_download_task(client_ip, params, OUTPUT_ROOT)
     if err:

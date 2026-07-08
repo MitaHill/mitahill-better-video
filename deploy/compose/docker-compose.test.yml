@@ -1,0 +1,18 @@
+services:
+  better_video_test:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/for-app/Dockerfile
+    image: better_video:latest
+    network_mode: host
+    runtime: nvidia
+    ipc: host
+    environment:
+      PYTHONPATH: "/workspace/app"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ../../pre-run/storage:/workspace/storage
+      - ../../pre-run/.env:/workspace/config/.env
+    command: python3 -m compileall -q app

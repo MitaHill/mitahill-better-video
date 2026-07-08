@@ -36,7 +36,6 @@
 - `app/src/Worker/pipelines/transcription/whisper_engine.py`: 转录执行器（支持 `whisper` / `faster_whisper` 双后端，按任务参数选择）。
 - `app/src/Api/task_parsers/*`: 后端任务参数解析按类别原子化拆分（enhance/convert/transcribe/download）；`app/src/Api/parsers.py` 仅保留兼容导出层。
 - `app/src/Api/routes/transcriptions_handlers/*`: 转录路由子处理器（参数应用、提交处理、运行时配置载荷）原子化拆分。
-- `app/src/Api/services/form_constraints.py`: 三大任务类别统一参数约束引擎（固定锁/范围锁/不约束，前后端同源）。
 - `app/WebUI/src/components/workbench/TaskStatusPanel.vue`: status panel shell.
 - `app/WebUI/src/components/workbench/status/StatusQueryHeader.vue`: status query row + task list.
 - `app/WebUI/src/components/workbench/status/StatusProgressSummary.vue`: progress and file summary.
@@ -48,9 +47,6 @@
 - `app/WebUI/src/composables/workbench/submitPayloadBuilders/*`: 按任务类别拆分的提交载荷构建器（index 聚合导出）。
 - `app/WebUI/src/composables/workbench/submission/*`: 提交流程原子模块（通用动作 + enhance/convert/transcribe/download 各自 submitter）。
 - `app/WebUI/src/composables/workbench/useWorkbenchAdmin.js`: 管理鉴权与总览数据获取。
-- `app/WebUI/src/composables/workbench/useWorkbenchFormConstraints.js`: 前端参数约束获取、字段策略解析与表单值纠正。
-- `app/WebUI/src/components/admin/AdminConstraintEditor.vue`: 管理面板参数约束编辑器（按类别）。
-- `app/WebUI/src/constants/formConstraints.js`: 前端字段名与后端参数名映射。
 - `app/WebUI/src/constants/workbench.js`: category path and menu constants.
 - `app/WebUI/src/styles/navigation.css`: top menu animation/style module.
 
@@ -74,11 +70,3 @@
 - 支持会话令牌（`admin_sessions`），接口使用 `Authorization: Bearer <token>`。
 - 客户端IP解析由 `app/src/Utils/client_ip.py` 统一处理，支持 IPv4/IPv6、`Forwarded`、`X-Forwarded-For`、`X-Real-IP`。
 - 通过“管理页可编辑配置 + 环境变量默认值”组合管理受信代理 CIDR，动态处理代理链，适配 Nginx / FRP 转发场景。
-
-## Parameter Constraints
-- 后端提供统一配置：`/api/admin/config/form-constraints`（管理端）与 `/api/form-constraints`（创建页）。
-- 约束模型支持：
-  - `free`：不约束
-  - `fixed`：固定锁（用户不可改）
-  - `range`：范围锁（数值字段）
-- 创建任务时后端会再次应用约束，避免绕过前端直接提交非法参数。
