@@ -2,6 +2,7 @@ services:
   better_video:
     image: better_video:latest
     container_name: better_video
+    gpus: all
     runtime: nvidia
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
