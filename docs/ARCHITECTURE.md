@@ -20,6 +20,13 @@
 - **Main process**: Flask API server
 - **Worker process**: long-running task processing loop
 
+## Processing Model
+- Long videos are processed in segments to keep disk, memory, and VRAM usage
+  bounded.
+- Each segment follows the same lifecycle: extract frames, upscale, encode the
+  segment, then release intermediate frames before moving on.
+- This avoids full-video frame extraction for multi-hour inputs.
+
 ## WebUI Module Layout
 - `app/WebUI/src/pages/WorkbenchPage.vue`: page shell only (layout + component assembly).
 - `app/WebUI/src/components/workbench/WorkbenchHeader.vue`: theme selector + category switch entry.
@@ -27,11 +34,9 @@
 - `app/WebUI/src/components/workbench/TaskCreatePanel.vue`: task creation panel shell.
 - `app/WebUI/src/components/workbench/EnhanceTaskForm.vue`: enhance form module.
 - `app/WebUI/src/components/workbench/ConvertTaskForm.vue`: conversion form module.
-- `app/WebUI/src/components/workbench/TranscribeTaskForm.vue`: transcription form module.
 - `app/WebUI/src/components/workbench/WatermarkTimelineEditor.vue`: watermark timeline editor module.
 - `app/WebUI/src/components/workbench/enhance/*`: enhance section modules.
 - `app/WebUI/src/components/workbench/convert/*`: conversion section modules.
-- `app/WebUI/src/components/workbench/transcribe/*`: transcription section modules.
 - `app/src/Worker/pipelines/transcription/translation/*`: 转录翻译提供器与分段翻译子模块（Ollama/OpenAI兼容）。
 - `app/src/Worker/pipelines/transcription/whisper_engine.py`: 转录执行器（支持 `whisper` / `faster_whisper` 双后端，按任务参数选择）。
 - `app/src/Api/task_parsers/*`: 后端任务参数解析按类别原子化拆分（enhance/convert/transcribe/download）；`app/src/Api/parsers.py` 仅保留兼容导出层。
@@ -53,6 +58,8 @@
 ## Frontend Maintainability Rule
 - Do not reintroduce large single-file page components.
 - Keep page files focused on composition, move domain logic to composables, and move view sections to dedicated components.
+- Transcription frontend components may remain in the source tree, but
+  transcription entry points are intentionally hidden from the active UI.
 
 ## Storage
 - SQLite: `/workspace/storage/data/tasks.db`
