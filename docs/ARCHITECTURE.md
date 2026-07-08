@@ -71,6 +71,15 @@
   - `whisper`: `/workspace/storage/models/transcription/whisper-openai`
   - `faster_whisper`: `/workspace/storage/models/transcription/faster-whisper/<model_id>`
 
+## SQLite Runtime Rules
+- SQLite runs in WAL mode with `synchronous=NORMAL`, `temp_store=MEMORY`, and a
+  30s busy timeout.
+- The intended concurrency model is one Worker writer plus API readers.
+- Avoid long API transactions, especially around progress polling or admin
+  task deletion.
+- If multi-worker scale-out becomes necessary, move the task database to
+  PostgreSQL instead of stretching SQLite beyond the single-writer model.
+
 ## Admin & Real IP
 - 管理入口通过顶部菜单 `后端管理` 访问，采用密码登录，密码哈希保存在 SQLite `app_settings`。
 - 后端管理页采用侧拉菜单结构，内置模糊搜索菜单项，方便后续扩展更多管理模块。

@@ -64,8 +64,14 @@ docker compose -f deploy/compose/docker-compose.build.yml build app_image
 - [API contract](API.md)
 - [Operational SOP](SOP.md)
 - [Real IP deployment](DEPLOY_REAL_IP.md)
-- [SQLite optimization](DB_OPTIMIZATION.md)
 - [Compose workflows](../deploy/compose/README.md)
+
+## Git baseline
+
+- `dev`: daily development branch. New features and fixes start here.
+- `main`: stable branch. Merge only tested, release-ready changes from `dev`.
+- Every commit on `dev` must be validated before commit; record the relevant
+  test command or manual verification in the commit/PR notes.
 
 ## Acknowledgements
 

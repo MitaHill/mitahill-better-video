@@ -60,13 +60,26 @@ Validation checklist:
 
 ## Git workflow
 
-- Keep changes scoped and commit with semantic prefixes:
+- Branch roles:
+  - `dev`: development branch for new features, fixes, and documentation work.
+  - `main`: stable branch for tested versions only.
+- Start new work from `dev`. Do not develop directly on `main`.
+- Merge `dev` into `main` only after the branch is validated and ready to be
+  treated as stable.
+- Keep changes scoped and commit with semantic prefixes or short Chinese
+  summaries that clearly state the change:
   - `feat:` feature or behavior change
   - `fix:` bug fix
   - `docs:` documentation-only change
   - `perf:` performance change
   - `chore:` maintenance
-- Work on feature branches, then merge into `main` after validation.
+- Every commit on `dev` must be tested before commit. Use the narrowest useful
+  check for the change, then run broader checks before merging to `main`.
+- Recommended checks:
+  - Python/backend: `python3 -m compileall -q app/src`
+  - Frontend: `cd app/WebUI && npm run build`
+  - Runtime/config: `cd pre-run && docker compose config`
+  - Behavior change: run a small real task and confirm status/output/logs
 - Primary remote is `origin`.
 - Before pushing, check:
 
