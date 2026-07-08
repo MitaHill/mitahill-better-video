@@ -12,15 +12,21 @@ COPY app/WebUI/src ./src
 RUN npm ci
 RUN npm run build
 
+FROM ghcr.io/astral-sh/uv:0.8.13 AS uv
+
 FROM base_better_video:20260210-2330
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    UV_NO_CACHE=1 \
     PYTHONPATH=/workspace/app
 
 WORKDIR /workspace
+
+COPY --from=uv /uv /uvx /usr/local/bin/
 
 # --- CACHE BUSTER TO ENSURE SOURCE CODE IS ALWAYS RE-COPIED AND RE-VERIFIED ---
 RUN echo "Triggering Re-build (Force Update 2026-01-08-1051)"
@@ -33,17 +39,19 @@ RUN apt-get update && \
 COPY app/ /workspace/app/
 
 # 2. Install web backend dependencies
-RUN pip install --no-cache-dir \
-    flask==2.3.3 \
-    gunicorn==21.2.0 \
-    flask-socketio==5.3.6 \
-    eventlet==0.36.1 \
-    faster-whisper==1.0.3 \
-    yt-dlp==2026.2.4 \
-    voicefixer \
-    deepfilternet \
-    python-dotenv==1.0.1 \
-    basicsr==1.4.2
+COPY pyproject.toml uv.lock /workspace/
+RUN uv export --locked --no-emit-project --no-default-groups --group base --group app \
+        --format requirements.txt --no-hashes --output-file /tmp/app-requirements.txt && \
+    uv pip install --system setuptools==69.5.1 wheel==0.45.1 numpy==1.24.4 cython==0.29.36 && \
+    uv pip install --system \
+        --index https://download.pytorch.org/whl/cu116 \
+        --index-strategy unsafe-best-match \
+        --no-build-isolation-package openai-whisper \
+        --no-build-isolation-package basicsr \
+        --no-build-isolation-package facexlib \
+        --no-build-isolation-package gfpgan \
+        --requirements /tmp/app-requirements.txt && \
+    rm -f /tmp/app-requirements.txt
 
 # 3. Configure VoiceFixer cache (Symlink to pre-downloaded weights)
 RUN mkdir -p /root/.cache/voicefixer/analysis_module/checkpoints && \
