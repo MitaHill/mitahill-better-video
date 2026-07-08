@@ -15,23 +15,6 @@ const STAGE_LABELS = {
   completed: "已完成",
 };
 
-const clampNumber = (value, fallback = 0) => {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-};
-
-const formatAgeLabel = (updatedAtMs, nowMs) => {
-  const updated = clampNumber(updatedAtMs, 0);
-  const now = clampNumber(nowMs, Date.now());
-  if (updated <= 0) return "";
-  const diffSec = Math.max(0, Math.floor((now - updated) / 1000));
-  if (diffSec <= 1) return "刚刚更新";
-  if (diffSec < 60) return `${diffSec}s前更新`;
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m前更新`;
-  return `${Math.floor(diffMin / 60)}h前更新`;
-};
-
 export const resolveStageLabel = (stage, category = "") => {
   const safeStage = String(stage || "").trim().toLowerCase();
   if (safeStage && STAGE_LABELS[safeStage]) {
@@ -138,34 +121,9 @@ export const buildParamRows = (status) => {
 };
 
 export const buildProgressDetails = (status, live, nowMs = Date.now()) => {
-  if (!status) return "";
-
-  const category = String(status?.task_params?.task_category || "").trim().toLowerCase();
-  const fallbackProgress = status.task_progress || {};
-  const fallbackSegment = status.segment_progress || {};
-  const totalFrames = clampNumber(live.totalFrames || fallbackProgress.total_frames || 0, 0);
-  const totalFrame = clampNumber(live.totalFrame || 0, 0);
-  const itemCount = clampNumber(live.itemCount || live.segmentCount || fallbackProgress.total_segments || 0, 0);
-  const itemIndex = clampNumber(live.itemIndex || live.segmentIndex || fallbackSegment.segment_index || 0, 0);
-  const itemLabel =
-    String(live.itemLabel || "").trim() ||
-    (itemCount ? (category === "enhance" ? "分段" : category === "download" ? "任务" : "文件") : "");
-  const unitTotal = clampNumber(live.unitTotal || live.segmentTotal || fallbackSegment.total_frames || 0, 0);
-  const unitDone = clampNumber(live.unitDone || live.segmentFrame || fallbackSegment.last_done_frame || 0, 0);
-  const unitLabel = String(live.unitLabel || "").trim() || (unitTotal ? "帧" : "");
-  const stageLabel = resolveStageLabel(live.stage, category);
-
-  const parts = [];
-  // 这串文字是状态页顶部那一行“高密度摘要”，因此只拼最关键的信息：
-  // 当前阶段、当前项、子进度、GPU 和更新时间。再多就会变成噪音。
-  if (stageLabel) parts.push(stageLabel);
-  if (itemCount && itemLabel) parts.push(`${itemLabel} ${itemIndex}/${itemCount}`);
-  if (unitTotal && unitLabel) parts.push(`${unitLabel} ${unitDone}/${unitTotal}`);
-  if (live.gpu !== null) parts.push(`GPU ${live.gpu}%`);
-  if (totalFrames) parts.push(`总帧 ${totalFrame}/${totalFrames}`);
-  const ageLabel = formatAgeLabel(live.updatedAtMs, nowMs);
-  if (ageLabel) parts.push(ageLabel);
-  return parts.join(" | ");
+  // 实时状态已经由 StatusProgressSummary 的矩形信息卡展示。
+  // 这里保留函数接口，避免改动调用链，但不再生成重复的文字摘要。
+  return "";
 };
 
 export const resolveStatusClass = (status) => {
