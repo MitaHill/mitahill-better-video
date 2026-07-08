@@ -8,6 +8,7 @@ COPY app/WebUI/package.json .
 COPY app/WebUI/package-lock.json .
 COPY app/WebUI/vite.config.js .
 COPY app/WebUI/index.html .
+COPY app/WebUI/public ./public
 COPY app/WebUI/src ./src
 RUN npm ci
 RUN npm run build
@@ -58,12 +59,9 @@ RUN mkdir -p /root/.cache/voicefixer/analysis_module/checkpoints && \
     ln -s /workspace/app/models/audio/voicefixer/analysis_module.ckpt /root/.cache/voicefixer/analysis_module/checkpoints/vf.ckpt && \
     ln -s /workspace/app/models/audio/voicefixer/model.ckpt-1490000_trimed.pt /root/.cache/voicefixer/model.ckpt-1490000_trimed.pt
 
-# 3b. Pre-download DeepFilterNet2 weights to avoid runtime fetch
+# 3b. Provide bundled DeepFilterNet2 weights to avoid runtime/build-time fetch
 RUN mkdir -p /root/.cache/DeepFilterNet && \
-    wget -q -O /root/.cache/DeepFilterNet/DeepFilterNet2.zip \
-      https://github.com/Rikorose/DeepFilterNet/raw/main/models/DeepFilterNet2.zip && \
-    unzip -q /root/.cache/DeepFilterNet/DeepFilterNet2.zip -d /root/.cache/DeepFilterNet && \
-    rm /root/.cache/DeepFilterNet/DeepFilterNet2.zip
+    cp -a /workspace/app/models/audio/deepfilternet/DeepFilterNet2 /root/.cache/DeepFilterNet/
 
 # 4. Copy built frontend assets
 COPY --from=frontend-build /frontend/dist /workspace/app/WebUI/dist
