@@ -286,6 +286,29 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     }
   };
 
+  const deleteTaskById = async (taskId) => {
+    const safeTaskId = String(taskId || "").trim();
+    if (!auth.token || !safeTaskId) return;
+    overview.error = "";
+    overview.taskActionLoading[safeTaskId] = true;
+    try {
+      const res = await fetch(`/api/admin/tasks/${encodeURIComponent(safeTaskId)}`, {
+        method: "DELETE",
+        headers: _authHeaders(),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "删除任务失败");
+      }
+      await fetchOverview();
+    } catch (error) {
+      overview.error = error.message;
+    } finally {
+      overview.taskActionLoading[safeTaskId] = false;
+    }
+  };
+
   const fetchGpuUsage = async (seconds = gpuUsage.rangeSeconds || 60) => {
     if (!auth.token) return;
     gpuUsage.loading = true;
@@ -750,6 +773,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     fetchOverview,
     setMaintenanceMode,
     cancelTaskById,
+    deleteTaskById,
     fetchGpuUsage,
     fetchRealIpConfig,
     updateRealIpConfig,

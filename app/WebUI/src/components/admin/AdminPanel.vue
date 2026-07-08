@@ -82,6 +82,7 @@
             :error="overview.error"
             :on-refresh="fetchOverview"
             :on-cancel-task="onTaskCancel"
+            :on-delete-task="onTaskDelete"
             :task-action-loading="taskActionLoading"
             @update:status-filter="onStatusFilterChange"
           />
@@ -221,6 +222,7 @@ const {
   fetchOverview,
   setMaintenanceMode,
   cancelTaskById,
+  deleteTaskById,
   fetchGpuUsage,
   fetchRealIpConfig,
   updateRealIpConfig,
@@ -379,6 +381,10 @@ const onStatusFilterChange = (value) => {
 
 const onTaskCancel = async (taskId) => {
   await cancelTaskById(taskId);
+};
+
+const onTaskDelete = async (taskId) => {
+  await deleteTaskById(taskId);
 };
 
 const taskActionLoading = (taskId) => Boolean(overview.taskActionLoading[String(taskId || "")]);

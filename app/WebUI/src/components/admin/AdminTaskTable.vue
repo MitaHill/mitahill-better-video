@@ -40,6 +40,14 @@
               >
                 {{ taskActionLoading(task.task_id) ? "取消中..." : "取消" }}
               </button>
+              <button
+                v-else-if="canDelete(task.status)"
+                type="button"
+                :disabled="loading || taskActionLoading(task.task_id)"
+                @click="confirmDelete(task.task_id)"
+              >
+                {{ taskActionLoading(task.task_id) ? "删除中..." : "删除" }}
+              </button>
               <span v-else>-</span>
             </td>
             <td class="mono">{{ task.task_id }}</td>
@@ -65,7 +73,7 @@
 <script setup>
 import { formatDateTimeToSecond } from "./formatDateTime";
 
-defineProps({
+const props = defineProps({
   tasks: {
     type: Array,
     required: true,
@@ -87,6 +95,10 @@ defineProps({
     required: true,
   },
   onCancelTask: {
+    type: Function,
+    required: true,
+  },
+  onDeleteTask: {
     type: Function,
     required: true,
   },
@@ -115,5 +127,15 @@ const statusText = (status) => {
 const canCancel = (status) => {
   const raw = String(status || "").toUpperCase();
   return raw === "PENDING" || raw === "PROCESSING";
+};
+
+const canDelete = (status) => {
+  const raw = String(status || "").toUpperCase();
+  return raw === "COMPLETED" || raw === "FAILED";
+};
+
+const confirmDelete = (taskId) => {
+  if (!window.confirm(`确认删除任务 ${taskId}？相关文件和数据库记录将被永久删除。`)) return;
+  props.onDeleteTask(taskId);
 };
 </script>

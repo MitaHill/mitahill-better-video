@@ -256,3 +256,19 @@ def cancel_task(task_id: str, reason: str = "已取消（管理员操作）") ->
     db_core.update_task_status(safe_task_id, "FAILED", progress=task.get("progress") or 0, message=reason)
     latest = db_core.get_task(safe_task_id)
     return latest or task
+
+
+def delete_task(task_id: str) -> None:
+    safe_task_id = str(task_id or "").strip()
+    if not safe_task_id:
+        raise ValueError("task_id is required")
+
+    task = db_core.get_task(safe_task_id)
+    if not task:
+        raise ValueError("task not found")
+
+    status = str(task.get("status") or "").upper()
+    if status not in {"COMPLETED", "FAILED"}:
+        raise ValueError("only completed or failed tasks can be deleted")
+
+    db_core.delete_task(safe_task_id)

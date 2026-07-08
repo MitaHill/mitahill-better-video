@@ -141,6 +141,20 @@ def admin_cancel_task(task_id: str):
     return jsonify({"ok": True, "task": task})
 
 
+@bp.delete("/api/admin/tasks/<task_id>")
+def admin_delete_task(task_id: str):
+    _session, err = get_admin_session(request)
+    if err:
+        return jsonify({"error": err}), 401
+    try:
+        db_admin.delete_task(task_id)
+    except ValueError as exc:
+        message = str(exc)
+        status = 404 if message == "task not found" else 400
+        return jsonify({"error": message}), status
+    return jsonify({"ok": True})
+
+
 @bp.put("/api/admin/maintenance-mode")
 def admin_update_maintenance_mode():
     _session, err = get_admin_session(request)
