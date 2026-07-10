@@ -1,12 +1,14 @@
 import gc
+import json
 import logging
+import os
 import shutil
 import subprocess
+import sys
 import traceback
 from datetime import datetime
 from pathlib import Path
 
-import torch
 from PIL import Image
 from werkzeug.datastructures import FileStorage
 
@@ -30,6 +32,8 @@ class StartupSelfCheckService:
 
     @staticmethod
     def _cleanup_memory():
+        import torch
+
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -152,3 +156,41 @@ class StartupSelfCheckService:
             shutil.rmtree(self.workspace, ignore_errors=True)
         except Exception:
             logger.warning("Failed to cleanup self-check workspace: %s", self.workspace, exc_info=True)
+
+
+def run_startup_self_check_subprocess(*, config_payload):
+    payload = config_payload or {}
+    if not bool(((payload.get("runtime") or {}).get("startup_self_check_enabled"))):
+        logger.info("Startup self-check disabled, skip.")
+        return
+
+    env = os.environ.copy()
+    env["STARTUP_SELF_CHECK_CONFIG_JSON"] = json.dumps(payload, ensure_ascii=False)
+    logger.info("Startup self-check enabled, run in isolated subprocess.")
+    result = subprocess.run(
+        [sys.executable, "-m", "app.src.Services.startup_self_check_service"],
+        env=env,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"启动自检子进程失败，退出码: {result.returncode}")
+
+
+def _main():
+    from app.src.Config.logging_setup import configure_logging
+    from app.src.Config import settings as config
+
+    configure_logging(component="startup-self-check")
+    config.initialize_context()
+    db.init_db()
+    raw = os.getenv("STARTUP_SELF_CHECK_CONFIG_JSON", "{}")
+    try:
+        payload = json.loads(raw) or {}
+    except Exception:
+        payload = {}
+    StartupSelfCheckService(config_payload=payload).run_if_enabled()
+
+
+if __name__ == "__main__":
+    _main()

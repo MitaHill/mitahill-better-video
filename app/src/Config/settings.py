@@ -225,26 +225,22 @@ def initialize_context():
     if _initialized: return
     
     log_system_info()
-    # Fail-fast GPU checks
     try:
-        import torch
-    except Exception as e:
-        logger.critical(f"[FAILED] PyTorch not available for CUDA checks: {e}")
-        sys.exit(1)
-    if not torch.cuda.is_available():
-        logger.critical("[FAILED] CUDA not available. NVIDIA GPU required.")
-        sys.exit(1)
-    try:
-        subprocess.run(["nvidia-smi", "-L"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        gpu_result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
     except Exception as e:
         logger.critical(f"[FAILED] NVIDIA GPU not detected via nvidia-smi: {e}")
         sys.exit(1)
-    try:
-        gpu_name = torch.cuda.get_device_name(0)
-        logger.info(f"NVIDIA GPU detected: {gpu_name}")
-    except Exception as e:
-        logger.critical(f"[FAILED] Unable to query NVIDIA GPU: {e}")
+    gpu_name = (gpu_result.stdout or "").strip().splitlines()[0] if gpu_result.stdout else ""
+    if not gpu_name:
+        logger.critical("[FAILED] NVIDIA GPU not detected via nvidia-smi.")
         sys.exit(1)
+    logger.info(f"NVIDIA GPU detected: {gpu_name}")
     verify_models()
     DEFAULT_SMART_TILE_SIZE, vram = resolve_default_tile_size()
     if vram is None:

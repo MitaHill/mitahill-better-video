@@ -12,7 +12,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from app.src.Config.logging_setup import configure_logging
 from app.src.Services.gpu_sampler_service import GpuSamplerService
-from app.src.Services.startup_self_check_service import StartupSelfCheckService
+from app.src.Services.startup_self_check_service import run_startup_self_check_subprocess
 from app.src.Services.worker_service import WorkerService
 from flask_socketio import SocketIO, join_room
 from app.src.Api.services.admin import get_transcription_config
@@ -39,7 +39,7 @@ def main():
     db_admin.ensure_admin_password(config.ADMIN_INITIAL_PASSWORD)
     db_admin.ensure_real_ip_trusted_proxies(config.REAL_IP_TRUSTED_PROXIES_RAW)
     transcription_config = get_transcription_config()
-    StartupSelfCheckService(config_payload=transcription_config).run_if_enabled()
+    run_startup_self_check_subprocess(config_payload=transcription_config)
     logger.info("Init recommendations: %s", init_info)
 
     worker_service = _build_worker_service()
