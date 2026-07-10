@@ -175,7 +175,7 @@ try:
     TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS = get_env_float("TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS", 120.0)
     TRANSCRIPTION_TRANSLATOR_PROMPT = os.getenv(
         "TRANSCRIPTION_TRANSLATOR_PROMPT",
-        "将译文放到代码块中，不要增加解释。例如```译文```",
+        "",
     ).strip()
 except Exception as e:
     logger.critical(f"[FAILED] Configuration error: {e}")

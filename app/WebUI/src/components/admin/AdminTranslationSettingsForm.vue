@@ -51,10 +51,10 @@
         <code v-pre>{{target_language_code}}</code>（示例: zh）。
       </p>
       <p class="notice" style="margin-top: 6px;">
-        程序执行顺序：变量替换 -> 自动追加核心提示词 -> 携带最近 20 轮上下文发送给翻译模型。
+        程序执行顺序：变量替换 -> 自动追加英文核心提示词 -> 携带最近 20 轮上下文发送给翻译模型。
       </p>
       <p class="notice" style="margin-top: 6px;">
-        返回解析顺序：若模型输出包含代码块 <code>```译文```</code>，优先提取代码块正文；
+        返回解析顺序：若模型输出包含代码块 <code>```Translation```</code>，优先提取代码块正文；
         若没有代码块，则按“极端情况回退策略”决定使用“模型返回全文”或“原始待翻译文本”。
       </p>
 
@@ -127,6 +127,12 @@ const local = reactive({
   previewTargetLanguage: "zh",
 });
 
+const CORE_TRANSLATION_PROMPT = "Place the translation in a code block; do not add explanations. For example: ```Translation```";
+const LEGACY_CORE_TRANSLATION_PROMPTS = new Set([
+  CORE_TRANSLATION_PROMPT,
+  "将译文放到代码块中，不要增加解释。例如```译文```",
+]);
+
 const TARGET_LANGUAGE_NAME_MAP = Object.freeze({
   zh: "Chinese",
   en: "English",
@@ -168,7 +174,7 @@ const resolveTargetLanguageMeta = (targetLanguage) => {
 
 const renderCustomPrompt = (rawPrompt, targetLanguage) => {
   const source = String(rawPrompt || "").trim();
-  if (!source) return "";
+  if (!source || LEGACY_CORE_TRANSLATION_PROMPTS.has(source)) return "";
   const meta = resolveTargetLanguageMeta(targetLanguage);
   return source
     .replaceAll("{{target_language_code}}", meta.code)
@@ -176,7 +182,7 @@ const renderCustomPrompt = (rawPrompt, targetLanguage) => {
     .replaceAll("{{target_language}}", meta.display);
 };
 
-const buildStrictRules = () => "将译文放到代码块中，不要增加解释。例如```译文```";
+const buildStrictRules = () => CORE_TRANSLATION_PROMPT;
 
 const previewSystemPrompt = computed(() => {
   const custom = renderCustomPrompt(local.prompt, local.previewTargetLanguage);
@@ -193,7 +199,8 @@ const applyFromProps = () => {
   local.model = translation.model || "";
   local.apiKey = translation.api_key || "";
   local.timeoutSec = Number(translation.timeout_sec ?? 120);
-  local.prompt = translation.prompt || "";
+  const prompt = String(translation.prompt || "").trim();
+  local.prompt = LEGACY_CORE_TRANSLATION_PROMPTS.has(prompt) ? "" : prompt;
   local.fallbackMode = translation.fallback_mode || "model_full_text";
 };
 
