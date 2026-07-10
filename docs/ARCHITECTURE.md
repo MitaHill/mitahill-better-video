@@ -48,7 +48,7 @@
 - `app/WebUI/src/components/workbench/enhance/*`: enhance section modules.
 - `app/WebUI/src/components/workbench/convert/*`: conversion section modules.
 - `app/src/Worker/pipelines/transcription/translation/*`: 转录翻译提供器与分段翻译子模块（仅 OpenAI 兼容 Chat Completions 格式）。
-- `app/src/Worker/pipelines/transcription/whisper_engine.py`: 转录执行器（固定 `faster_whisper`，按 CTranslate2 runtime 支持列表选择 compute type）。
+- `app/src/Worker/pipelines/transcription/whisper_engine.py`: 转录执行器（固定原版 OpenAI Whisper；CUDA 运行，旧显卡使用 `fp16=False`）。
 - `app/src/Api/task_parsers/*`: 后端任务参数解析按类别原子化拆分（enhance/convert/transcribe/download）；`app/src/Api/parsers.py` 仅保留兼容导出层。
 - `app/src/Api/routes/transcriptions_handlers/*`: 转录路由子处理器（参数应用、提交处理、运行时配置载荷）原子化拆分。
 - `app/WebUI/src/components/workbench/TaskStatusPanel.vue`: status panel shell.
@@ -78,8 +78,7 @@
 - Uploads: `/workspace/storage/upload/run_<task_id>/`
 - Task categories in unified queue: `enhance` / `convert` / `transcribe`
 - Transcription model cache roots:
-  - `whisper`: `/workspace/storage/models/transcription/whisper-openai`
-  - `faster_whisper`: `/workspace/storage/models/transcription/faster-whisper/<model_id>`
+  - `whisper`: `/workspace/storage/models/transcription/whisper/*.pt`
 
 ## SQLite Runtime Rules
 - SQLite runs in WAL mode with `synchronous=NORMAL`, `temp_store=MEMORY`, and a

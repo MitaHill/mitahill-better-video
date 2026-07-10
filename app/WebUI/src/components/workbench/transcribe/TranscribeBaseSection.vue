@@ -33,7 +33,7 @@
 
     <div class="inline-grid two">
       <div class="field compact">
-        <label>Fast-Whisper 模型</label>
+        <label>Whisper 模型</label>
         <select v-model="transcribeForm.whisperModel" :disabled="isDisabled('whisperModel')">
           <option v-for="model in whisperModelOptions" :key="model" :value="model">{{ model }}</option>
         </select>
@@ -125,8 +125,7 @@ const whisperModelOptions = computed(() =>
     "large-v1",
     "large-v2",
     "large-v3",
-    "distil-large-v2",
-    "distil-large-v3",
+    "large",
   ])
 );
 

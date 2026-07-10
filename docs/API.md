@@ -70,7 +70,7 @@ entry and admin transcription tools.
 
 Fields:
 - `media_files` (required, multiple; also compatible with `files` / `file`)
-- `transcription_backend` (`faster_whisper`)
+- `transcription_backend` (`whisper`)
 - `transcribe_mode` (`subtitle_zip` | `subtitled_video` | `subtitle_and_video_zip`)
 - `subtitle_format` (`srt` | `vtt`)
 - `whisper_model`
@@ -221,9 +221,9 @@ Request (example):
 ```json
 {
   "transcription": {
-    "backend": "faster_whisper",
-    "active_model": "large-v3",
-    "allowed_models": ["small", "medium", "large-v3", "turbo"]
+    "backend": "whisper",
+    "active_model": "medium",
+    "allowed_models": ["small", "medium", "large-v3", "large"]
   },
   "translation": {
     "provider": "openai_compatible",
@@ -238,7 +238,7 @@ Request (example):
 Header:
 - `Authorization: Bearer <token>`
 
-返回 faster-whisper 模型目录，以及本地安装状态。
+返回 OpenAI Whisper 模型目录，以及本地安装状态。
 
 ### POST /api/admin/transcription/models/download
 Header:
@@ -248,7 +248,7 @@ Header:
 
 Request:
 ```json
-{ "backend": "faster_whisper", "model_id": "large-v3" }
+{ "backend": "whisper", "model_id": "medium" }
 ```
 
 ### GET /api/admin/transcription/models/downloads
@@ -276,8 +276,8 @@ Request (optional):
 ```json
 {
   "mode": "hash",
-  "backend": "faster_whisper",
-  "model_id": "large-v3"
+  "backend": "whisper",
+  "model_id": "medium"
 }
 ```
 - `mode=hash`：执行到 HASH 校验即返回

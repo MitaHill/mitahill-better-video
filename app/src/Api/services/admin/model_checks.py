@@ -1,21 +1,15 @@
 import hashlib
 import logging
 import os
-import re
 import tempfile
 import time
 import wave
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict
 
 import requests
 
-from app.src.Worker.pipelines.transcription.compute_type import (
-    inspect_faster_whisper_compute_types,
-    resolve_faster_whisper_device,
-)
-
-from .transcription_catalog import fetch_hf_model_files, get_model_entry, get_storage_roots
+from .transcription_catalog import get_model_entry, get_storage_roots
 
 logger = logging.getLogger("ADMIN_MODEL_CHECKS")
 
@@ -30,49 +24,6 @@ def _digest_of_file(path: Path, algo: str) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def _git_blob_sha1_of_file(path: Path) -> str:
-    size = path.stat().st_size
-    digest = hashlib.sha1()
-    digest.update(f"blob {size}\0".encode("utf-8"))
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _clean_etag_digest(etag_value: str) -> str:
-    raw = str(etag_value or "").strip()
-    if not raw:
-        return ""
-    cleaned = raw.replace("W/", "").strip().strip("\"")
-    if "-" in cleaned:
-        # multipart etag is not a stable file digest, skip it
-        return ""
-    return cleaned if re.fullmatch(r"[a-fA-F0-9]{40}|[a-fA-F0-9]{64}", cleaned) else ""
-
-
-def _infer_hash_algo(digest: str) -> str:
-    token = str(digest or "").strip().lower()
-    if len(token) == 64 and re.fullmatch(r"[a-f0-9]{64}", token):
-        return "sha256"
-    if len(token) == 40 and re.fullmatch(r"[a-f0-9]{40}", token):
-        return "sha1"
-    return ""
-
-
-def _fetch_hf_hash_via_head(repo_id: str, filename: str) -> Dict:
-    resolve_url = f"https://huggingface.co/{repo_id}/resolve/main/{filename}?download=true"
-    response = requests.head(resolve_url, allow_redirects=True, timeout=30)
-    response.raise_for_status()
-    digest = _clean_etag_digest(response.headers.get("etag", ""))
-    algo = _infer_hash_algo(digest)
-    return {
-        "url": resolve_url,
-        "digest": digest.lower() if digest else "",
-        "algo": algo,
-    }
 
 
 def _speed_grade(latency_sec: float) -> str:
@@ -100,107 +51,54 @@ def _extract_error_detail(resp) -> str:
 
 def verify_model_hashes(model_entry: Dict) -> Dict:
     backend = str(model_entry.get("backend") or "").strip().lower()
-    out = {"ok": True, "checks": []}
 
-    if backend == "faster_whisper":
-        repo_id = str(model_entry.get("repo_id") or "").strip()
+    if backend == "whisper":
         model_id = str(model_entry.get("model_id") or "").strip()
-        local_dir = Path(model_entry.get("local_path") or "")
-        if not local_dir.exists():
+        local_path = Path(model_entry.get("local_path") or "")
+        expected = str(model_entry.get("expected_sha256") or "").strip().lower()
+        if not local_path.exists():
             return {
                 "ok": False,
                 "checks": [
                     {
                         "name": "hash",
                         "status": "failed",
-                        "message": f"模型目录不存在: {local_dir}",
+                        "file": str(local_path),
+                        "message": f"模型文件不存在: {local_path}",
                     }
                 ],
             }
 
-        try:
-            remote_meta = fetch_hf_model_files(repo_id)
-        except Exception as exc:
-            logger.error("Failed to fetch HF hash metadata for %s: %s", repo_id, exc)
+        if not expected:
             return {
                 "ok": False,
                 "checks": [
                     {
                         "name": "hash",
                         "status": "failed",
-                        "message": f"无法拉取远程 HASH 数据: {exc}",
+                        "file": str(local_path),
+                        "message": "模型 URL 未提供 SHA256",
                     }
                 ],
             }
 
-        required_files: List[str] = model_entry.get("required_files") or []
-        all_ok = True
-        checks = []
-        for filename in required_files:
-            local_file = local_dir / filename
-            if not local_file.exists():
-                checks.append(
-                    {
-                        "name": "hash",
-                        "status": "failed",
-                        "file": str(local_file),
-                        "message": "文件缺失",
-                    }
-                )
-                all_ok = False
-                continue
-
-            remote_entry = remote_meta.get(filename) or {}
-            expected = str(remote_entry.get("sha256") or "").strip().lower()
-            algo = "sha256" if expected and _infer_hash_algo(expected) == "sha256" else ""
-
-            if not expected or not algo:
-                blob_id = str(remote_entry.get("blob_id") or "").strip().lower()
-                if blob_id and _infer_hash_algo(blob_id) == "sha1":
-                    expected = blob_id
-                    algo = "git_blob_sha1"
-
-            if not expected or not algo:
-                try:
-                    head_meta = _fetch_hf_hash_via_head(repo_id, filename)
-                    expected = str(head_meta.get("digest") or "").strip().lower()
-                    algo = str(head_meta.get("algo") or "").strip().lower()
-                except Exception as exc:
-                    logger.warning("Failed to fetch HEAD hash for %s/%s: %s", repo_id, filename, exc)
-                    expected = ""
-                    algo = ""
-
-            if not expected or not algo:
-                checks.append(
-                    {
-                        "name": "hash",
-                        "status": "failed",
-                        "file": str(local_file),
-                        "message": "远程未提供可用 HASH",
-                    }
-                )
-                all_ok = False
-                continue
-
-            if algo == "git_blob_sha1":
-                actual = _git_blob_sha1_of_file(local_file)
-            else:
-                actual = _digest_of_file(local_file, algo)
-            passed = actual == expected
-            all_ok = all_ok and passed
-            checks.append(
+        actual = _digest_of_file(local_path, "sha256")
+        passed = actual == expected
+        return {
+            "ok": passed,
+            "checks": [
                 {
                     "name": "hash",
                     "status": "passed" if passed else "failed",
-                    "algorithm": algo,
-                    "file": str(local_file),
+                    "algorithm": "sha256",
+                    "file": str(local_path),
                     "expected": expected,
                     "actual": actual,
-                    "message": f"{algo.upper()} 校验通过" if passed else f"{algo.upper()} 校验失败",
+                    "message": "SHA256 校验通过" if passed else "SHA256 校验失败",
                 }
-            )
-
-        return {"ok": all_ok, "checks": checks, "model_id": model_id}
+            ],
+            "model_id": model_id,
+        }
 
     return {
         "ok": False,
@@ -235,26 +133,25 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
     local_path = Path(model_entry.get("local_path") or "")
     started = time.time()
 
-    try:
-        import torch
+    import torch
 
-        device = resolve_faster_whisper_device("cuda" if torch.cuda.is_available() else "cpu")
-    except Exception:
-        device = "cpu"
+    device = "cuda" if torch.cuda.is_available() else ""
 
     wav_path = _build_silent_wav()
     try:
-        if backend == "faster_whisper":
-            from faster_whisper import WhisperModel
-
-            model_ref = str(local_path) if local_path.exists() else model_id
-            compute_info = inspect_faster_whisper_compute_types(device)
-            compute_type = str(compute_info.get("selected") or "")
-            model = WhisperModel(model_ref, device=device, compute_type=compute_type)
-            segments, _info = model.transcribe(str(wav_path), beam_size=1, language="en")
-            list(segments)
-        else:
+        if backend != "whisper":
             raise RuntimeError(f"Unsupported backend: {backend}")
+        if not device:
+            raise RuntimeError("CUDA not available. NVIDIA GPU required for transcription.")
+
+        import whisper
+
+        major, _minor = torch.cuda.get_device_capability(0)
+        fp16 = int(major) >= 7
+        model = whisper.load_model(model_id, device=device, download_root=str(local_path.parent))
+        model.transcribe(str(wav_path), beam_size=1, language="en", fp16=fp16)
+        del model
+        torch.cuda.empty_cache()
 
         elapsed = time.time() - started
         return {
@@ -262,8 +159,7 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
             "backend": backend,
             "model_id": model_id,
             "device": device,
-            "compute_type": compute_type,
-            "supported_compute_types": compute_info.get("supported") or [],
+            "fp16": fp16,
             "elapsed_sec": round(elapsed, 3),
             "message": "热身成功，模型可调用",
         }
@@ -275,8 +171,7 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
             "backend": backend,
             "model_id": model_id,
             "device": device,
-            "compute_type": locals().get("compute_type", ""),
-            "supported_compute_types": (locals().get("compute_info") or {}).get("supported") or [],
+            "fp16": locals().get("fp16", False),
             "elapsed_sec": round(elapsed, 3),
             "message": str(exc),
         }

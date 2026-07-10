@@ -57,13 +57,10 @@ process restart loops and import-time resource contention.
 - After each task, registered GPU models must be released immediately, then
   Python and CUDA memory should be cleaned with `gc.collect()` and
   `torch.cuda.empty_cache()`.
-- Faster-whisper compute type must be selected from CTranslate2 runtime
-  capability detection, not from hard-coded VRAM guesses.
-- For old NVIDIA GPUs such as GTX 960 4G (Compute Capability 5.x), CTranslate2
-  GPU execution is effectively limited to float32. Use faster-whisper small on
-  GPU for the best stability/quality tradeoff; use medium only if it passes the
-  admin model test on that exact machine, or run medium through CPU int8 when
-  GPU memory is insufficient.
+- Transcription uses original OpenAI Whisper only. CUDA is required; do not add
+  CPU fallback paths. On old NVIDIA GPUs such as GTX 960 4G, run Whisper with
+  `fp16=False`. If `medium` does not fit VRAM on a target machine, fail clearly
+  and let the user select a smaller downloaded model.
 - Automatic expired-task deletion is currently disabled. Admin users delete
   completed/failed task files and database records explicitly from the task
   overview table.

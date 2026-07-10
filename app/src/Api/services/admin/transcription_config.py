@@ -11,7 +11,7 @@ from app.src.Database import transcription_admin as db_transcription
 from .transcription_catalog import get_models_for_backend
 
 
-_VALID_BACKENDS = {"faster_whisper"}
+_VALID_BACKENDS = {"whisper"}
 _VALID_TRANSLATORS = {"none", "openai_compatible"}
 _VALID_TRANSLATION_FALLBACK_MODES = {"model_full_text", "source_text"}
 
@@ -19,8 +19,8 @@ def default_transcription_config() -> Dict[str, Any]:
     return {
         "version": 1,
         "transcription": {
-            "backend": "faster_whisper",
-            "active_model": "large-v3",
+            "backend": "whisper",
+            "active_model": "medium",
             "allowed_models": [
                 "tiny",
                 "tiny.en",
@@ -33,8 +33,7 @@ def default_transcription_config() -> Dict[str, Any]:
                 "large-v1",
                 "large-v2",
                 "large-v3",
-                "distil-large-v2",
-                "distil-large-v3",
+                "large",
             ],
         },
         "translation": {
@@ -76,14 +75,12 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
 def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     merged = _deep_merge(default_transcription_config(), raw or {})
 
-    backend = str(merged["transcription"].get("backend") or "faster_whisper").strip().lower()
-    # 后台配置层面也只允许 faster-whisper。
-    # 这里做二次收口，避免数据库残留旧值时把普通 whisper 又放回来。
+    backend = str(merged["transcription"].get("backend") or "whisper").strip().lower()
     if backend not in _VALID_BACKENDS:
-        backend = "faster_whisper"
+        backend = "whisper"
     merged["transcription"]["backend"] = backend
     merged["transcription"]["active_model"] = str(
-        merged["transcription"].get("active_model") or "large-v3"
+        merged["transcription"].get("active_model") or "medium"
     ).strip().lower()
 
     backend_supported = get_models_for_backend(backend)
@@ -94,7 +91,7 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
         str(item).strip().lower() for item in allowed if str(item).strip()
     ]
     # 模型设置页已移除：管理端不再用白名单限制模型选择。
-    # 这里保留所有已知 faster-whisper 模型，并允许数据库里的自定义模型 ID 留存。
+    # 这里保留所有已知 Whisper 模型，并允许数据库里的自定义模型 ID 留存。
     # 任务提交时的模型是否可运行，交给实际本地模型文件和加载流程判断。
     merged["transcription"]["allowed_models"] = sorted(
         set(backend_supported) | set(merged["transcription"]["allowed_models"])
@@ -183,8 +180,8 @@ def get_parser_defaults() -> Dict[str, Any]:
     transcription = current.get("transcription") or {}
     translation = current.get("translation") or {}
     return {
-        "transcription_backend": str(transcription.get("backend") or "faster_whisper").strip().lower(),
-        "whisper_model": str(transcription.get("active_model") or "large-v3").strip().lower(),
+        "transcription_backend": str(transcription.get("backend") or "whisper").strip().lower(),
+        "whisper_model": str(transcription.get("active_model") or "medium").strip().lower(),
         "translator_provider": str(translation.get("provider") or "none").strip().lower(),
         "translator_base_url": str(translation.get("base_url") or "").strip(),
         "translator_model": str(translation.get("model") or "").strip(),

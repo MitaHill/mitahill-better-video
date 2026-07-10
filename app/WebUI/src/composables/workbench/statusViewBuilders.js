@@ -68,7 +68,7 @@ export const buildParamRows = (status) => {
       { label: "任务类别", value: "视频转录" },
       { label: "转录类型", value: modeLabelMap[params.transcribe_mode] || params.transcribe_mode || "-" },
       { label: "字幕格式", value: (params.subtitle_format || "-").toUpperCase() },
-      { label: "Fast-Whisper 模型", value: params.whisper_model || "-" },
+      { label: "Whisper 模型", value: params.whisper_model || "-" },
       { label: "语言", value: params.language || "auto" },
       { label: "翻译到", value: params.translate_to || "-" },
       { label: "翻译提供器", value: providerLabelMap[params.translator_provider] || params.translator_provider || "-" },

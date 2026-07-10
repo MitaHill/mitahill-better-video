@@ -9,7 +9,7 @@ from typing import Callable, Dict, Optional
 from app.src.Database import transcription_admin as db_transcription
 
 from .model_checks import verify_model_hashes, warmup_transcription_model
-from .transcription_catalog import fetch_hf_model_files, get_faster_required_files, get_model_entry
+from .transcription_catalog import get_model_entry
 from .transcription_config import get_transcription_config
 
 logger = logging.getLogger("ADMIN_MODEL_DOWNLOAD")
@@ -99,7 +99,7 @@ def _run_aria2(
         raise RuntimeError(f"aria2 下载失败，退出码: {code}")
 
 
-def _run_openai_download(job_id: str, model_entry: Dict, aria2_config: Dict):
+def _run_whisper_download(job_id: str, model_entry: Dict, aria2_config: Dict):
     target_path = Path(model_entry.get("local_path") or "")
 
     def on_progress(percent: float, _line: str):
@@ -117,56 +117,6 @@ def _run_openai_download(job_id: str, model_entry: Dict, aria2_config: Dict):
         aria2_config=aria2_config,
         progress_callback=on_progress,
     )
-
-
-def _run_faster_download(job_id: str, model_entry: Dict, aria2_config: Dict):
-    repo_id = str(model_entry.get("repo_id") or "").strip()
-    if not repo_id:
-        raise RuntimeError("faster-whisper 模型缺少 repo_id")
-
-    remote = fetch_hf_model_files(repo_id)
-    required_files = get_faster_required_files(model_entry.get("model_id"), remote)
-    local_dir = Path(model_entry.get("local_path") or "")
-    local_dir.mkdir(parents=True, exist_ok=True)
-
-    file_weights = []
-    for name in required_files:
-        size = int((remote.get(name) or {}).get("size") or 0)
-        file_weights.append(max(size, 1))
-    total_weight = float(sum(file_weights) or len(required_files) or 1)
-
-    done_weight = 0.0
-    for idx, filename in enumerate(required_files):
-        meta = remote.get(filename) or {}
-        url = str(meta.get("url") or "")
-        if not url:
-            raise RuntimeError(f"远程文件缺失: {filename}")
-
-        weight = float(file_weights[idx])
-        db_transcription.update_model_download_job(
-            job_id,
-            status="RUNNING",
-            progress=min(98.0, done_weight / total_weight * 100.0),
-            message=f"下载文件: {filename}",
-        )
-
-        def on_progress(percent: float, _line: str, done=done_weight, w=weight):
-            overall = ((done + w * max(0.0, min(100.0, percent)) / 100.0) / total_weight) * 100.0
-            db_transcription.update_model_download_job(
-                job_id,
-                status="RUNNING",
-                progress=min(98.0, overall),
-                message=f"下载文件: {filename} ({percent:.0f}%)",
-            )
-
-        _run_aria2(
-            job_id=job_id,
-            url=url,
-            output_path=local_dir / filename,
-            aria2_config=aria2_config,
-            progress_callback=on_progress,
-        )
-        done_weight += weight
 
 
 def _is_cancel_requested(job_id: str) -> bool:
@@ -225,8 +175,8 @@ def _run_download_job(job_id: str, model_entry: Dict):
         if _is_cancel_requested(job_id):
             raise RuntimeError("任务已取消")
 
-        if backend == "faster_whisper":
-            _run_faster_download(job_id, model_entry, aria2_cfg)
+        if backend == "whisper":
+            _run_whisper_download(job_id, model_entry, aria2_cfg)
         else:
             raise RuntimeError(f"不支持的后端: {backend}")
 

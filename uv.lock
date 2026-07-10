@@ -400,22 +400,6 @@ wheels = [
 ]
 
 [[package]]
-name = "faster-whisper"
-version = "1.0.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "av" },
-    { name = "ctranslate2" },
-    { name = "huggingface-hub" },
-    { name = "onnxruntime" },
-    { name = "tokenizers" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/1e/f2/77437ee937233d6e8259e3df511a4662cd7e833dabeaaddbfc929d2a3ed5/faster-whisper-1.0.3.tar.gz", hash = "sha256:1a145db86450b56aaa623c8df7d4ef86e8a1159900f60533e2890e98e8453a17", size = 1980019, upload-time = "2024-07-01T10:06:25.012Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7f/00/4742b1cd3afd23d0ff9b7e72ec40b2c398988332a5578115728fd83415d1/faster_whisper-1.0.3-py3-none-any.whl", hash = "sha256:364d0e378ab232ed26f39656e5c98548b38045224e206b20f7d8c90e2745b9d3", size = 1974982, upload-time = "2024-07-01T10:06:22.97Z" },
-]
-
-[[package]]
 name = "ffmpeg-python"
 version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -963,7 +947,6 @@ app = [
     { name = "basicsr" },
     { name = "deepfilternet" },
     { name = "eventlet" },
-    { name = "faster-whisper" },
     { name = "flask" },
     { name = "flask-socketio" },
     { name = "gunicorn" },
@@ -1005,7 +988,6 @@ app = [
     { name = "basicsr", specifier = "==1.4.2" },
     { name = "deepfilternet" },
     { name = "eventlet", specifier = "==0.36.1" },
-    { name = "faster-whisper", specifier = "==1.0.3" },
     { name = "flask", specifier = "==2.3.3" },
     { name = "flask-socketio", specifier = "==5.3.6" },
     { name = "gunicorn", specifier = "==21.2.0" },

@@ -90,7 +90,7 @@ export const useWorkbenchFormsState = () => {
   const transcribeForm = reactive({
     transcribeMode: "subtitle_zip",
     subtitleFormat: "srt",
-    whisperModel: "large-v3",
+    whisperModel: "medium",
     language: "auto",
     translateTo: "",
     translatorProvider: "none",
