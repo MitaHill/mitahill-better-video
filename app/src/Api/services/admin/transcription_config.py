@@ -65,7 +65,7 @@ def default_transcription_config() -> Dict[str, Any]:
         },
         "runtime": {
             "transcribe_runtime_mode": "parallel",
-            "startup_self_check_enabled": False,
+            "startup_self_check_enabled": True,
         },
     }
 
@@ -180,10 +180,9 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     runtime_mode = str(runtime.get("transcribe_runtime_mode") or "parallel").strip().lower()
     if runtime_mode not in _VALID_RUNTIME_MODES:
         runtime_mode = "parallel"
-    startup_self_check_enabled = bool(runtime.get("startup_self_check_enabled"))
     merged["runtime"] = {
         "transcribe_runtime_mode": runtime_mode,
-        "startup_self_check_enabled": startup_self_check_enabled,
+        "startup_self_check_enabled": True,
     }
 
     return merged

@@ -5,6 +5,12 @@
 - Worker runs in a dedicated subprocess started by `app/main.py`.
 - Vue (Vite) builds to static assets served by Flask from `app/WebUI/dist`.
 
+## Design Standard
+- 本项目的代码设计优先级是：易实现、稳健、最小改动、简单。
+- 优先复用现有模块和运行路径；不要为了未来可能性提前引入复杂抽象。
+- 启动、恢复、清理、模型加载等基础路径必须保持短链路、可解释、可失败。
+- 如果一个方案需要明显扩大状态机、调度器或跨模块耦合，应先证明简单方案不足。
+
 ## Service Flow
 1. Frontend uploads file to `POST /api/tasks`.
 2. Backend writes file into `/workspace/storage/upload/run_<task_id>/` and inserts task row.
@@ -26,6 +32,10 @@
 - Each segment follows the same lifecycle: extract frames, upscale, encode the
   segment, then release intermediate frames before moving on.
 - This avoids full-video frame extraction for multi-hour inputs.
+- GPU model loading is coordinated through a small release-hook registry. Before
+  loading a model-heavy pipeline, the loader may release other idle in-process
+  models and retry once after CUDA OOM. Keep this mechanism simple; do not add a
+  second task scheduler unless the worker model changes to real concurrency.
 
 ## WebUI Module Layout
 - `app/WebUI/src/pages/WorkbenchPage.vue`: page shell only (layout + component assembly).

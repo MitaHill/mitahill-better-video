@@ -50,15 +50,9 @@
             节省显存模式下会在转录与翻译阶段之间主动释放显存，并在翻译结束后卸载 Ollama 模型（若使用）。
           </p>
         </div>
-        <div class="field compact">
-          <label class="check-inline" style="margin-top: 24px;">
-            <input v-model="local.startupSelfCheckEnabled" :disabled="loading" type="checkbox" />
-            启用容器启动自检（增强/转换/转录）
-          </label>
-          <p class="notice" style="margin-top: 6px;">
-            仅支持全局开启/关闭。开启后，任一模块自检失败将中止程序启动并输出详细堆栈日志。
-          </p>
-        </div>
+        <p class="notice" style="margin-top: 24px;">
+          容器启动自检已固定开启：先检查 nvidia-smi，再运行一个最小 GPU 任务验证任务链路。
+        </p>
       </div>
     </div>
 
@@ -153,7 +147,7 @@ const local = reactive({
     proxy: "",
   },
   runtimeMode: "parallel",
-  startupSelfCheckEnabled: false,
+  startupSelfCheckEnabled: true,
 });
 
 const normalizeModelIds = (values) =>
@@ -198,7 +192,7 @@ const applyFromProps = () => {
   local.aria2.proxy = aria2.proxy || "";
   const runtime = cfg.runtime || {};
   local.runtimeMode = runtime.transcribe_runtime_mode || "parallel";
-  local.startupSelfCheckEnabled = Boolean(runtime.startup_self_check_enabled);
+  local.startupSelfCheckEnabled = true;
 };
 
 watch(
@@ -233,7 +227,7 @@ const save = async () => {
     },
     runtime: {
       transcribe_runtime_mode: String(local.runtimeMode || "parallel").trim().toLowerCase(),
-      startup_self_check_enabled: Boolean(local.startupSelfCheckEnabled),
+      startup_self_check_enabled: true,
     },
   });
 };

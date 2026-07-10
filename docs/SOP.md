@@ -8,6 +8,18 @@
   commands, because they can mount or create the wrong storage path.
 - The service listens on host port `8501`; clear port conflicts before restart.
 
+## Engineering standard
+
+- Prefer easy-to-implement, robust, minimal, and simple changes.
+- Do not add broad abstractions, multi-path logic, or new schedulers unless the
+  current concrete problem cannot be solved safely without them.
+- Reuse existing project APIs, services, database helpers, and worker modules
+  before introducing new pathways.
+- Keep startup and recovery paths especially small: they must fail clearly,
+  avoid network dependency, and clean up their own temporary state.
+- A change that is clever but harder to operate is not acceptable for this
+  project unless explicitly justified in the same commit.
+
 ## Process model
 
 - `app/main.py` is the only normal process supervisor.
@@ -23,6 +35,18 @@ Avoid heavyweight work at module import time.
 GPU probing, model hash checks, `nvidia-smi`, and similar work must be behind
 explicit runtime initialization, not top-level imports. This prevents child
 process restart loops and import-time resource contention.
+
+## Startup self-check rule
+
+- Startup self-check is always enabled and intentionally minimal.
+- It must first run `nvidia-smi`; if that fails, log the command output and stop
+  the process.
+- It may run one tiny GPU-backed task through existing project service/worker
+  modules, then delete the task row and temporary files.
+- It must not run broad multi-module validation, download models from the
+  internet, or depend on optional heavyweight components such as VoiceFixer.
+- Deeper validation belongs in admin debug tools or manual smoke tests after the
+  service has started.
 
 ## Performance and cleanup
 
@@ -40,6 +64,15 @@ Build image from repository root:
 ```bash
 docker compose -f deploy/compose/docker-compose.build.yml build app_image
 ```
+
+Model packaging rule:
+
+- Small, stable model files can be committed when they materially improve
+  repeatable builds.
+- Large model weights should stay in the Docker base image layer or an explicit
+  model volume, not in the source repository.
+- VoiceFixer currently needs about 597 MiB of weights, so it is packaged in the
+  base image layer and linked into `/root/.cache/voicefixer` by the app image.
 
 Deploy from `pre-run/`:
 

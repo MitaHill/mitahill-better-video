@@ -1,18 +1,20 @@
 import gc
 import logging
 import shutil
+import subprocess
 import traceback
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 import torch
 from PIL import Image
+from werkzeug.datastructures import FileStorage
 
-from app.src.Audio.enhancer import AudioEnhancer
-from app.src.Media.upscaler import build_model
-from app.src.Utils.ffmpeg import run_ffmpeg
-from app.src.Worker.pipelines.transcription.whisper_engine import ENGINE
+from app.src.Api.services import create_enhance_task
+from app.src.Config import settings as config
+from app.src.Database import admin as db_admin
+from app.src.Database import core as db
+from app.src.Worker.pipelines.dispatch import process_task
 
 
 logger = logging.getLogger("STARTUP_SELF_CHECK")
@@ -24,8 +26,6 @@ class StartupSelfCheckService:
         self.enabled = bool(((self.config_payload.get("runtime") or {}).get("startup_self_check_enabled")))
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         self.workspace = Path("/workspace/storage/selfcheck") / f"startup_{stamp}"
-        self.workspace.mkdir(parents=True, exist_ok=True)
-        self.sample_video = self.workspace / "sample_black_beep.mp4"
 
     @staticmethod
     def _cleanup_memory():
@@ -37,195 +37,113 @@ class StartupSelfCheckService:
         if not self.enabled:
             logger.info("Startup self-check disabled, skip.")
             return
-        logger.info("Startup self-check enabled, begin full checks.")
+        logger.info("Startup self-check enabled, begin minimal GPU task check.")
         self.run()
 
     def run(self):
+        task_id = ""
         try:
-            self._generate_sample_video()
-            self._check_conversion()
-            self._check_enhancement()
-            self._check_transcription()
-            logger.info("Startup self-check completed successfully: 视频增强 / 视频转换 / 视频转录")
+            self.workspace.mkdir(parents=True, exist_ok=True)
+            self._check_nvidia_smi()
+            task_id = self._create_probe_task()
+            self._run_probe_task(task_id)
+            logger.info("Startup self-check completed successfully, task_id=%s", task_id)
         except Exception as exc:
             logger.error("Startup self-check failed: %s", exc)
             logger.error("Startup self-check traceback:\n%s", traceback.format_exc())
             raise RuntimeError(f"启动自检失败: {exc}") from exc
         finally:
+            self._cleanup_task(task_id)
+            self.cleanup_workspace()
             self._cleanup_memory()
 
-    def _generate_sample_video(self):
-        logger.info("Self-check [视频转换] 生成黑屏+哔声音频测试视频...")
-        run_ffmpeg(
-            [
-                "ffmpeg",
-                "-y",
-                "-f",
-                "lavfi",
-                "-i",
-                "color=c=black:s=640x360:r=25:d=3",
-                "-f",
-                "lavfi",
-                "-i",
-                "sine=frequency=1000:sample_rate=48000:duration=3",
-                "-filter_complex",
-                "[1:a]aformat=sample_fmts=s16:channel_layouts=stereo,volume=0.2[aout]",
-                "-map",
-                "0:v:0",
-                "-map",
-                "[aout]",
-                "-c:v",
-                "libx264",
-                "-pix_fmt",
-                "yuv420p",
-                "-c:a",
-                "aac",
-                "-b:a",
-                "128k",
-                str(self.sample_video),
-            ]
+    def _check_nvidia_smi(self):
+        logger.info("Self-check [GPU] running nvidia-smi...")
+        result = subprocess.run(
+            ["nvidia-smi"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+            check=False,
         )
-        if not self.sample_video.exists():
-            raise RuntimeError("测试视频生成失败")
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout or "").strip()
+            raise RuntimeError(f"nvidia-smi failed: {detail}")
+        logger.info("Self-check [GPU] nvidia-smi passed.")
 
-    def _check_conversion(self):
-        logger.info("Self-check [视频转换] 执行转换验证...")
-        output_file = self.workspace / "conversion" / "converted.mp4"
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        run_ffmpeg(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(self.sample_video),
-                "-r",
-                "24",
-                "-c:v",
-                "libx264",
-                "-c:a",
-                "aac",
-                "-ac",
-                "2",
-                str(output_file),
-            ]
-        )
-        if not output_file.exists():
-            raise RuntimeError("视频转换自检失败：未生成输出文件")
+    def _create_probe_image(self) -> Path:
+        image_path = self.workspace / "startup_probe.png"
+        Image.new("RGB", (32, 32), color=(12, 24, 48)).save(image_path)
+        return image_path
 
-    def _check_enhancement(self):
-        logger.info("Self-check [视频增强] 执行快速超分与音频增强验证...")
-        output_dir = self.workspace / "enhancement"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        frame_path = output_dir / "frame.png"
-        upscaled_path = output_dir / "frame_upscaled.png"
-        audio_input = output_dir / "audio_input.wav"
-        audio_output = output_dir / "audio_enhanced.wav"
-        weights_dir = Path("/workspace/app/models/video")
+    def _create_probe_task(self) -> str:
+        image_path = self._create_probe_image()
+        with image_path.open("rb") as handle:
+            upload = FileStorage(stream=handle, filename=image_path.name, content_type="image/png")
+            task_id, err = create_enhance_task(
+                upload,
+                {
+                    "task_category": "enhance",
+                    "input_type": "Image",
+                    "model_name": "realesr-general-x4v3",
+                    "upscale": 2,
+                    "tile": 64,
+                    "tile_pad": 10,
+                    "fp16": True,
+                    "denoise_strength": 0.5,
+                    "keep_audio": False,
+                    "audio_enhance": False,
+                    "pre_denoise_mode": "off",
+                    "haas_enabled": False,
+                    "haas_delay_ms": 0,
+                    "haas_lead": "left",
+                    "crf": 18,
+                    "output_codec": "h264",
+                    "deinterlace": False,
+                },
+                client_ip="startup-self-check",
+                output_root=Path("/workspace/storage/output"),
+                upload_root=Path("/workspace/storage/upload"),
+                max_video_mb=config.MAX_VIDEO_SIZE_MB,
+                max_image_mb=config.MAX_IMAGE_SIZE_MB,
+                logger=logger,
+            )
+        if err:
+            raise RuntimeError(f"自检任务创建失败: {err}")
+        if not task_id:
+            raise RuntimeError("自检任务创建失败: 未返回 task_id")
+        logger.info("Self-check [Task] created probe task: %s", task_id)
+        return str(task_id)
 
-        run_ffmpeg(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(self.sample_video),
-                "-vf",
-                "select=eq(n\\,0)",
-                "-vframes",
-                "1",
-                str(frame_path),
-            ]
-        )
-        if not frame_path.exists():
-            raise RuntimeError("视频增强自检失败：无法提取测试帧")
+    def _run_probe_task(self, task_id: str):
+        task = db.get_task(task_id)
+        if not task:
+            raise RuntimeError(f"自检任务不存在: {task_id}")
+        process_task(task)
+        latest = db.get_task(task_id) or {}
+        status = str(latest.get("status") or "").upper()
+        if status != "COMPLETED":
+            raise RuntimeError(f"自检任务失败: status={status}, message={latest.get('message') or '-'}")
+        result_value = str(latest.get("result_path") or "").strip()
+        if not result_value:
+            raise RuntimeError("自检任务未记录结果文件路径")
+        result_path = Path(result_value)
+        if not result_path.exists():
+            raise RuntimeError(f"自检任务未生成结果文件: {result_path}")
+        logger.info("Self-check [Task] probe task completed: %s", result_path)
 
-        upsampler = build_model(
-            model_name="realesr-general-x4v3",
-            scale=2,
-            tile=64,
-            tile_pad=10,
-            fp16=True,
-            weights_dir=weights_dir,
-            denoise_strength=0.5,
-        )
-        img = Image.open(frame_path).convert("RGB")
-        out, _ = upsampler.enhance(np.array(img)[:, :, ::-1], outscale=2)
-        Image.fromarray(out[:, :, ::-1]).save(upscaled_path)
-        if not upscaled_path.exists():
-            raise RuntimeError("视频增强自检失败：超分输出不存在")
-
-        run_ffmpeg(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(self.sample_video),
-                "-vn",
-                "-ac",
-                "1",
-                "-ar",
-                "44100",
-                "-acodec",
-                "pcm_s16le",
-                str(audio_input),
-            ]
-        )
-        enhancer = AudioEnhancer()
-        enhancer.process(audio_input, audio_output)
-        if not audio_output.exists():
-            raise RuntimeError("视频增强自检失败：音频增强输出不存在")
-
-        del upsampler
-        self._cleanup_memory()
-
-    def _check_transcription(self):
-        logger.info("Self-check [视频转录] 执行默认模型转录验证...")
-        output_dir = self.workspace / "transcription"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        audio_input = output_dir / "audio_16k.wav"
-        run_ffmpeg(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(self.sample_video),
-                "-vn",
-                "-ac",
-                "1",
-                "-ar",
-                "16000",
-                "-acodec",
-                "pcm_s16le",
-                str(audio_input),
-            ]
-        )
-        transcription = self.config_payload.get("transcription") or {}
-        runtime = self.config_payload.get("runtime") or {}
-        backend = str(transcription.get("backend") or "faster_whisper").strip().lower()
-        model_name = str(transcription.get("active_model") or "large-v3").strip().lower()
-        runtime_mode = str(runtime.get("transcribe_runtime_mode") or "parallel").strip().lower()
-
-        result = ENGINE.transcribe(
-            audio_input,
-            backend=backend,
-            model_name=model_name,
-            language="auto",
-            temperature=0.0,
-            beam_size=1,
-            best_of=1,
-            runtime_mode=runtime_mode,
-            task_id="startup_self_check",
-        )
-        if not isinstance(result, dict):
-            raise RuntimeError("视频转录自检失败：转录结果格式异常")
-        segment_count = len(result.get("segments") or [])
-        logger.info(
-            "Self-check [视频转录] 通过，backend=%s, model=%s, segments=%s",
-            backend,
-            model_name,
-            segment_count,
-        )
-        ENGINE.finalize_task(runtime_mode=runtime_mode)
-        self._cleanup_memory()
+    def _cleanup_task(self, task_id: str):
+        if not task_id:
+            return
+        try:
+            latest = db.get_task(task_id)
+            if latest and str(latest.get("status") or "").upper() not in {"COMPLETED", "FAILED"}:
+                db.update_task_status(task_id, "FAILED", message="startup self-check cleanup")
+            if db.get_task(task_id):
+                db_admin.delete_task(task_id)
+        except Exception:
+            logger.warning("Failed to cleanup startup self-check task: %s", task_id, exc_info=True)
 
     def cleanup_workspace(self):
         try:

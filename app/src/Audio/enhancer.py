@@ -15,24 +15,22 @@ class AudioEnhancer:
     def _ensure_cache_links(self):
         cache_dir = Path("/root/.cache/voicefixer")
         analysis_cache = cache_dir / "analysis_module/checkpoints/vf.ckpt"
-        synth_cache = cache_dir / "model.ckpt-1490000_trimed.pt"
+        synth_cache = cache_dir / "synthesis_module/44100/model.ckpt-1490000_trimed.pt"
         if analysis_cache.exists() and synth_cache.exists():
             logger.info("VoiceFixer cache ready: %s", cache_dir)
             return
 
         weights_dir = Path("/workspace/app/models/audio/voicefixer")
         analysis_src = weights_dir / "analysis_module.ckpt"
-        synth_src = weights_dir / "model.ckpt-1490000_trimed.pt"
-        if not (analysis_src.exists() and synth_src.exists()):
-            logger.error("VoiceFixer packaged weights missing under %s", weights_dir)
-            return
+        synth_src = weights_dir / "synthesis_module/44100/model.ckpt-1490000_trimed.pt"
 
         (cache_dir / "analysis_module/checkpoints").mkdir(parents=True, exist_ok=True)
+        (cache_dir / "synthesis_module/44100").mkdir(parents=True, exist_ok=True)
         try:
-            if not analysis_cache.exists():
+            if not analysis_cache.exists() and analysis_src.exists():
                 analysis_cache.symlink_to(analysis_src)
                 logger.info("VoiceFixer cache linked: %s", analysis_cache)
-            if not synth_cache.exists():
+            if not synth_cache.exists() and synth_src.exists():
                 synth_cache.symlink_to(synth_src)
                 logger.info("VoiceFixer cache linked: %s", synth_cache)
         except FileExistsError:
@@ -44,7 +42,7 @@ class AudioEnhancer:
             self._apply_torch_weight_norm_compat()
             required = [
                 Path("/root/.cache/voicefixer/analysis_module/checkpoints/vf.ckpt"),
-                Path("/root/.cache/voicefixer/model.ckpt-1490000_trimed.pt"),
+                Path("/root/.cache/voicefixer/synthesis_module/44100/model.ckpt-1490000_trimed.pt"),
             ]
             missing = [str(p) for p in required if not p.exists()]
             if missing:

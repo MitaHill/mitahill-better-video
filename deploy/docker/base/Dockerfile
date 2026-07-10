@@ -50,7 +50,9 @@ RUN mkdir -p /workspace/app/models/video /workspace/app/models/audio/voicefixer 
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth
 
-# Pre-download VoiceFixer weights.
-RUN mkdir -p /workspace/app/models/audio/voicefixer && \
+# Pre-download VoiceFixer weights into the layout expected by voicefixer.
+# Full VoiceFixer weights are about 597 MiB, so they stay in the base image layer
+# instead of being committed to the source repository.
+RUN mkdir -p /workspace/app/models/audio/voicefixer/synthesis_module/44100 && \
     wget -q -O /workspace/app/models/audio/voicefixer/analysis_module.ckpt https://huggingface.co/Diogodiogod/voicefixer-models/resolve/main/vf.ckpt && \
-    wget -q -O /workspace/app/models/audio/voicefixer/model.ckpt-1490000_trimed.pt https://huggingface.co/Diogodiogod/voicefixer-models/resolve/main/model.ckpt-1490000_trimed.pt
+    wget -q -O /workspace/app/models/audio/voicefixer/synthesis_module/44100/model.ckpt-1490000_trimed.pt https://huggingface.co/Diogodiogod/voicefixer-models/resolve/main/model.ckpt-1490000_trimed.pt

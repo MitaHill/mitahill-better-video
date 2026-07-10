@@ -7,6 +7,7 @@ from typing import Dict, Iterable, List
 import torch
 
 from app.src.Database import core as db
+from app.src.Worker.gpu_model_coordinator import is_cuda_oom, register_release_hook, release_models_except
 from app.src.Worker.pipelines.transcription.compute_type import select_faster_whisper_compute_type
 
 
@@ -24,6 +25,7 @@ class WhisperEngine:
         self._model = None
         self._device = "cuda" if torch.cuda.is_available() else "cpu"
         _FASTER_ROOT.mkdir(parents=True, exist_ok=True)
+        register_release_hook("faster_whisper", self.release)
 
     def _resolve_faster_model_ref(self, model_name: str):
         safe_model = (model_name or "large-v3").strip().lower()
@@ -67,7 +69,7 @@ class WhisperEngine:
             # 因此这里会等待其他任务让出显存，而不是硬上导致多个大模型互相挤爆。
             time.sleep(max(0.2, float(poll_sec or 1.0)))
 
-    def _offload_to_cpu(self):
+    def release(self):
         with self._lock:
             if self._model is None:
                 return
@@ -77,6 +79,9 @@ class WhisperEngine:
             logger.info("Faster-whisper model released from GPU memory.")
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+
+    def _offload_to_cpu(self):
+        self.release()
 
     def after_transcription_step(self, runtime_mode: str = "parallel"):
         safe_mode = str(runtime_mode or "parallel").strip().lower()
@@ -131,7 +136,18 @@ class WhisperEngine:
             # 模型按 backend + model 维度做缓存。
             # 同模型复用实例，不同模型切换时才重载，避免每段任务都重新初始化。
             if self._model is None or self._model_name != safe_model or self._backend != safe_backend:
-                self._load(safe_backend, safe_model)
+                try:
+                    release_models_except("faster_whisper")
+                    self._load(safe_backend, safe_model)
+                except RuntimeError as exc:
+                    if not is_cuda_oom(exc):
+                        raise
+                    logger.warning(
+                        "CUDA OOM while loading faster-whisper model %s; releasing peer models and retrying once.",
+                        safe_model,
+                    )
+                    release_models_except("faster_whisper")
+                    self._load(safe_backend, safe_model)
             model = self._model
 
         language_value = (language or "auto").strip().lower()

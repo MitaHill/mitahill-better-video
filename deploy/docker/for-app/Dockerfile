@@ -54,10 +54,14 @@ RUN uv export --locked --no-emit-project --no-default-groups --group base --grou
         --requirements /tmp/app-requirements.txt && \
     rm -f /tmp/app-requirements.txt
 
-# 3. Configure VoiceFixer cache (Symlink to pre-downloaded weights)
-RUN mkdir -p /root/.cache/voicefixer/analysis_module/checkpoints && \
-    ln -s /workspace/app/models/audio/voicefixer/analysis_module.ckpt /root/.cache/voicefixer/analysis_module/checkpoints/vf.ckpt && \
-    ln -s /workspace/app/models/audio/voicefixer/model.ckpt-1490000_trimed.pt /root/.cache/voicefixer/model.ckpt-1490000_trimed.pt
+# 3. Configure VoiceFixer cache from bundled weights when present.
+RUN mkdir -p /root/.cache/voicefixer/analysis_module/checkpoints /root/.cache/voicefixer/synthesis_module/44100 && \
+    if [ -f /workspace/app/models/audio/voicefixer/analysis_module.ckpt ]; then \
+        ln -sf /workspace/app/models/audio/voicefixer/analysis_module.ckpt /root/.cache/voicefixer/analysis_module/checkpoints/vf.ckpt; \
+    fi && \
+    if [ -f /workspace/app/models/audio/voicefixer/synthesis_module/44100/model.ckpt-1490000_trimed.pt ]; then \
+        ln -sf /workspace/app/models/audio/voicefixer/synthesis_module/44100/model.ckpt-1490000_trimed.pt /root/.cache/voicefixer/synthesis_module/44100/model.ckpt-1490000_trimed.pt; \
+    fi
 
 # 3b. Provide bundled DeepFilterNet2 weights to avoid runtime/build-time fetch
 RUN mkdir -p /root/.cache/DeepFilterNet && \

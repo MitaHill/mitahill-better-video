@@ -19,6 +19,7 @@ from app.src.Media.upscaler import build_model
 from app.src.Audio.enhancer import AudioEnhancer
 from app.src.Audio.denoiser import apply_pre_denoise
 from app.src.Audio.haas_effect import apply_haas_effect
+from app.src.Worker.gpu_model_coordinator import is_cuda_oom, release_models_except
 from .preview import generate_previews
 
 logger = logging.getLogger("PROCESSOR")
@@ -46,11 +47,23 @@ def process_enhancement_task(task):
 
         # 1. Load Model ONCE
         db.update_task_status(task_id, "PROCESSING", 5, "Loading Model...")
-        upsampler = build_model(
-            params['model_name'], params['upscale'], params['tile'], 
-            params.get('tile_pad', 10), params.get('fp16', True), 
-            weights_dir, params.get('denoise_strength', 0.5)
-        )
+        release_models_except("realesrgan")
+        try:
+            upsampler = build_model(
+                params['model_name'], params['upscale'], params['tile'],
+                params.get('tile_pad', 10), params.get('fp16', True),
+                weights_dir, params.get('denoise_strength', 0.5)
+            )
+        except RuntimeError as exc:
+            if not is_cuda_oom(exc):
+                raise
+            logger.warning("CUDA OOM while loading Real-ESRGAN; releasing peer models and retrying once.")
+            release_models_except("realesrgan")
+            upsampler = build_model(
+                params['model_name'], params['upscale'], params['tile'],
+                params.get('tile_pad', 10), params.get('fp16', True),
+                weights_dir, params.get('denoise_strength', 0.5)
+            )
         logger.info("Model loaded: %s", params.get("model_name"))
 
         if params['input_type'] == 'Video':
@@ -360,6 +373,7 @@ def process_enhancement_task(task):
             set_preview_from_path(task_id, "original", run_dir / "preview_original.jpg", 1)
             set_preview_from_path(task_id, "upscaled", run_dir / "preview_upscaled.jpg", 1)
 
+        db.update_task_result(task_id, output_root / out_name)
         db.update_task_status(task_id, "COMPLETED", 100, f"Completed: {out_name}")
 
     except Exception as e:
