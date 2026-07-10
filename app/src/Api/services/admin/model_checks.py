@@ -12,6 +12,8 @@ from urllib.parse import urlparse
 
 import requests
 
+from app.src.Worker.pipelines.transcription.compute_type import select_faster_whisper_compute_type
+
 from .transcription_catalog import fetch_hf_model_files, get_model_entry, get_storage_roots
 
 logger = logging.getLogger("ADMIN_MODEL_CHECKS")
@@ -246,7 +248,7 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
             from faster_whisper import WhisperModel
 
             model_ref = str(local_path) if local_path.exists() else model_id
-            compute_type = "float16" if device == "cuda" else "int8"
+            compute_type = select_faster_whisper_compute_type(device)
             model = WhisperModel(model_ref, device=device, compute_type=compute_type)
             segments, _info = model.transcribe(str(wav_path), beam_size=1, language="en")
             list(segments)
