@@ -7,10 +7,7 @@ import requests
 
 CONTEXT_WINDOW_SIZE = 20
 CORE_TRANSLATION_PROMPT = "Place the translation in a code block; do not add explanations. For example: ```Translation```"
-_LEGACY_CORE_TRANSLATION_PROMPTS = {
-    CORE_TRANSLATION_PROMPT,
-    "将译文放到代码块中，不要增加解释。例如```译文```",
-}
+_LEGACY_PLACEHOLDER_RULE = "Preserve placeholders and markup exactly: {name}, [MASK], <tag>, %s, ${VAR}."
 _CODE_BLOCK_RE = re.compile(r"```(?:[a-zA-Z]+\n)?\s*([\s\S]*?)```", re.MULTILINE)
 _THINK_TAG_RE = re.compile(r"<think>[\s\S]*?</think>", re.IGNORECASE)
 _LANGUAGE_NAME_MAP = {
@@ -117,8 +114,11 @@ class BaseTranslator:
 
     @staticmethod
     def _render_custom_prompt(prompt_text: str, target_language: str) -> str:
-        raw = str(prompt_text or "").strip()
-        if not raw or raw in _LEGACY_CORE_TRANSLATION_PROMPTS:
+        raw = "\n".join(
+            line for line in str(prompt_text or "").splitlines()
+            if line.strip() != _LEGACY_PLACEHOLDER_RULE
+        ).strip()
+        if not raw:
             return ""
         code, name, display = BaseTranslator._resolve_target_language(target_language)
         rendered = (
@@ -131,9 +131,7 @@ class BaseTranslator:
     @classmethod
     def _system_prompt(cls, target_language: str, custom_prompt: str = "") -> str:
         resolved_custom = cls._render_custom_prompt(custom_prompt, target_language)
-        if resolved_custom:
-            return f"{resolved_custom}\n\n{CORE_TRANSLATION_PROMPT}"
-        return CORE_TRANSLATION_PROMPT
+        return resolved_custom or CORE_TRANSLATION_PROMPT
 
 
 def _strip_known_endpoint_suffix(base_url: str) -> str:

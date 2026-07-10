@@ -45,13 +45,13 @@
       <label>系统提示词</label>
       <textarea v-model="local.prompt" :disabled="loading" rows="4" placeholder="翻译系统提示词"></textarea>
       <p class="notice" style="margin-top: 6px;">
-        该内容是“自定义前缀提示词”，支持变量：
+        该内容会作为实际系统提示词发送，支持变量：
         <code v-pre>{{target_language}}</code>（示例: Chinese (zh)）、
         <code v-pre>{{target_language_name}}</code>（示例: Chinese）、
         <code v-pre>{{target_language_code}}</code>（示例: zh）。
       </p>
       <p class="notice" style="margin-top: 6px;">
-        程序执行顺序：变量替换 -> 自动追加英文核心提示词 -> 携带最近 20 轮上下文发送给翻译模型。
+        程序执行顺序：变量替换 -> 携带最近 20 轮上下文发送给翻译模型。
       </p>
       <p class="notice" style="margin-top: 6px;">
         返回解析顺序：若模型输出包含代码块 <code>```Translation```</code>，优先提取代码块正文；
@@ -73,7 +73,7 @@
         </div>
       </div>
       <div class="field compact">
-        <label>最终系统提示词预览（变量替换 + 核心提示词）</label>
+        <label>最终系统提示词预览（变量替换）</label>
         <textarea :value="previewSystemPrompt" rows="11" readonly />
       </div>
     </div>
@@ -128,10 +128,7 @@ const local = reactive({
 });
 
 const CORE_TRANSLATION_PROMPT = "Place the translation in a code block; do not add explanations. For example: ```Translation```";
-const LEGACY_CORE_TRANSLATION_PROMPTS = new Set([
-  CORE_TRANSLATION_PROMPT,
-  "将译文放到代码块中，不要增加解释。例如```译文```",
-]);
+const LEGACY_PLACEHOLDER_RULE = "Preserve placeholders and markup exactly: {name}, [MASK], <tag>, %s, ${VAR}.";
 
 const TARGET_LANGUAGE_NAME_MAP = Object.freeze({
   zh: "Chinese",
@@ -173,8 +170,8 @@ const resolveTargetLanguageMeta = (targetLanguage) => {
 };
 
 const renderCustomPrompt = (rawPrompt, targetLanguage) => {
-  const source = String(rawPrompt || "").trim();
-  if (!source || LEGACY_CORE_TRANSLATION_PROMPTS.has(source)) return "";
+  const source = cleanPrompt(rawPrompt);
+  if (!source) return "";
   const meta = resolveTargetLanguageMeta(targetLanguage);
   return source
     .replaceAll("{{target_language_code}}", meta.code)
@@ -182,13 +179,16 @@ const renderCustomPrompt = (rawPrompt, targetLanguage) => {
     .replaceAll("{{target_language}}", meta.display);
 };
 
-const buildStrictRules = () => CORE_TRANSLATION_PROMPT;
+function cleanPrompt(rawPrompt) {
+  return String(rawPrompt || "")
+    .split("\n")
+    .filter((line) => line.trim() !== LEGACY_PLACEHOLDER_RULE)
+    .join("\n")
+    .trim();
+}
 
 const previewSystemPrompt = computed(() => {
-  const custom = renderCustomPrompt(local.prompt, local.previewTargetLanguage);
-  const strict = buildStrictRules(local.previewTargetLanguage);
-  if (custom) return `${custom}\n\n${strict}`;
-  return strict;
+  return renderCustomPrompt(local.prompt, local.previewTargetLanguage) || CORE_TRANSLATION_PROMPT;
 });
 
 const applyFromProps = () => {
@@ -199,8 +199,8 @@ const applyFromProps = () => {
   local.model = translation.model || "";
   local.apiKey = translation.api_key || "";
   local.timeoutSec = Number(translation.timeout_sec ?? 120);
-  const prompt = String(translation.prompt || "").trim();
-  local.prompt = LEGACY_CORE_TRANSLATION_PROMPTS.has(prompt) ? "" : prompt;
+  const prompt = cleanPrompt(translation.prompt);
+  local.prompt = prompt || CORE_TRANSLATION_PROMPT;
   local.fallbackMode = translation.fallback_mode || "model_full_text";
 };
 
@@ -220,7 +220,7 @@ const save = async () => {
       model: String(local.model || "").trim(),
       api_key: String(local.apiKey || "").trim(),
       timeout_sec: Number(local.timeoutSec || 120),
-      prompt: String(local.prompt || "").trim(),
+      prompt: cleanPrompt(local.prompt),
       fallback_mode: String(local.fallbackMode || "model_full_text").trim().toLowerCase(),
     },
   });
