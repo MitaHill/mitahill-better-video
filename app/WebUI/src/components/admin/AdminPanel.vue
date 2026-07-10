@@ -122,6 +122,19 @@
             :on-save="saveTranslationConfig"
           />
 
+          <AdminTranscriptionModelPanel
+            v-if="activeMenuKey === 'transcribe_cfg_catalog'"
+            :models="transcriptionModels.items"
+            :jobs="transcriptionModels.jobs"
+            :loading="transcriptionModels.loading"
+            :error="transcriptionModels.error"
+            :message="transcriptionModels.message"
+            :on-refresh="refreshTranscriptionCatalog"
+            :on-download="startTranscriptionModelDownload"
+            :on-cancel-job="cancelTranscriptionModelDownloadJob"
+            :on-delete-job="deleteTranscriptionModelDownloadJob"
+          />
+
           <AdminDebugToolsPanel
             v-if="activeMenuKey === 'debug_tests'"
             :loading-model="debugTools.loadingModelTest"
@@ -170,6 +183,7 @@ import AdminPasswordForm from "./AdminPasswordForm.vue";
 import AdminProxyConfigForm from "./AdminProxyConfigForm.vue";
 import AdminSideDrawer from "./AdminSideDrawer.vue";
 import AdminTaskTable from "./AdminTaskTable.vue";
+import AdminTranscriptionModelPanel from "./AdminTranscriptionModelPanel.vue";
 import AdminTranslationSettingsForm from "./AdminTranslationSettingsForm.vue";
 
 const props = defineProps({
@@ -187,6 +201,7 @@ const {
   passwordForm,
   proxyConfig,
   transcriptionConfig,
+  transcriptionModels,
   debugTools,
   logsView,
   initAdminAuth,
@@ -202,6 +217,11 @@ const {
   changeAdminPassword,
   fetchTranscriptionConfig,
   updateTranscriptionConfig,
+  fetchTranscriptionModels,
+  fetchModelDownloadJobs,
+  startModelDownload,
+  cancelModelDownloadJob,
+  deleteModelDownloadJob,
   testTranscriptionModel,
   testTranslationProvider,
   fetchAdminLogs,
@@ -241,6 +261,7 @@ const menuTree = Object.freeze([
         keywords: "transcribe transcription subtitle whisper model translate 转录 字幕 模型 翻译",
         children: Object.freeze([
           { key: "transcribe_cfg_translation", label: "翻译源设置", keywords: "translate provider openai 翻译 源" },
+          { key: "transcribe_cfg_catalog", label: "转录模型目录", keywords: "catalog download model transcription 模型 目录 下载" },
           { key: "debug_tests", label: "测试", keywords: "debug test transcription whisper translate provider 调试 测试 转录 翻译" },
         ]),
       },
@@ -312,6 +333,7 @@ const stopTimer = () => {
 };
 
 const needOverviewRefresh = () => ["overview", "tasks", "ips"].includes(activeMenuKey.value);
+const needModelDownloadRefresh = () => activeMenuKey.value === "transcribe_cfg_catalog";
 const needLogsRefresh = () => activeMenuKey.value === "logs_warn";
 const needGpuUsageRefresh = () => activeMenuKey.value === "overview";
 
@@ -324,6 +346,9 @@ const startTimer = () => {
     }
     if (needGpuUsageRefresh()) {
       fetchGpuUsage(gpuUsage.rangeSeconds || 60);
+    }
+    if (needModelDownloadRefresh()) {
+      fetchModelDownloadJobs();
     }
     if (needLogsRefresh()) {
       fetchAdminLogs();
@@ -387,6 +412,26 @@ const saveTranslationConfig = async (payload) => {
   await fetchTranscriptionConfig();
 };
 
+const refreshTranscriptionCatalog = async () => {
+  await fetchTranscriptionModels();
+  await fetchModelDownloadJobs();
+};
+
+const startTranscriptionModelDownload = async (backend, modelId) => {
+  await startModelDownload(backend, modelId);
+  await fetchModelDownloadJobs();
+};
+
+const cancelTranscriptionModelDownloadJob = async (jobId) => {
+  await cancelModelDownloadJob(jobId);
+  await fetchModelDownloadJobs();
+};
+
+const deleteTranscriptionModelDownloadJob = async (jobId) => {
+  await deleteModelDownloadJob(jobId);
+  await fetchModelDownloadJobs();
+};
+
 const onLogsMinLevelChange = (value) => {
   logsView.minLevel = value;
   fetchAdminLogs();
@@ -409,6 +454,10 @@ const loadByMenuKey = async (value) => {
   }
   if (value === "transcribe_cfg_translation") {
     await fetchTranscriptionConfig();
+    return;
+  }
+  if (value === "transcribe_cfg_catalog") {
+    await refreshTranscriptionCatalog();
     return;
   }
   if (value === "debug_tests") {
