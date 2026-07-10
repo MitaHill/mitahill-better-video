@@ -30,8 +30,6 @@ _FASTER_REQUIRED_FILES = [
     "config.json",
     "model.bin",
     "tokenizer.json",
-    "vocabulary.json",
-    "preprocessor_config.json",
 ]
 
 def get_storage_roots() -> Dict[str, Path]:
@@ -83,7 +81,7 @@ def build_faster_model_entry(model_id: str) -> Optional[Dict]:
     if not meta:
         return None
     local_dir = _FASTER_STORAGE_ROOT / model_id
-    model_bin = local_dir / "model.bin"
+    required_files = get_faster_required_files()
     return {
         "model_id": model_id,
         "label": model_id,
@@ -92,8 +90,8 @@ def build_faster_model_entry(model_id: str) -> Optional[Dict]:
         "source": "huggingface",
         "repo_id": meta["repo"],
         "local_path": str(local_dir),
-        "installed": model_bin.exists(),
-        "required_files": get_faster_required_files(),
+        "installed": all((local_dir / name).exists() for name in required_files),
+        "required_files": required_files,
     }
 
 

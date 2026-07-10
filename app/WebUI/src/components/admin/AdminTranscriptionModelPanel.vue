@@ -13,7 +13,6 @@
           <tr>
             <th>操作</th>
             <th>模型</th>
-            <th>后端</th>
             <th>引擎</th>
             <th>已安装</th>
             <th>存储路径</th>
@@ -31,13 +30,12 @@
               </button>
             </td>
             <td class="mono">{{ item.model_id }}</td>
-            <td>{{ item.backend }}</td>
             <td>{{ item.engine }}</td>
             <td>{{ item.installed ? "是" : "否" }}</td>
             <td class="mono">{{ item.local_path }}</td>
           </tr>
           <tr v-if="!models.length">
-            <td colspan="6" class="notice">暂无模型数据</td>
+            <td colspan="5" class="notice">暂无模型数据</td>
           </tr>
         </tbody>
       </table>
@@ -52,7 +50,6 @@
               <th>删除</th>
               <th>任务ID</th>
               <th>模型</th>
-              <th>后端</th>
               <th>状态</th>
               <th>进度</th>
               <th>消息</th>
@@ -76,7 +73,6 @@
               </td>
               <td class="mono">{{ job.job_id }}</td>
               <td class="mono">{{ job.model_id }}</td>
-              <td>{{ job.backend }}</td>
               <td>{{ job.status }}</td>
               <td style="min-width: 180px;">
                 <div class="progress" style="height: 8px; margin-bottom: 4px;">
@@ -99,7 +95,7 @@
               </td>
             </tr>
             <tr v-if="!jobs.length">
-              <td colspan="9" class="notice">暂无下载任务</td>
+              <td colspan="8" class="notice">暂无下载任务</td>
             </tr>
           </tbody>
         </table>
