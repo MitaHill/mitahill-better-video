@@ -51,39 +51,12 @@
         <code v-pre>{{target_language_code}}</code>（示例: zh）。
       </p>
       <p class="notice" style="margin-top: 6px;">
-        程序执行顺序：变量替换 -> 自动追加简短系统规则 -> 携带最近 20 轮上下文发送给翻译模型。
-        模型只需要翻译最后一条用户输入。
+        程序执行顺序：变量替换 -> 自动追加核心提示词 -> 携带最近 20 轮上下文发送给翻译模型。
       </p>
       <p class="notice" style="margin-top: 6px;">
         返回解析顺序：若模型输出包含代码块 <code>```译文```</code>，优先提取代码块正文；
         若没有代码块，则按“极端情况回退策略”决定使用“模型返回全文”或“原始待翻译文本”。
       </p>
-
-      <div class="status-row" style="gap: 8px; margin-top: 8px; flex-wrap: wrap;">
-        <button class="secondary" type="button" :disabled="loading" @click="applyPromptTemplate('general')">套用模板：通用稳健</button>
-        <button class="secondary" type="button" :disabled="loading" @click="applyPromptTemplate('subtitle')">套用模板：字幕保形</button>
-        <button class="secondary" type="button" :disabled="loading" @click="applyPromptTemplate('technical')">套用模板：术语优先</button>
-      </div>
-
-      <details style="margin-top: 10px;">
-        <summary class="notice" style="cursor: pointer;">查看模板提示词（可直接复制）</summary>
-        <div class="notice mono" style="margin-top: 8px; white-space: pre-wrap;">
-【模板A：通用稳健】
-Translate to {{target_language}}.
-Use recent subtitle context.
-Put the translation in a code block.
-
-【模板B：字幕保形】
-Translate subtitles into {{target_language_name}} ({{target_language_code}}).
-Keep names, numbers, and placeholders stable.
-Put the translation in a code block.
-
-【模板C：术语优先】
-Translate to {{target_language}} with technical accuracy.
-Use consistent terminology from context.
-Put the translation in a code block.
-        </div>
-      </details>
 
       <div class="inline-grid two" style="margin-top: 12px;">
         <div class="field compact">
@@ -100,7 +73,7 @@ Put the translation in a code block.
         </div>
       </div>
       <div class="field compact">
-        <label>最终系统提示词预览（变量替换 + 简短规则）</label>
+        <label>最终系统提示词预览（变量替换 + 核心提示词）</label>
         <textarea :value="previewSystemPrompt" rows="11" readonly />
       </div>
     </div>
@@ -154,24 +127,6 @@ const local = reactive({
   previewTargetLanguage: "zh",
 });
 
-const PROMPT_TEMPLATES = Object.freeze({
-  general: [
-    "Translate to {{target_language}}.",
-    "Use recent subtitle context.",
-    "Put the translation in a code block.",
-  ].join("\n"),
-  subtitle: [
-    "Translate subtitles into {{target_language_name}} ({{target_language_code}}).",
-    "Keep names, numbers, and placeholders stable.",
-    "Put the translation in a code block.",
-  ].join("\n"),
-  technical: [
-    "Translate to {{target_language}} with technical accuracy.",
-    "Use consistent terminology from context.",
-    "Put the translation in a code block.",
-  ].join("\n"),
-});
-
 const TARGET_LANGUAGE_NAME_MAP = Object.freeze({
   zh: "Chinese",
   en: "English",
@@ -221,18 +176,7 @@ const renderCustomPrompt = (rawPrompt, targetLanguage) => {
     .replaceAll("{{target_language}}", meta.display);
 };
 
-const buildStrictRules = (targetLanguage) => {
-  const meta = resolveTargetLanguageMeta(targetLanguage);
-  const targetLine = meta.code ? `Target language: ${meta.display}` : `Target language: ${meta.name}`;
-  return [
-    "You are translating transcription subtitles.",
-    targetLine,
-    "Use previous messages only as context.",
-    "Translate only the latest user message.",
-    "Put the final translation inside one code block.",
-    "If you need to explain anything, put it outside the code block.",
-  ].join("\n");
-};
+const buildStrictRules = () => "将译文放到代码块中，不要增加解释。例如```译文```";
 
 const previewSystemPrompt = computed(() => {
   const custom = renderCustomPrompt(local.prompt, local.previewTargetLanguage);
@@ -260,12 +204,6 @@ watch(
   },
   { immediate: true, deep: true }
 );
-
-const applyPromptTemplate = (key) => {
-  const template = PROMPT_TEMPLATES[String(key || "").trim().toLowerCase()];
-  if (!template) return;
-  local.prompt = template;
-};
 
 const save = async () => {
   await props.onSave({

@@ -125,17 +125,8 @@ class BaseTranslator:
 
     @classmethod
     def _system_prompt(cls, target_language: str, custom_prompt: str = "") -> str:
-        code, name, display = cls._resolve_target_language(target_language)
         resolved_custom = cls._render_custom_prompt(custom_prompt, target_language)
-        target_line = f"Target language: {display}" if code else f"Target language: {name}"
-        base_prompt = (
-            "You are translating transcription subtitles.\n"
-            f"{target_line}\n"
-            "Use previous messages only as context.\n"
-            "Translate only the latest user message.\n"
-            "Put the final translation inside one code block.\n"
-            "If you need to explain anything, put it outside the code block."
-        )
+        base_prompt = "将译文放到代码块中，不要增加解释。例如```译文```"
         if resolved_custom:
             return f"{resolved_custom}\n\n{base_prompt}"
         return base_prompt
