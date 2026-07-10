@@ -5,6 +5,7 @@
       :transcribe-media-info="transcribeMediaInfo"
       :on-transcribe-media-change="onTranscribeMediaChange"
       :get-field-policy="getFieldPolicy"
+      :runtime-config="runtimeConfig"
     />
     <TranscribeAdvancedSection :transcribe-form="transcribeForm" :get-field-policy="getFieldPolicy" />
   </div>
@@ -30,6 +31,10 @@ defineProps({
   getFieldPolicy: {
     type: Function,
     required: true,
+  },
+  runtimeConfig: {
+    type: Object,
+    default: null,
   },
 });
 </script>

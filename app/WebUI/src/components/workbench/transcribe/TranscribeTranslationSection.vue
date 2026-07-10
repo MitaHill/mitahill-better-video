@@ -11,14 +11,6 @@
       <p class="notice" v-if="runtimeSummary">后台当前默认：{{ runtimeSummary }}</p>
       <div class="status-row" style="gap: 8px; margin-top: 10px;">
         <button
-          v-if="showApplyRuntimeButton"
-          type="button"
-          class="secondary"
-          @click="applyRuntimeDefaults"
-        >
-          套用后台默认翻译源
-        </button>
-        <button
           v-if="showDisableTranslationButton"
           type="button"
           class="secondary"
@@ -57,44 +49,6 @@
       </label>
     </div>
 
-    <div v-if="transcribeForm.translateTo" class="inline-grid two">
-      <div class="field compact">
-        <label>翻译服务地址</label>
-        <input
-          v-model="transcribeForm.translatorBaseUrl"
-          placeholder="http://127.0.0.1:8000/v1 或 https://api.xxx/v1"
-          :disabled="isDisabled('translatorBaseUrl')"
-        />
-      </div>
-      <div class="field compact">
-        <label>翻译模型名</label>
-        <input
-          v-model="transcribeForm.translatorModel"
-          placeholder="qwen3:8b / gpt-4.1"
-          :disabled="isDisabled('translatorModel')"
-        />
-      </div>
-    </div>
-
-    <div v-if="transcribeForm.translateTo" class="field compact">
-      <label>翻译 API Key</label>
-      <input
-        v-model="transcribeForm.translatorApiKey"
-        type="password"
-        placeholder="按兼容服务要求填写，可留空"
-        :disabled="isDisabled('translatorApiKey')"
-      />
-    </div>
-
-    <div v-if="transcribeForm.translateTo" class="field compact">
-      <label>翻译提示词（可选）</label>
-      <textarea
-        v-model="transcribeForm.translatorPrompt"
-        rows="4"
-        placeholder="留空使用后端默认提示词"
-        :disabled="isDisabled('translatorPrompt')"
-      ></textarea>
-    </div>
   </div>
 </template>
 
@@ -162,23 +116,10 @@ const translationModeDescription = computed(() => {
   if (!props.transcribeForm.translateTo) {
     return "当前未选择目标语言，本次任务只做转录，不会进入翻译阶段。";
   }
-  return "当前任务会使用 OpenAI 兼容格式翻译；如果你想快速沿用后台默认翻译配置，可以直接点“套用后台默认翻译源”。";
-});
-
-const showApplyRuntimeButton = computed(() => {
-  const translation = runtimeTranslation.value;
-  return Boolean(props.transcribeForm.translateTo) && translation && translation.provider === "openai_compatible";
+  return "当前任务会使用后台管理页面配置的 OpenAI 兼容翻译源。";
 });
 
 const showDisableTranslationButton = computed(() => Boolean(props.transcribeForm.translateTo));
-
-const applyRuntimeDefaults = () => {
-  const translation = runtimeTranslation.value;
-  if (!translation) return;
-  props.transcribeForm.translatorProvider = "openai_compatible";
-  props.transcribeForm.translatorBaseUrl = String(translation.base_url || "");
-  props.transcribeForm.translatorModel = String(translation.model || "");
-};
 
 const disableTranslation = () => {
   props.transcribeForm.translateTo = "";

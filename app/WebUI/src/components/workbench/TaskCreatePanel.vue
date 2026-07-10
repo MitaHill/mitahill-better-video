@@ -26,6 +26,7 @@
       :transcribe-media-info="transcribeMediaInfo"
       :on-transcribe-media-change="onTranscribeMediaChange"
       :get-field-policy="getFieldPolicy"
+      :runtime-config="transcriptionRuntimeConfig"
     />
     <DownloadTaskForm v-else :download-form="downloadForm" :on-probe-source="onProbeDownloadSource" />
 
@@ -123,6 +124,10 @@ const props = defineProps({
   getFieldPolicy: {
     type: Function,
     required: true,
+  },
+  transcriptionRuntimeConfig: {
+    type: Object,
+    default: null,
   },
   submitTask: {
     type: Function,

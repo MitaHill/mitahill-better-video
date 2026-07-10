@@ -34,9 +34,10 @@
     <div class="inline-grid two">
       <div class="field compact">
         <label>Whisper 模型</label>
-        <select v-model="transcribeForm.whisperModel" :disabled="isDisabled('whisperModel')">
+        <select v-model="transcribeForm.whisperModel" :disabled="isDisabled('whisperModel') || !whisperModelOptions.length">
           <option v-for="model in whisperModelOptions" :key="model" :value="model">{{ model }}</option>
         </select>
+        <p v-if="!whisperModelOptions.length" class="notice">未检测到已安装模型，请先在管理中心下载模型。</p>
       </div>
       <div class="field compact">
         <label>语言</label>
@@ -82,6 +83,10 @@ const props = defineProps({
     type: Function,
     required: true,
   },
+  runtimeConfig: {
+    type: Object,
+    default: null,
+  },
 });
 
 const readPolicy = (fieldKey) => props.getFieldPolicy("transcribe", fieldKey) || null;
@@ -112,22 +117,14 @@ const subtitleFormatOptions = computed(() =>
   }))
 );
 
-const whisperModelOptions = computed(() =>
-  allowed("whisperModel", [
-    "tiny",
-    "tiny.en",
-    "base",
-    "base.en",
-    "small",
-    "small.en",
-    "medium",
-    "medium.en",
-    "large-v1",
-    "large-v2",
-    "large-v3",
-    "large",
-  ])
-);
+const whisperModelOptions = computed(() => {
+  const installed = props.runtimeConfig?.transcription?.installed_models;
+  const models = Array.isArray(installed) ? installed : [];
+  const allowedModels = new Set(allowed("whisperModel", models).map((item) => String(item || "").trim().toLowerCase()));
+  return models
+    .map((item) => String(item || "").trim().toLowerCase())
+    .filter((item) => item.length > 0 && allowedModels.has(item));
+});
 
 const languageOptions = computed(() => {
   const constrained = allowed("language", TRANSCRIPTION_LANGUAGE_CODES);

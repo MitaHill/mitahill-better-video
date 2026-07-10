@@ -29,6 +29,7 @@
           :add-watermark-segment="addWatermarkSegment"
           :remove-watermark-segment="removeWatermarkSegment"
           :get-field-policy="getFieldPolicy"
+          :transcription-runtime-config="transcriptionRuntimeConfig"
           :submit-task="submitTask"
         />
 
@@ -99,6 +100,7 @@ const {
   probeDownloadSource,
   addWatermarkSegment,
   removeWatermarkSegment,
+  transcriptionRuntimeConfig,
   getFieldPolicy,
   submitTask,
   fetchStatus,

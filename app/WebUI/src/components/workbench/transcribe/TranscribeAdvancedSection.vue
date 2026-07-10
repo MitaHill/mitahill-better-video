@@ -98,45 +98,6 @@
       <input v-model="transcribeForm.exportJson" type="checkbox" :disabled="isDisabled('exportJson')" />
       导出 JSON 分段
     </label>
-
-    <div v-if="transcribeForm.translateTo" class="inline-grid two">
-      <div class="field compact">
-        <label>翻译服务地址</label>
-        <input
-          v-model="transcribeForm.translatorBaseUrl"
-          placeholder="http://127.0.0.1:8000/v1 或 https://api.xxx/v1"
-          :disabled="isDisabled('translatorBaseUrl')"
-        />
-      </div>
-      <div class="field compact">
-        <label>翻译模型名</label>
-        <input
-          v-model="transcribeForm.translatorModel"
-          placeholder="qwen3:8b / gpt-4o-mini"
-          :disabled="isDisabled('translatorModel')"
-        />
-      </div>
-    </div>
-
-    <div v-if="transcribeForm.translateTo" class="field compact">
-      <label>翻译 API Key</label>
-      <input
-        v-model="transcribeForm.translatorApiKey"
-        type="password"
-        placeholder="按兼容服务要求填写，可留空"
-        :disabled="isDisabled('translatorApiKey')"
-      />
-    </div>
-
-    <div v-if="transcribeForm.translateTo" class="field compact">
-      <label>翻译提示词（可选）</label>
-      <textarea
-        v-model="transcribeForm.translatorPrompt"
-        rows="4"
-        placeholder="留空使用后端默认提示词"
-        :disabled="isDisabled('translatorPrompt')"
-      ></textarea>
-    </div>
   </div>
 </template>
 

@@ -13,6 +13,7 @@ export const useWorkbenchController = () => {
   const loading = reactive({ submit: false });
   const submitError = ref("");
   const submitWarnings = ref("");
+  const transcriptionRuntimeConfig = ref(null);
 
   const { themeMode, activeTheme, onThemeModeChange, initTheme, disposeTheme } = useWorkbenchTheme();
   const { activeCategory, switchCategory, initCategoryRouting, disposeCategoryRouting } = useWorkbenchCategory();
@@ -92,6 +93,37 @@ export const useWorkbenchController = () => {
   });
 
   const { fetchRecommendations } = useWorkbenchRecommendations({ enhanceForm });
+
+  const syncTranscriptionModel = () => {
+    const installed = transcriptionRuntimeConfig.value?.transcription?.installed_models;
+    const models = Array.isArray(installed)
+      ? installed.map((item) => String(item || "").trim().toLowerCase()).filter((item) => item.length > 0)
+      : [];
+    if (!models.length) return;
+
+    const current = String(transcribeForm.whisperModel || "").trim().toLowerCase();
+    if (models.includes(current)) {
+      transcribeForm.whisperModel = current;
+      return;
+    }
+
+    const active = String(transcriptionRuntimeConfig.value?.transcription?.active_model || "").trim().toLowerCase();
+    transcribeForm.whisperModel = models.includes(active) ? active : models[0];
+  };
+
+  const fetchTranscriptionRuntimeConfig = async () => {
+    try {
+      const res = await fetch("/api/transcriptions/runtime-config");
+      const data = await parseJsonSafe(res);
+      if (!res.ok) {
+        throw new Error(data.error || "读取转录运行配置失败");
+      }
+      transcriptionRuntimeConfig.value = data;
+      syncTranscriptionModel();
+    } catch (error) {
+      console.warn(error);
+    }
+  };
 
   const syncDownloadSourceMetrics = (probeData = null) => {
     const fallbackWidth = Number(downloadForm.probeWidth || probeData?.width || 0);
@@ -174,6 +206,7 @@ export const useWorkbenchController = () => {
     initTheme();
     initCategoryRouting();
     fetchRecommendations();
+    fetchTranscriptionRuntimeConfig();
     if (!convertForm.watermarkTimeline.length) {
       addWatermarkSegment();
     }
@@ -220,6 +253,7 @@ export const useWorkbenchController = () => {
     probeDownloadSource,
     addWatermarkSegment,
     removeWatermarkSegment,
+    transcriptionRuntimeConfig,
     submitTask,
     fetchStatus,
     downloadResult,
