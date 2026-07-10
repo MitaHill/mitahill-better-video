@@ -2,13 +2,11 @@ import hashlib
 import logging
 import os
 import re
-import socket
 import tempfile
 import time
 import wave
 from pathlib import Path
 from typing import Dict, List
-from urllib.parse import urlparse
 
 import requests
 
@@ -17,7 +15,6 @@ from app.src.Worker.pipelines.transcription.compute_type import select_faster_wh
 from .transcription_catalog import fetch_hf_model_files, get_model_entry, get_storage_roots
 
 logger = logging.getLogger("ADMIN_MODEL_CHECKS")
-_OPENAI_BASE_URL = "https://api.openai.com/v1"
 
 
 def _digest_of_file(path: Path, algo: str) -> str:
@@ -284,6 +281,8 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
 
 def test_translation_provider(translation_config: Dict) -> Dict:
     provider = str(translation_config.get("provider") or "none").strip().lower()
+    if provider in {"openai", "ollama"}:
+        provider = "openai_compatible"
     base_url = str(translation_config.get("base_url") or "").strip().rstrip("/")
     model = str(translation_config.get("model") or "").strip()
     api_key = str(translation_config.get("api_key") or "").strip()
@@ -291,27 +290,19 @@ def test_translation_provider(translation_config: Dict) -> Dict:
 
     if provider == "none":
         return {"ok": False, "provider": provider, "error": "翻译提供器未启用"}
-    if provider == "openai":
-        return _test_openai(
-            base_url=base_url or _OPENAI_BASE_URL,
-            model=model,
-            api_key=api_key,
-            timeout_sec=max(1.0, min(timeout_sec, 60.0)),
-        )
+    if provider != "openai_compatible":
+        return {"ok": False, "provider": provider, "error": f"不支持的翻译提供器: {provider}"}
     if not base_url:
         return {"ok": False, "provider": provider, "error": "未配置翻译服务地址"}
+    if not model:
+        return {"ok": False, "provider": provider, "error": "未配置翻译模型名"}
 
-    if provider == "ollama":
-        return _test_ollama(base_url=base_url, model=model)
-    if provider == "openai_compatible":
-        return _test_openai_compatible(
-            base_url=base_url,
-            model=model,
-            api_key=api_key,
-            timeout_sec=max(1.0, min(timeout_sec, 60.0)),
-        )
-
-    return {"ok": False, "provider": provider, "error": f"不支持的翻译提供器: {provider}"}
+    return _test_openai_compatible(
+        base_url=base_url,
+        model=model,
+        api_key=api_key,
+        timeout_sec=max(1.0, min(timeout_sec, 60.0)),
+    )
 
 
 def _normalize_openai_base_url(base_url: str) -> str:
@@ -320,93 +311,7 @@ def _normalize_openai_base_url(base_url: str) -> str:
         raw = raw[: -len("/responses")]
     if raw.endswith("/chat/completions"):
         raw = raw[: -len("/chat/completions")]
-    return raw or _OPENAI_BASE_URL
-
-
-def _test_ollama(base_url: str, model: str) -> Dict:
-    parsed = urlparse(base_url)
-    host = parsed.hostname or ""
-    port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    if not host:
-        return {"ok": False, "provider": "ollama", "error": "无效的 Ollama 地址"}
-
-    steps = []
-
-    try:
-        begin = time.time()
-        with socket.create_connection((host, port), timeout=3):
-            pass
-        tcp_elapsed = time.time() - begin
-        steps.append({"step": "tcp_ping", "status": "passed", "elapsed_sec": round(tcp_elapsed, 3)})
-    except Exception as exc:
-        return {
-            "ok": False,
-            "provider": "ollama",
-            "steps": [{"step": "tcp_ping", "status": "failed", "message": str(exc)}],
-            "error": f"TCP-PING 失败: {exc}",
-        }
-
-    try:
-        tags_resp = requests.get(f"{base_url}/api/tags", timeout=10)
-        tags_resp.raise_for_status()
-        payload = tags_resp.json() or {}
-        names = [str((item or {}).get("name") or "") for item in (payload.get("models") or [])]
-        if model and not any(name == model or name.startswith(f"{model}:") for name in names):
-            return {
-                "ok": False,
-                "provider": "ollama",
-                "steps": steps + [{"step": "list_models", "status": "failed", "message": "未找到目标模型"}],
-                "error": f"目标模型不存在: {model}",
-                "available_models": names,
-            }
-        steps.append({"step": "list_models", "status": "passed", "count": len(names)})
-    except Exception as exc:
-        return {
-            "ok": False,
-            "provider": "ollama",
-            "steps": steps + [{"step": "list_models", "status": "failed", "message": str(exc)}],
-            "error": f"读取模型列表失败: {exc}",
-        }
-
-    try:
-        started = time.time()
-        resp = requests.post(
-            f"{base_url}/api/chat",
-            json={
-                "model": model,
-                "stream": False,
-                "messages": [{"role": "user", "content": "Hello.What's Your Name"}],
-            },
-            timeout=60,
-        )
-        resp.raise_for_status()
-        payload = resp.json() or {}
-        content = ((payload.get("message") or {}).get("content") or "").strip()
-        latency = time.time() - started
-        steps.append(
-            {
-                "step": "chat",
-                "status": "passed",
-                "elapsed_sec": round(latency, 3),
-                "speed_grade": _speed_grade(latency),
-                "reply_preview": content[:120],
-            }
-        )
-        return {"ok": True, "provider": "ollama", "steps": steps}
-    except requests.Timeout:
-        return {
-            "ok": False,
-            "provider": "ollama",
-            "steps": steps + [{"step": "chat", "status": "failed", "message": "超过 60 秒超时"}],
-            "error": "对话超时（60秒）",
-        }
-    except Exception as exc:
-        return {
-            "ok": False,
-            "provider": "ollama",
-            "steps": steps + [{"step": "chat", "status": "failed", "message": str(exc)}],
-            "error": f"对话测试失败: {exc}",
-        }
+    return raw
 
 
 def _test_openai_compatible(base_url: str, model: str, api_key: str, timeout_sec: float) -> Dict:
@@ -480,90 +385,6 @@ def _test_openai_compatible(base_url: str, model: str, api_key: str, timeout_sec
         return {
             "ok": False,
             "provider": "openai_compatible",
-            "error": f"调用失败: {exc}",
-        }
-
-
-def _test_openai(base_url: str, model: str, api_key: str, timeout_sec: float) -> Dict:
-    if not model:
-        return {"ok": False, "provider": "openai", "error": "未配置 OpenAI 模型名"}
-    if not api_key:
-        return {"ok": False, "provider": "openai", "error": "未配置 OpenAI API Key"}
-
-    endpoint = f"{_normalize_openai_base_url(base_url)}/responses"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-    }
-
-    started = time.time()
-    try:
-        resp = requests.post(
-            endpoint,
-            headers=headers,
-            json={
-                "model": model,
-                "instructions": "Reply with a very short plain text greeting only.",
-                "input": "Say hello in one short sentence.",
-            },
-            timeout=timeout_sec,
-        )
-        if resp.status_code >= 400:
-            detail = _extract_error_detail(resp)
-            mapping = {
-                400: "请求参数错误",
-                401: "OpenAI API Key 无效或未授权",
-                403: "OpenAI 账户无权访问该模型或接口",
-                404: "接口或模型不存在",
-                429: "触发限流或额度不足",
-                500: "OpenAI 服务端内部错误",
-                502: "OpenAI 上游网关错误",
-                503: "OpenAI 服务暂不可用",
-                504: "OpenAI 网关超时",
-            }
-            return {
-                "ok": False,
-                "provider": "openai",
-                "error": mapping.get(resp.status_code, f"HTTP {resp.status_code}"),
-                "http_status": resp.status_code,
-                "detail": detail,
-            }
-
-        payload = resp.json() or {}
-        content = str(payload.get("output_text") or "").strip()
-        if not content:
-            for item in payload.get("output") or []:
-                for content_item in (item or {}).get("content") or []:
-                    text = str((content_item or {}).get("text") or "").strip()
-                    if text:
-                        content = text
-                        break
-                if content:
-                    break
-        latency = time.time() - started
-        return {
-            "ok": True,
-            "provider": "openai",
-            "elapsed_sec": round(latency, 3),
-            "speed_grade": _speed_grade(latency),
-            "reply_preview": content[:120],
-        }
-    except requests.Timeout:
-        return {
-            "ok": False,
-            "provider": "openai",
-            "error": f"请求超时（>{timeout_sec:.0f}s）",
-        }
-    except requests.ConnectionError as exc:
-        return {
-            "ok": False,
-            "provider": "openai",
-            "error": f"连接失败: {exc}",
-        }
-    except Exception as exc:
-        return {
-            "ok": False,
-            "provider": "openai",
             "error": f"调用失败: {exc}",
         }
 

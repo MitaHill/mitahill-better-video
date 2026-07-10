@@ -1,7 +1,7 @@
 <template>
   <div class="panel admin-card">
     <h2>转录模型设置</h2>
-    <p class="notice" style="margin-bottom: 10px;">转录链路已固定为 faster-whisper。这里用于配置默认模型、运行模式与 aria2 下载行为。</p>
+    <p class="notice" style="margin-bottom: 10px;">转录链路已固定为 faster-whisper。这里用于配置默认模型与 aria2 下载行为。</p>
 
     <div class="inline-grid two">
       <div class="field compact">
@@ -39,21 +39,12 @@
 
     <div class="param-section" style="margin-top: 10px;">
       <div class="param-title">运行与启动策略</div>
-      <div class="inline-grid two">
-        <div class="field compact">
-          <label>转录运行模式</label>
-          <select v-model="local.runtimeMode" :disabled="loading">
-            <option value="parallel">并行模式（Fast-Whisper 常驻，响应更快）</option>
-            <option value="memory_saving">节省显存（按阶段卸载/清理）</option>
-          </select>
-          <p class="notice" style="margin-top: 6px;">
-            节省显存模式下会在转录与翻译阶段之间主动释放显存，并在翻译结束后卸载 Ollama 模型（若使用）。
-          </p>
-        </div>
-        <p class="notice" style="margin-top: 24px;">
-          容器启动自检已固定开启：先检查 nvidia-smi，再运行一个最小 GPU 任务验证任务链路。
-        </p>
-      </div>
+      <p class="notice" style="margin-top: 6px;">
+        转录运行逻辑由后端调度器统一安排：模型加载前检查显存，任务结束后立即释放模型。
+      </p>
+      <p class="notice" style="margin-top: 6px;">
+        容器启动自检已固定开启：先检查 nvidia-smi，再运行一个最小 GPU 任务验证任务链路。
+      </p>
     </div>
 
     <div class="param-section" style="margin-top: 10px;">
@@ -146,7 +137,6 @@ const local = reactive({
     timeoutSec: 120,
     proxy: "",
   },
-  runtimeMode: "parallel",
   startupSelfCheckEnabled: true,
 });
 
@@ -190,8 +180,6 @@ const applyFromProps = () => {
   local.aria2.connectTimeoutSec = Number(aria2.connect_timeout_sec ?? 10);
   local.aria2.timeoutSec = Number(aria2.timeout_sec ?? 120);
   local.aria2.proxy = aria2.proxy || "";
-  const runtime = cfg.runtime || {};
-  local.runtimeMode = runtime.transcribe_runtime_mode || "parallel";
   local.startupSelfCheckEnabled = true;
 };
 
@@ -226,7 +214,6 @@ const save = async () => {
       },
     },
     runtime: {
-      transcribe_runtime_mode: String(local.runtimeMode || "parallel").trim().toLowerCase(),
       startup_self_check_enabled: true,
     },
   });

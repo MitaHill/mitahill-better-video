@@ -104,7 +104,7 @@ export const buildTranscriptionTaskFormData = (transcribeForm) => {
   data.append("whisper_model", transcribeForm.whisperModel);
   data.append("language", transcribeForm.language);
   data.append("translate_to", transcribeForm.translateTo || "");
-  data.append("translator_provider", transcribeForm.translatorProvider || "none");
+  data.append("translator_provider", transcribeForm.translateTo ? "openai_compatible" : "none");
   data.append("translator_base_url", transcribeForm.translatorBaseUrl || "");
   data.append("translator_model", transcribeForm.translatorModel || "");
   data.append("translator_api_key", transcribeForm.translatorApiKey || "");

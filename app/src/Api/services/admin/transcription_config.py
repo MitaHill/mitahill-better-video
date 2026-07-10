@@ -12,9 +12,8 @@ from .transcription_catalog import get_models_for_backend
 
 
 _VALID_BACKENDS = {"faster_whisper"}
-_VALID_TRANSLATORS = {"none", "ollama", "openai", "openai_compatible"}
+_VALID_TRANSLATORS = {"none", "openai_compatible"}
 _VALID_TRANSLATION_FALLBACK_MODES = {"model_full_text", "source_text"}
-_VALID_RUNTIME_MODES = {"parallel", "memory_saving"}
 
 _DEFAULT_MODEL_BY_BACKEND = {
     "faster_whisper": "large-v3",
@@ -64,7 +63,6 @@ def default_transcription_config() -> Dict[str, Any]:
             }
         },
         "runtime": {
-            "transcribe_runtime_mode": "parallel",
             "startup_self_check_enabled": True,
         },
     }
@@ -121,12 +119,12 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
         merged["transcription"]["active_model"] = fallback_model
 
     provider = str(merged["translation"].get("provider") or "none").strip().lower()
+    if provider in {"openai", "ollama"}:
+        provider = "openai_compatible"
     if provider not in _VALID_TRANSLATORS:
         provider = "none"
     merged["translation"]["provider"] = provider
     merged["translation"]["base_url"] = str(merged["translation"].get("base_url") or "").strip()
-    if provider == "openai" and not merged["translation"]["base_url"]:
-        merged["translation"]["base_url"] = "https://api.openai.com/v1"
     merged["translation"]["model"] = str(merged["translation"].get("model") or "").strip()
     merged["translation"]["api_key"] = str(merged["translation"].get("api_key") or "").strip()
     merged["translation"]["prompt"] = str(merged["translation"].get("prompt") or "").strip()
@@ -176,12 +174,7 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
         "timeout_sec": max(10, min(timeout_sec, 600)),
     }
 
-    runtime = merged.get("runtime") or {}
-    runtime_mode = str(runtime.get("transcribe_runtime_mode") or "parallel").strip().lower()
-    if runtime_mode not in _VALID_RUNTIME_MODES:
-        runtime_mode = "parallel"
     merged["runtime"] = {
-        "transcribe_runtime_mode": runtime_mode,
         "startup_self_check_enabled": True,
     }
 
@@ -217,5 +210,4 @@ def get_parser_defaults() -> Dict[str, Any]:
         "translator_prompt": str(translation.get("prompt") or "").strip(),
         "translator_fallback_mode": str(translation.get("fallback_mode") or "model_full_text").strip().lower(),
         "translator_timeout_sec": float(translation.get("timeout_sec") or 120.0),
-        "transcribe_runtime_mode": str((current.get("runtime") or {}).get("transcribe_runtime_mode") or "parallel").strip().lower(),
     }

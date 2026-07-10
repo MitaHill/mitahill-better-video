@@ -146,7 +146,7 @@
           />
 
           <AdminDebugToolsPanel
-            v-if="activeMenuKey === 'debug_model' || activeMenuKey === 'debug_translate'"
+            v-if="activeMenuKey === 'debug_tests'"
             :loading-model="debugTools.loadingModelTest"
             :model-error="debugTools.modelTestError"
             :model-result="debugTools.modelTestResult"
@@ -273,10 +273,9 @@ const menuTree = Object.freeze([
         keywords: "transcribe transcription subtitle whisper model translate 转录 字幕 模型 翻译",
         children: Object.freeze([
           { key: "transcribe_cfg_model", label: "转录模型设置", keywords: "transcribe whisper model faster 模型 设置" },
-          { key: "transcribe_cfg_translation", label: "翻译源设置", keywords: "translate provider ollama openai 翻译 源" },
+          { key: "transcribe_cfg_translation", label: "翻译源设置", keywords: "translate provider openai 翻译 源" },
           { key: "transcribe_cfg_catalog", label: "转录模型目录", keywords: "catalog download model transcription 模型 目录 下载" },
-          { key: "debug_model", label: "测试转录模型", keywords: "debug test transcription whisper 调试 测试 转录" },
-          { key: "debug_translate", label: "测试翻译源", keywords: "debug test translate provider 调试 测试 翻译" },
+          { key: "debug_tests", label: "测试", keywords: "debug test transcription whisper translate provider 调试 测试 转录 翻译" },
         ]),
       },
     ]),
@@ -482,13 +481,9 @@ const loadByMenuKey = async (value) => {
     await refreshTranscriptionCatalog();
     return;
   }
-  if (value === "debug_model") {
+  if (value === "debug_tests") {
     await fetchTranscriptionConfig();
     await fetchTranscriptionModels();
-    return;
-  }
-  if (value === "debug_translate") {
-    await fetchTranscriptionConfig();
     return;
   }
   if (value === "logs_warn") {

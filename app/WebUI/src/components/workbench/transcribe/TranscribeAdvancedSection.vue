@@ -76,13 +76,7 @@
       </div>
     </div>
 
-    <div class="inline-grid three">
-      <div class="field compact">
-        <label>翻译提供器</label>
-        <select v-model="transcribeForm.translatorProvider" :disabled="isDisabled('translatorProvider')">
-          <option v-for="item in translatorProviderOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-        </select>
-      </div>
+    <div class="inline-grid two">
       <div class="field compact">
         <label>翻译超时(秒)</label>
         <input
@@ -105,12 +99,12 @@
       导出 JSON 分段
     </label>
 
-    <div v-if="transcribeForm.translateTo && transcribeForm.translatorProvider !== 'none'" class="inline-grid two">
+    <div v-if="transcribeForm.translateTo" class="inline-grid two">
       <div class="field compact">
         <label>翻译服务地址</label>
         <input
           v-model="transcribeForm.translatorBaseUrl"
-          :placeholder="transcribeForm.translatorProvider === 'openai' ? '留空则使用 https://api.openai.com/v1' : 'http://127.0.0.1:11434 或 https://api.xxx/v1'"
+          placeholder="http://127.0.0.1:8000/v1 或 https://api.xxx/v1"
           :disabled="isDisabled('translatorBaseUrl')"
         />
       </div>
@@ -124,17 +118,17 @@
       </div>
     </div>
 
-    <div v-if="transcribeForm.translateTo && transcribeForm.translatorProvider !== 'none'" class="field compact">
+    <div v-if="transcribeForm.translateTo" class="field compact">
       <label>翻译 API Key</label>
       <input
         v-model="transcribeForm.translatorApiKey"
         type="password"
-        :placeholder="transcribeForm.translatorProvider === 'openai' ? 'OpenAI 云端为必填' : '留空则不带 Authorization 头'"
+        placeholder="按兼容服务要求填写，可留空"
         :disabled="isDisabled('translatorApiKey')"
       />
     </div>
 
-    <div v-if="transcribeForm.translateTo && transcribeForm.translatorProvider !== 'none'" class="field compact">
+    <div v-if="transcribeForm.translateTo" class="field compact">
       <label>翻译提示词（可选）</label>
       <textarea
         v-model="transcribeForm.translatorPrompt"
@@ -183,19 +177,4 @@ const outputVideoCodecOptions = computed(() =>
   }))
 );
 
-const translatorProviderOptions = computed(() =>
-  allowed("translatorProvider", ["none", "ollama", "openai", "openai_compatible"]).map((value) => ({
-    value,
-    label:
-      value === "none"
-        ? "不启用"
-        : value === "ollama"
-          ? "Ollama"
-          : value === "openai"
-            ? "OpenAI 云端"
-            : value === "openai_compatible"
-              ? "OpenAI兼容"
-              : value,
-  }))
-);
 </script>

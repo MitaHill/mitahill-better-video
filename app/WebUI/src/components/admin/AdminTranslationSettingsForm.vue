@@ -6,12 +6,7 @@
     <div class="inline-grid two">
       <div class="field compact">
         <label>翻译提供器</label>
-        <select v-model="local.provider" :disabled="loading">
-          <option value="none">不启用</option>
-          <option value="ollama">Ollama</option>
-          <option value="openai">OpenAI Cloud</option>
-          <option value="openai_compatible">OpenAI Compatible</option>
-        </select>
+        <input :value="'OpenAI 兼容格式'" disabled />
       </div>
       <div class="field compact">
         <label>超时(s)</label>
@@ -32,7 +27,7 @@
 
     <div class="field compact">
       <label>服务地址</label>
-      <input v-model="local.baseUrl" :disabled="loading" placeholder="OpenAI Cloud 可留空，默认 https://api.openai.com/v1" />
+      <input v-model="local.baseUrl" :disabled="loading" placeholder="例如: http://127.0.0.1:8000/v1 或 https://api.example.com/v1" />
     </div>
 
     <div class="inline-grid two">
@@ -42,7 +37,7 @@
       </div>
       <div class="field compact">
         <label>API Key</label>
-        <input v-model="local.apiKey" :disabled="loading" placeholder="OpenAI Cloud 必填，兼容服务按需填写" />
+        <input v-model="local.apiKey" :disabled="loading" placeholder="按兼容服务要求填写，可留空" />
       </div>
     </div>
 
@@ -118,6 +113,9 @@ If a term should remain untranslated, keep it as is.
     </div>
     <p v-if="error" class="notice" style="color: var(--accent-2); margin-top: 10px;">{{ error }}</p>
     <p v-if="message" class="notice" style="margin-top: 8px;">{{ message }}</p>
+    <p class="notice" style="margin-top: 10px;">
+      如果本地部署模型，建议使用 vLLM 或 Ollama 提供 OpenAI 兼容格式。
+    </p>
   </div>
 </template>
 
@@ -149,7 +147,7 @@ const props = defineProps({
 });
 
 const local = reactive({
-  provider: "none",
+  provider: "openai_compatible",
   baseUrl: "",
   model: "",
   apiKey: "",
@@ -253,7 +251,7 @@ const previewSystemPrompt = computed(() => {
 const applyFromProps = () => {
   const cfg = props.configData || {};
   const translation = cfg.translation || {};
-  local.provider = translation.provider || "none";
+  local.provider = "openai_compatible";
   local.baseUrl = translation.base_url || "";
   local.model = translation.model || "";
   local.apiKey = translation.api_key || "";
@@ -279,7 +277,7 @@ const applyPromptTemplate = (key) => {
 const save = async () => {
   await props.onSave({
     translation: {
-      provider: String(local.provider || "none").trim().toLowerCase(),
+      provider: "openai_compatible",
       base_url: String(local.baseUrl || "").trim(),
       model: String(local.model || "").trim(),
       api_key: String(local.apiKey || "").trim(),

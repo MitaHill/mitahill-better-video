@@ -19,7 +19,7 @@ from app.src.Media.upscaler import build_model
 from app.src.Audio.enhancer import AudioEnhancer
 from app.src.Audio.denoiser import apply_pre_denoise
 from app.src.Audio.haas_effect import apply_haas_effect
-from app.src.Worker.gpu_model_coordinator import is_cuda_oom, release_models_except
+from app.src.Worker.gpu_model_coordinator import is_cuda_oom, prepare_model_load, register_release_hook
 from .preview import generate_previews
 
 logger = logging.getLogger("PROCESSOR")
@@ -27,6 +27,14 @@ logger = logging.getLogger("PROCESSOR")
 def process_enhancement_task(task):
     task_id = task['task_id']
     logger.info(f"=== Starting Task Processor: {task_id} ===")
+    model_holder = {}
+
+    def _release_realesrgan():
+        model_holder.pop("upsampler", None)
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    register_release_hook("realesrgan", _release_realesrgan)
     
     try:
         db.update_task_status(task_id, "PROCESSING", 0, "Initializing...")
@@ -47,23 +55,25 @@ def process_enhancement_task(task):
 
         # 1. Load Model ONCE
         db.update_task_status(task_id, "PROCESSING", 5, "Loading Model...")
-        release_models_except("realesrgan")
+        prepare_model_load("realesrgan")
         try:
             upsampler = build_model(
                 params['model_name'], params['upscale'], params['tile'],
                 params.get('tile_pad', 10), params.get('fp16', True),
                 weights_dir, params.get('denoise_strength', 0.5)
             )
+            model_holder["upsampler"] = upsampler
         except RuntimeError as exc:
             if not is_cuda_oom(exc):
                 raise
             logger.warning("CUDA OOM while loading Real-ESRGAN; releasing peer models and retrying once.")
-            release_models_except("realesrgan")
+            prepare_model_load("realesrgan")
             upsampler = build_model(
                 params['model_name'], params['upscale'], params['tile'],
                 params.get('tile_pad', 10), params.get('fp16', True),
                 weights_dir, params.get('denoise_strength', 0.5)
             )
+            model_holder["upsampler"] = upsampler
         logger.info("Model loaded: %s", params.get("model_name"))
 
         if params['input_type'] == 'Video':
@@ -381,6 +391,7 @@ def process_enhancement_task(task):
         db.update_task_status(task_id, "FAILED", message=str(e))
     finally:
         clear_preview_cache(task_id)
+        model_holder.pop("upsampler", None)
         if 'upsampler' in locals():
             del upsampler
         if torch.cuda.is_available():

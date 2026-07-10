@@ -62,8 +62,6 @@ export const buildParamRows = (status) => {
     };
     const providerLabelMap = {
       none: "不启用",
-      ollama: "Ollama",
-      openai: "OpenAI 云端",
       openai_compatible: "OpenAI 兼容",
     };
     return [

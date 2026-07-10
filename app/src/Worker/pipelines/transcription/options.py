@@ -2,10 +2,9 @@ from app.src.Config import settings as config
 
 VALID_TRANSCRIBE_MODES = {"subtitle_zip", "subtitled_video", "subtitle_and_video_zip"}
 VALID_SUBTITLE_FORMATS = {"srt", "vtt"}
-VALID_TRANSLATOR_PROVIDERS = {"none", "ollama", "openai", "openai_compatible"}
+VALID_TRANSLATOR_PROVIDERS = {"none", "openai_compatible"}
 VALID_TRANSLATOR_FALLBACK_MODES = {"model_full_text", "source_text"}
 VALID_TRANSCRIPTION_BACKENDS = {"faster_whisper"}
-VALID_TRANSCRIBE_RUNTIME_MODES = {"parallel", "memory_saving"}
 
 
 def _to_bool(value, default=False):
@@ -59,22 +58,18 @@ def normalize_transcription_options(raw):
 
     translate_to = (options.get("translate_to") or "").strip()
     provider = (options.get("translator_provider") or config.TRANSCRIPTION_TRANSLATOR_PROVIDER or "none").strip().lower()
+    if provider in {"ollama", "openai"}:
+        provider = "openai_compatible"
     if provider not in VALID_TRANSLATOR_PROVIDERS:
         provider = "none"
     fallback_mode = (options.get("translator_fallback_mode") or "model_full_text").strip().lower()
     if fallback_mode not in VALID_TRANSLATOR_FALLBACK_MODES:
         fallback_mode = "model_full_text"
-    runtime_mode = (options.get("transcribe_runtime_mode") or "parallel").strip().lower()
-    if runtime_mode not in VALID_TRANSCRIBE_RUNTIME_MODES:
-        runtime_mode = "parallel"
-
     translator_base_url = (
         options.get("translator_base_url")
         or config.TRANSCRIPTION_TRANSLATOR_BASE_URL
         or ""
     ).strip()
-    if provider == "openai" and not translator_base_url:
-        translator_base_url = "https://api.openai.com/v1"
 
     normalized = {
         "transcription_backend": backend,
@@ -108,7 +103,6 @@ def normalize_transcription_options(raw):
             or ""
         ).strip(),
         "translator_fallback_mode": fallback_mode,
-        "transcribe_runtime_mode": runtime_mode,
         "translator_timeout_sec": _to_float(
             options.get("translator_timeout_sec"),
             config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS,

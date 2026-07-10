@@ -7,7 +7,6 @@ import requests
 
 _CODE_BLOCK_RE = re.compile(r"```(?:[a-zA-Z]+)?\s*([\s\S]*?)```", re.MULTILINE)
 _THINK_TAG_RE = re.compile(r"<think>[\s\S]*?</think>", re.IGNORECASE)
-_OPENAI_BASE_URL = "https://api.openai.com/v1"
 _LANGUAGE_NAME_MAP = {
     "zh": "Chinese",
     "en": "English",
@@ -51,7 +50,6 @@ class BaseTranslator:
         prompt: str,
         timeout_sec: float,
         fallback_mode: str = "model_full_text",
-        runtime_mode: str = "parallel",
     ):
         self.base_url = (base_url or "").strip()
         self.model = (model or "").strip()
@@ -60,8 +58,6 @@ class BaseTranslator:
         self.timeout_sec = float(timeout_sec or 120.0)
         mode = str(fallback_mode or "model_full_text").strip().lower()
         self.fallback_mode = mode if mode in {"model_full_text", "source_text"} else "model_full_text"
-        safe_runtime_mode = str(runtime_mode or "parallel").strip().lower()
-        self.runtime_mode = safe_runtime_mode if safe_runtime_mode in {"parallel", "memory_saving"} else "parallel"
 
     def translate_text(self, text: str, target_language: str) -> str:
         raise NotImplementedError
@@ -155,16 +151,6 @@ def _strip_known_endpoint_suffix(base_url: str) -> str:
     return raw
 
 
-def _normalize_openai_base_url(base_url: str) -> str:
-    raw = _strip_known_endpoint_suffix(base_url)
-    if not raw:
-        return _OPENAI_BASE_URL
-    parsed = urlparse(raw)
-    if not parsed.scheme or not parsed.netloc:
-        raise ValueError("OpenAI translator requires a valid HTTPS base URL or leave it empty for the default endpoint.")
-    return raw
-
-
 def _normalize_openai_compatible_endpoint(base_url: str) -> str:
     raw = _strip_known_endpoint_suffix(base_url)
     if not raw:
@@ -173,97 +159,6 @@ def _normalize_openai_compatible_endpoint(base_url: str) -> str:
     if not parsed.scheme or not parsed.netloc:
         raise ValueError("OpenAI-compatible translator requires a valid base URL.")
     return f"{raw}/chat/completions"
-
-
-def _extract_openai_responses_text(payload: dict) -> str:
-    direct = str(payload.get("output_text") or "").strip()
-    if direct:
-        return direct
-    outputs = payload.get("output") or []
-    for item in outputs:
-        if not isinstance(item, dict):
-            continue
-        for content in item.get("content") or []:
-            if not isinstance(content, dict):
-                continue
-            text = str(content.get("text") or "").strip()
-            if text:
-                return text
-    return ""
-
-
-class OllamaTranslator(BaseTranslator):
-    label = "ollama"
-
-    def _keep_alive_value(self):
-        if self.runtime_mode == "parallel":
-            return -1
-        return "2m"
-
-    def prepare_for_task(self):
-        if not self.base_url or not self.model:
-            return None
-        try:
-            endpoint = f"{self.base_url.rstrip('/')}/api/generate"
-            # 这里做的不是“测试翻译”，而是把模型预热并保持常驻，
-            # 避免第一段字幕就把超时时间花在模型冷启动上。
-            requests.post(
-                endpoint,
-                json={
-                    "model": self.model,
-                    "prompt": "",
-                    "stream": False,
-                    "keep_alive": self._keep_alive_value(),
-                },
-                timeout=min(self.timeout_sec, 10.0),
-            )
-        except Exception:
-            # warmup failure should not fail task creation
-            return None
-        return None
-
-    def on_task_end(self):
-        if self.runtime_mode != "memory_saving":
-            return None
-        if not self.base_url or not self.model:
-            return None
-        try:
-            endpoint = f"{self.base_url.rstrip('/')}/api/generate"
-            requests.post(
-                endpoint,
-                json={"model": self.model, "prompt": "", "stream": False, "keep_alive": 0},
-                timeout=min(self.timeout_sec, 10.0),
-            )
-        except Exception:
-            return None
-        return None
-
-    def translate_text(self, text: str, target_language: str) -> str:
-        if not self.base_url or not self.model:
-            raise ValueError("Ollama translator requires translator_base_url and translator_model.")
-        endpoint = f"{self.base_url.rstrip('/')}/api/chat"
-        payload = {
-            "model": self.model,
-            "stream": False,
-            # qwen 系列默认可能输出较长思考过程；翻译场景里这只会拖慢首段响应。
-            "think": False,
-            "messages": [
-                {"role": "system", "content": self._system_prompt(target_language, self.prompt)},
-                {"role": "user", "content": str(text or "")},
-            ],
-            "options": {"temperature": 0.2, "top_p": 0.9},
-            "keep_alive": self._keep_alive_value(),
-        }
-        response = requests.post(endpoint, json=payload, timeout=self.timeout_sec)
-        response.raise_for_status()
-        data = response.json()
-        content = ((data.get("message") or {}).get("content") or "").strip()
-        # 如果模型喜欢把结果包在代码块里，优先拆代码块内容。
-        # 拆不到时再走 sanitize + fallback，尽量避免把解释性废话写进字幕文件。
-        parsed = self._extract_code_block_content(content)
-        if parsed:
-            return parsed
-        return self._resolve_fallback_text(model_raw_text=content, source_text=text)
 
 
 class OpenAICompatibleTranslator(BaseTranslator):
@@ -300,41 +195,13 @@ class OpenAICompatibleTranslator(BaseTranslator):
         return self._resolve_fallback_text(model_raw_text=content, source_text=text)
 
 
-class OpenAITranslator(BaseTranslator):
-    label = "openai"
-
-    def _endpoint(self) -> str:
-        return f"{_normalize_openai_base_url(self.base_url)}/responses"
-
-    def translate_text(self, text: str, target_language: str) -> str:
-        if not self.model:
-            raise ValueError("OpenAI translator requires translator_model.")
-        if not self.api_key:
-            raise ValueError("OpenAI translator requires translator_api_key.")
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
-        }
-        payload = {
-            "model": self.model,
-            "instructions": self._system_prompt(target_language, self.prompt),
-            "input": str(text or ""),
-        }
-        response = requests.post(self._endpoint(), headers=headers, json=payload, timeout=self.timeout_sec)
-        response.raise_for_status()
-        data = response.json() or {}
-        content = _extract_openai_responses_text(data)
-        parsed = self._extract_code_block_content(content)
-        if parsed:
-            return parsed
-        return self._resolve_fallback_text(model_raw_text=content, source_text=text)
-
-
 def create_translator(options) -> Optional[BaseTranslator]:
     provider = (options.get("translator_provider") or "none").strip().lower()
     if provider == "none" or not (options.get("translate_to") or "").strip():
         # 没有翻译目标语言时，哪怕 provider 配了也视为关闭。
         return None
+    if provider != "openai_compatible":
+        raise ValueError(f"Unsupported translator provider: {provider}")
 
     kwargs = {
         "base_url": options.get("translator_base_url", ""),
@@ -343,13 +210,5 @@ def create_translator(options) -> Optional[BaseTranslator]:
         "prompt": options.get("translator_prompt", ""),
         "fallback_mode": options.get("translator_fallback_mode", "model_full_text"),
         "timeout_sec": options.get("translator_timeout_sec", 120.0),
-        "runtime_mode": options.get("transcribe_runtime_mode", "parallel"),
     }
-    if provider == "ollama":
-        return OllamaTranslator(**kwargs)
-    if provider == "openai":
-        return OpenAITranslator(**kwargs)
-    if provider == "openai_compatible":
-        return OpenAICompatibleTranslator(**kwargs)
-
-    raise ValueError(f"Unsupported translator provider: {provider}")
+    return OpenAICompatibleTranslator(**kwargs)

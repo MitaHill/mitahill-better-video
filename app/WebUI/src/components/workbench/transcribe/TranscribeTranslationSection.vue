@@ -37,12 +37,6 @@
           <option v-for="item in translateTargetOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
         </select>
       </div>
-      <div class="field compact">
-        <label>翻译提供器</label>
-        <select v-model="transcribeForm.translatorProvider" :disabled="isDisabled('translatorProvider') || !transcribeForm.translateTo">
-          <option v-for="item in translatorProviderOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-        </select>
-      </div>
     </div>
 
     <div v-if="transcribeForm.translateTo" class="inline-grid two">
@@ -63,12 +57,12 @@
       </label>
     </div>
 
-    <div v-if="transcribeForm.translateTo && transcribeForm.translatorProvider !== 'none'" class="inline-grid two">
+    <div v-if="transcribeForm.translateTo" class="inline-grid two">
       <div class="field compact">
         <label>翻译服务地址</label>
         <input
           v-model="transcribeForm.translatorBaseUrl"
-          :placeholder="transcribeForm.translatorProvider === 'openai' ? '留空则使用 https://api.openai.com/v1' : 'http://127.0.0.1:11434 或 https://api.xxx/v1'"
+          placeholder="http://127.0.0.1:8000/v1 或 https://api.xxx/v1"
           :disabled="isDisabled('translatorBaseUrl')"
         />
       </div>
@@ -82,17 +76,17 @@
       </div>
     </div>
 
-    <div v-if="transcribeForm.translateTo && transcribeForm.translatorProvider !== 'none'" class="field compact">
+    <div v-if="transcribeForm.translateTo" class="field compact">
       <label>翻译 API Key</label>
       <input
         v-model="transcribeForm.translatorApiKey"
         type="password"
-        :placeholder="transcribeForm.translatorProvider === 'openai' ? 'OpenAI 云端为必填' : '留空则不带 Authorization 头'"
+        placeholder="按兼容服务要求填写，可留空"
         :disabled="isDisabled('translatorApiKey')"
       />
     </div>
 
-    <div v-if="transcribeForm.translateTo && transcribeForm.translatorProvider !== 'none'" class="field compact">
+    <div v-if="transcribeForm.translateTo" class="field compact">
       <label>翻译提示词（可选）</label>
       <textarea
         v-model="transcribeForm.translatorPrompt"
@@ -147,22 +141,6 @@ const translateTargetOptions = computed(() => {
   );
 });
 
-const translatorProviderOptions = computed(() =>
-  allowed("translatorProvider", ["none", "ollama", "openai", "openai_compatible"]).map((value) => ({
-    value,
-    label:
-      value === "none"
-        ? "不启用（不翻译）"
-        : value === "ollama"
-          ? "Ollama"
-          : value === "openai"
-            ? "OpenAI 云端"
-            : value === "openai_compatible"
-              ? "OpenAI 兼容"
-              : value,
-  }))
-);
-
 const runtimeTranslation = computed(() => props.runtimeConfig?.translation || null);
 
 const runtimeSummary = computed(() => {
@@ -172,36 +150,24 @@ const runtimeSummary = computed(() => {
   }
   const model = String(translation.model || "").trim() || "未配置模型";
   const baseUrl = String(translation.base_url || "").trim() || "未配置地址";
-  const providerLabel =
-    translation.provider === "openai"
-      ? "OpenAI 云端"
-      : translation.provider === "openai_compatible"
-        ? "OpenAI 兼容"
-        : translation.provider === "ollama"
-          ? "Ollama"
-          : translation.provider;
-  return `${providerLabel} / ${model} / ${baseUrl}`;
+  return `OpenAI 兼容 / ${model} / ${baseUrl}`;
 });
 
 const translationModeLabel = computed(() => {
   if (!props.transcribeForm.translateTo) return "不翻译";
-  if (props.transcribeForm.translatorProvider === "none") return "翻译已关闭";
-  return "使用本次任务设置";
+  return "OpenAI 兼容";
 });
 
 const translationModeDescription = computed(() => {
   if (!props.transcribeForm.translateTo) {
     return "当前未选择目标语言，本次任务只做转录，不会进入翻译阶段。";
   }
-  if (props.transcribeForm.translatorProvider === "none") {
-    return "当前“翻译提供器”设为“不启用”，表示本次任务不翻译，也不会自动继承后台默认翻译源。";
-  }
-  return "当前任务会严格按这里填写的翻译源执行；如果你想快速沿用后台默认翻译配置，可以直接点“套用后台默认翻译源”。";
+  return "当前任务会使用 OpenAI 兼容格式翻译；如果你想快速沿用后台默认翻译配置，可以直接点“套用后台默认翻译源”。";
 });
 
 const showApplyRuntimeButton = computed(() => {
   const translation = runtimeTranslation.value;
-  return Boolean(props.transcribeForm.translateTo) && translation && translation.provider && translation.provider !== "none";
+  return Boolean(props.transcribeForm.translateTo) && translation && translation.provider === "openai_compatible";
 });
 
 const showDisableTranslationButton = computed(() => Boolean(props.transcribeForm.translateTo));
@@ -209,7 +175,7 @@ const showDisableTranslationButton = computed(() => Boolean(props.transcribeForm
 const applyRuntimeDefaults = () => {
   const translation = runtimeTranslation.value;
   if (!translation) return;
-  props.transcribeForm.translatorProvider = String(translation.provider || "none");
+  props.transcribeForm.translatorProvider = "openai_compatible";
   props.transcribeForm.translatorBaseUrl = String(translation.base_url || "");
   props.transcribeForm.translatorModel = String(translation.model || "");
 };

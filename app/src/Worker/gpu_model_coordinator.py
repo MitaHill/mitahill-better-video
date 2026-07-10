@@ -33,6 +33,48 @@ def release_models_except(active_name: str = ""):
     cleanup_cuda_cache()
 
 
+def release_all_models():
+    with _lock:
+        hooks = list(_release_hooks.items())
+
+    for name, callback in hooks:
+        try:
+            callback()
+        except Exception:
+            logger.warning("Failed to release GPU model: %s", name, exc_info=True)
+
+    cleanup_cuda_cache()
+
+
+def _free_memory_ratio() -> float:
+    if not torch.cuda.is_available():
+        return 1.0
+    try:
+        free_bytes, total_bytes = torch.cuda.mem_get_info()
+    except Exception:
+        return 1.0
+    if total_bytes <= 0:
+        return 1.0
+    return float(free_bytes) / float(total_bytes)
+
+
+def assert_can_load_model(model_name: str = ""):
+    if not torch.cuda.is_available():
+        return
+    free_ratio = _free_memory_ratio()
+    if free_ratio < 0.15:
+        label = str(model_name or "model").strip() or "model"
+        raise RuntimeError(
+            f"GPU memory is insufficient to load {label}. "
+            "No new model was loaded; wait for current GPU work to finish or use a smaller/quantized model."
+        )
+
+
+def prepare_model_load(active_name: str = ""):
+    release_models_except(active_name)
+    assert_can_load_model(active_name)
+
+
 def cleanup_cuda_cache():
     gc.collect()
     if torch.cuda.is_available():

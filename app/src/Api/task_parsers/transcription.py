@@ -24,6 +24,10 @@ def parse_transcription_task_params(form):
         or "none"
     ).strip().lower()
     requested_provider = (form.get("translator_provider", default_provider) or default_provider).strip().lower()
+    if requested_provider in {"openai", "ollama"}:
+        requested_provider = "openai_compatible"
+    if requested_provider not in {"none", "openai_compatible"}:
+        requested_provider = "none"
     default_base_url = (
         defaults.get("translator_base_url", config.TRANSCRIPTION_TRANSLATOR_BASE_URL)
         or ""
@@ -32,8 +36,6 @@ def parse_transcription_task_params(form):
         requested_base_url = str(form.get("translator_base_url") or "").strip()
     else:
         requested_base_url = default_base_url
-    if requested_provider == "openai":
-        requested_base_url = requested_base_url or "https://api.openai.com/v1"
 
     parsed = {
         "task_category": "transcribe",
@@ -68,10 +70,6 @@ def parse_transcription_task_params(form):
             form.get("translator_fallback_mode", defaults.get("translator_fallback_mode", "model_full_text"))
             or defaults.get("translator_fallback_mode", "model_full_text")
             or "model_full_text"
-        ).strip().lower(),
-        "transcribe_runtime_mode": (
-            defaults.get("transcribe_runtime_mode", "parallel")
-            or "parallel"
         ).strip().lower(),
         "translator_timeout_sec": float_from_form(
             form,

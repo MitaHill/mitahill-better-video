@@ -14,11 +14,10 @@ def validate_translation_provider_guard(params):
         return None
     model = str(params.get("translator_model") or "").strip()
     base_url = str(params.get("translator_base_url") or "").strip()
-    api_key = str(params.get("translator_api_key") or "").strip()
-    if provider in {"openai", "openai_compatible"} and not model:
-        return "已启用云端翻译，但未配置翻译模型名。"
-    if provider == "openai" and not api_key:
-        return "已选择 OpenAI 云端翻译，但未配置 API Key。"
-    if provider == "openai_compatible" and not base_url:
-        return "已选择 OpenAI 兼容翻译，但未配置服务地址。"
+    if provider != "openai_compatible":
+        return "当前仅支持 OpenAI 兼容格式的翻译提供器。"
+    if not model:
+        return "已启用翻译，但未配置翻译模型名。"
+    if not base_url:
+        return "已启用翻译，但未配置 OpenAI 兼容服务地址。"
     return None

@@ -51,8 +51,15 @@ process restart loops and import-time resource contention.
 ## Performance and cleanup
 
 - Production logging defaults to `INFO`; avoid tile/frame-level `DEBUG` logs.
-- After model-heavy work, release Python and CUDA memory with `gc.collect()` and
-  `torch.cuda.empty_cache()` where the pipeline owns the model lifecycle.
+- Model-heavy work must go through the lightweight GPU model coordinator.
+  Before loading a model, release other registered models and check free VRAM;
+  if VRAM is insufficient, fail clearly instead of loading another model.
+- After each task, registered GPU models must be released immediately, then
+  Python and CUDA memory should be cleaned with `gc.collect()` and
+  `torch.cuda.empty_cache()`.
+- For old or low-VRAM NVIDIA GPUs such as GTX 960 4G, the minimum transcription
+  target remains faster-whisper medium, but it should run through CTranslate2
+  int8/int8_float32 instead of fp32/fp16.
 - Automatic expired-task deletion is currently disabled. Admin users delete
   completed/failed task files and database records explicitly from the task
   overview table.

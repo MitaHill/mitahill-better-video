@@ -1,10 +1,10 @@
 <template>
   <div class="panel admin-card">
-    <h2>调试工具</h2>
+    <h2>测试</h2>
 
     <div class="inline-grid two" style="margin-top: 10px;">
       <div class="param-section">
-        <div class="param-title">测试转录模型</div>
+        <div class="param-title">转录模型</div>
         <p class="notice" style="margin-bottom: 10px;">步骤：目标解析 -> HASH 校验 -> GPU 热身识别 5 秒静音音频</p>
         <div class="field compact" style="margin-bottom: 10px;">
           <label>测试目标（已安装模型）</label>
@@ -16,7 +16,7 @@
           暂无已安装模型，请先在“模型目录与下载”中下载模型。
         </p>
         <button type="button" :disabled="loadingModel || !selectedTarget" @click="triggerModelTest">
-          {{ loadingModel ? "测试中..." : "测试转录模型" }}
+          {{ loadingModel ? "测试中..." : "开始测试" }}
         </button>
         <div v-if="modelSteps.length" class="debug-step-list">
           <div
@@ -104,10 +104,10 @@
       </div>
 
       <div class="param-section">
-        <div class="param-title">测试翻译源</div>
-        <p class="notice" style="margin-bottom: 10px;">支持 Ollama TCP-PING、模型列表检查、对话耗时评估，以及 OpenAI 兼容错误诊断。</p>
+        <div class="param-title">翻译源</div>
+        <p class="notice" style="margin-bottom: 10px;">使用 OpenAI 兼容 Chat Completions 接口测试当前翻译源。</p>
         <button type="button" :disabled="loadingTranslation" @click="onTestTranslation">
-          {{ loadingTranslation ? "测试中..." : "测试翻译源" }}
+          {{ loadingTranslation ? "测试中..." : "开始测试" }}
         </button>
         <p v-if="translationError" class="notice" style="color: var(--accent-2); margin-top: 8px;">{{ translationError }}</p>
 
@@ -337,8 +337,6 @@ const shortHash = (value) => {
 
 const _translationStepLabel = (name) => {
   const key = String(name || "").trim().toLowerCase();
-  if (key === "tcp_ping") return "TCP 连通性";
-  if (key === "list_models") return "模型列表";
   if (key === "chat") return "对话测试";
   return key || "-";
 };
@@ -371,7 +369,7 @@ const translationResultSummary = computed(() => {
   const statusOk = Boolean(payload.ok);
   return {
     ok: statusOk,
-    provider: String(payload.provider || "-"),
+    provider: String(payload.provider || "-") === "openai_compatible" ? "OpenAI 兼容" : String(payload.provider || "-"),
     elapsedSec: elapsedFromRoot ?? elapsedFromChat,
     speedGrade,
     replyPreview,

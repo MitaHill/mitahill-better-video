@@ -1,13 +1,11 @@
 import logging
 import threading
-import time
 from pathlib import Path
 from typing import Dict, Iterable, List
 
 import torch
 
-from app.src.Database import core as db
-from app.src.Worker.gpu_model_coordinator import is_cuda_oom, register_release_hook, release_models_except
+from app.src.Worker.gpu_model_coordinator import is_cuda_oom, prepare_model_load, register_release_hook
 from app.src.Worker.pipelines.transcription.compute_type import select_faster_whisper_compute_type
 
 
@@ -56,19 +54,6 @@ class WhisperEngine:
         self._backend = safe_backend
         self._model_name = safe_model
 
-    @staticmethod
-    def _wait_until_no_other_processing(task_id: str = "", timeout_sec: float = 1800.0, poll_sec: float = 1.0):
-        deadline = time.time() + max(1.0, float(timeout_sec or 1800.0))
-        while True:
-            processing = db.count_processing_tasks(exclude_task_id=task_id)
-            if processing <= 0:
-                return
-            if time.time() >= deadline:
-                raise TimeoutError(f"waiting for idle processing tasks timed out ({processing} active)")
-            # memory_saving 模式的目标不是“快”，而是主动串行化 GPU 占用。
-            # 因此这里会等待其他任务让出显存，而不是硬上导致多个大模型互相挤爆。
-            time.sleep(max(0.2, float(poll_sec or 1.0)))
-
     def release(self):
         with self._lock:
             if self._model is None:
@@ -83,17 +68,7 @@ class WhisperEngine:
     def _offload_to_cpu(self):
         self.release()
 
-    def after_transcription_step(self, runtime_mode: str = "parallel"):
-        safe_mode = str(runtime_mode or "parallel").strip().lower()
-        if safe_mode != "memory_saving":
-            return
-        time.sleep(1.0)
-        self._offload_to_cpu()
-
-    def finalize_task(self, runtime_mode: str = "parallel"):
-        safe_mode = str(runtime_mode or "parallel").strip().lower()
-        if safe_mode != "memory_saving":
-            return
+    def finalize_task(self):
         self._offload_to_cpu()
 
     def _faster_segments_to_dict(self, segments: Iterable) -> Dict:
@@ -121,23 +96,17 @@ class WhisperEngine:
         temperature=0.0,
         beam_size=5,
         best_of=5,
-        runtime_mode="parallel",
         task_id="",
     ):
         safe_backend = (backend or "faster_whisper").strip().lower()
         safe_model = (model_name or "large-v3").strip().lower()
-        safe_runtime_mode = str(runtime_mode or "parallel").strip().lower()
-
-        if safe_runtime_mode == "memory_saving":
-            # 只有在显存节约模式下，任务才会在开跑前主动等队列清空。
-            self._wait_until_no_other_processing(task_id=task_id, timeout_sec=1800.0, poll_sec=1.0)
 
         with self._lock:
             # 模型按 backend + model 维度做缓存。
             # 同模型复用实例，不同模型切换时才重载，避免每段任务都重新初始化。
             if self._model is None or self._model_name != safe_model or self._backend != safe_backend:
                 try:
-                    release_models_except("faster_whisper")
+                    prepare_model_load("faster_whisper")
                     self._load(safe_backend, safe_model)
                 except RuntimeError as exc:
                     if not is_cuda_oom(exc):
@@ -146,7 +115,7 @@ class WhisperEngine:
                         "CUDA OOM while loading faster-whisper model %s; releasing peer models and retrying once.",
                         safe_model,
                     )
-                    release_models_except("faster_whisper")
+                    prepare_model_load("faster_whisper")
                     self._load(safe_backend, safe_model)
             model = self._model
 

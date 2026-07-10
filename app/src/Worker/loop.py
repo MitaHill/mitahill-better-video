@@ -11,6 +11,7 @@ from app.src.Database import core as db
 from app.src.Database import admin as db_admin
 from app.src.Config import settings as config
 from app.src.Worker.pipelines.dispatch import process_task
+from app.src.Worker.gpu_model_coordinator import release_all_models
 
 logger = logging.getLogger("WORKER")
 
@@ -78,6 +79,7 @@ def worker_loop():
                     logger.error(f"Fatal error during task {task['task_id']}: {e}")
                     db.update_task_status(task['task_id'], "FAILED", message=str(e))
                 finally:
+                    release_all_models()
                     gc.collect()
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()

@@ -70,13 +70,13 @@ entry and admin transcription tools.
 
 Fields:
 - `media_files` (required, multiple; also compatible with `files` / `file`)
-- `transcription_backend` (`whisper` | `faster_whisper`)
+- `transcription_backend` (`faster_whisper`)
 - `transcribe_mode` (`subtitle_zip` | `subtitled_video` | `subtitle_and_video_zip`)
 - `subtitle_format` (`srt` | `vtt`)
 - `whisper_model`
 - `language`
 - `translate_to`
-- `translator_provider` (`none` | `ollama` | `openai_compatible`)
+- `translator_provider` (`none` | `openai_compatible`)
 - `translator_base_url`
 - `translator_model`
 - `translator_api_key`
@@ -221,13 +221,13 @@ Request (example):
 ```json
 {
   "transcription": {
-    "backend": "whisper",
+    "backend": "faster_whisper",
     "active_model": "large-v3",
     "allowed_models": ["small", "medium", "large-v3", "turbo"]
   },
   "translation": {
-    "provider": "ollama",
-    "base_url": "http://127.0.0.1:11434",
+    "provider": "openai_compatible",
+    "base_url": "http://127.0.0.1:8000/v1",
     "model": "qwen2.5:7b",
     "timeout_sec": 120
   },
@@ -255,7 +255,7 @@ Header:
 
 Request:
 ```json
-{ "backend": "whisper", "model_id": "large-v3" }
+{ "backend": "faster_whisper", "model_id": "large-v3" }
 ```
 
 ### GET /api/admin/transcription/models/downloads
@@ -296,7 +296,6 @@ Header:
 - `Authorization: Bearer <token>`
 
 执行翻译源测试：
-- `ollama`: TCP-PING(3秒) -> 模型列表检查 -> 对话测速(60秒超时)
 - `openai_compatible`: Chat Completions 调用 + 常见错误分类
 
 ### GET /api/admin/logs

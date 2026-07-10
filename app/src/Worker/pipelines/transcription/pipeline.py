@@ -129,14 +129,11 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
             temperature=options.get("temperature", 0.0),
             beam_size=options.get("beam_size", 5),
             best_of=options.get("best_of", 5),
-            runtime_mode=options.get("transcribe_runtime_mode", "parallel"),
             task_id=task_id,
         )
         source_segments = _extract_segments(result)
         if not source_segments:
             raise RuntimeError(f"no transcript segments extracted from {media_item.get('filename')}")
-
-        ENGINE.after_transcription_step(runtime_mode=options.get("transcribe_runtime_mode", "parallel"))
 
         subtitle_ext = _subtitle_suffix(options.get("subtitle_format", "srt"))
         text_outputs = []
@@ -268,7 +265,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 {
                     "task_id": task_id,
                     "source_file": media_item,
-                    "runtime_mode": options.get("transcribe_runtime_mode", "parallel"),
+                    "runtime_mode": "scheduler",
                     "transcription_backend": options.get("transcription_backend", "faster_whisper"),
                     "whisper_model": options.get("whisper_model", "large-v3"),
                     "translate_to": options.get("translate_to", ""),
@@ -360,7 +357,7 @@ def process_transcription_task(task):
         raise
     finally:
         try:
-            ENGINE.finalize_task(runtime_mode=options.get("transcribe_runtime_mode", "parallel"))
+            ENGINE.finalize_task()
         except Exception:
             logger.warning("Task %s engine finalize failed", task_id, exc_info=True)
         if translator:
