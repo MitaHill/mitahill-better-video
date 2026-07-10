@@ -1,4 +1,5 @@
 import hashlib
+import gc
 import logging
 import os
 import tempfile
@@ -8,6 +9,8 @@ from pathlib import Path
 from typing import Dict
 
 import requests
+
+from app.src.Worker.gpu_model_coordinator import release_all_models
 
 from .transcription_catalog import get_model_entry, get_storage_roots
 
@@ -138,6 +141,7 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
     device = "cuda" if torch.cuda.is_available() else ""
 
     wav_path = _build_silent_wav()
+    model = None
     try:
         if backend != "whisper":
             raise RuntimeError(f"Unsupported backend: {backend}")
@@ -146,12 +150,10 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
 
         import whisper
 
-        major, _minor = torch.cuda.get_device_capability(0)
-        fp16 = int(major) >= 7
+        release_all_models()
+        fp16 = True
         model = whisper.load_model(model_id, device=device, download_root=str(local_path.parent))
         model.transcribe(str(wav_path), beam_size=1, language="en", fp16=fp16)
-        del model
-        torch.cuda.empty_cache()
 
         elapsed = time.time() - started
         return {
@@ -176,6 +178,13 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
             "message": str(exc),
         }
     finally:
+        try:
+            del model
+        except Exception:
+            pass
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         try:
             wav_path.unlink(missing_ok=True)
         except Exception:

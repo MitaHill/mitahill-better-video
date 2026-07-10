@@ -27,8 +27,7 @@ class WhisperEngine:
         register_release_hook("whisper", self.release)
 
     def _resolve_fp16(self) -> bool:
-        major, _minor = torch.cuda.get_device_capability(0)
-        return int(major) >= 7
+        return torch.cuda.is_available()
 
     def _require_downloaded_model(self, model_name: str):
         urls = getattr(whisper, "_MODELS", {}) or {}
