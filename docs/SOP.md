@@ -57,6 +57,9 @@ process restart loops and import-time resource contention.
 - After each task, registered GPU models must be released immediately, then
   Python and CUDA memory should be cleaned with `gc.collect()` and
   `torch.cuda.empty_cache()`.
+- Subtitle burn-in must use a safe temporary subtitle path under
+  `/workspace/storage/tmp/subtitles/`, such as `render_subtitle_<hash>.srt`,
+  and delete it immediately after ffmpeg exits.
 - Transcription uses original OpenAI Whisper only. CUDA is required; do not add
   CPU fallback paths. On old NVIDIA GPUs such as GTX 960 4G, run Whisper with
   `fp16=False`. If `medium` does not fit VRAM on a target machine, fail clearly

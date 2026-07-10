@@ -1,4 +1,6 @@
+import hashlib
 import json
+import shutil
 import zipfile
 from pathlib import Path
 
@@ -73,6 +75,14 @@ def _subtitle_filter_arg(subtitle_path):
 def render_subtitled_video(video_path, subtitle_path, output_path, codec_key, audio_bitrate_k):
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    source_subtitle = Path(subtitle_path)
+    subtitle_suffix = source_subtitle.suffix or ".srt"
+    subtitle_tmp_dir = Path("/workspace/storage/tmp/subtitles")
+    subtitle_tmp_dir.mkdir(parents=True, exist_ok=True)
+    subtitle_hash = hashlib.sha1(str(output_path).encode("utf-8")).hexdigest()[:12]
+    render_subtitle = subtitle_tmp_dir / f"render_subtitle_{subtitle_hash}{subtitle_suffix}"
+    render_subtitle.unlink(missing_ok=True)
+    shutil.copy2(source_subtitle, render_subtitle)
     gpu_codec = "h264_nvenc"
     cpu_codec = "libx264"
     if (codec_key or "").lower() in {"h265", "hevc"}:
@@ -85,7 +95,7 @@ def render_subtitled_video(video_path, subtitle_path, output_path, codec_key, au
         "-i",
         str(video_path),
         "-vf",
-        _subtitle_filter_arg(subtitle_path),
+        _subtitle_filter_arg(render_subtitle),
         "-c:v",
         video_codec,
         "-c:a",
@@ -100,7 +110,7 @@ def render_subtitled_video(video_path, subtitle_path, output_path, codec_key, au
         "-i",
         str(video_path),
         "-vf",
-        _subtitle_filter_arg(subtitle_path),
+        _subtitle_filter_arg(render_subtitle),
         "-c:v",
         cpu_codec,
         "-c:a",
@@ -109,7 +119,10 @@ def render_subtitled_video(video_path, subtitle_path, output_path, codec_key, au
         f"{max(32, int(audio_bitrate_k or 192))}k",
         str(output_path),
     ]
-    run_ffmpeg(base_cmd, fallback_args=fallback_cmd)
+    try:
+        run_ffmpeg(base_cmd, fallback_args=fallback_cmd)
+    finally:
+        render_subtitle.unlink(missing_ok=True)
     return output_path
 
 
