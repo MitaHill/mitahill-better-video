@@ -125,7 +125,7 @@ def _run_faster_download(job_id: str, model_entry: Dict, aria2_config: Dict):
         raise RuntimeError("faster-whisper 模型缺少 repo_id")
 
     remote = fetch_hf_model_files(repo_id)
-    required_files = get_faster_required_files()
+    required_files = get_faster_required_files(model_entry.get("model_id"), remote)
     local_dir = Path(model_entry.get("local_path") or "")
     local_dir.mkdir(parents=True, exist_ok=True)
 

@@ -31,6 +31,12 @@ _FASTER_REQUIRED_FILES = [
     "model.bin",
     "tokenizer.json",
 ]
+_FASTER_VOCAB_BY_MODEL = {
+    "large-v3": "vocabulary.json",
+    "distil-large-v2": "vocabulary.json",
+    "distil-large-v3": "vocabulary.json",
+}
+_FASTER_VOCAB_FILES = ("vocabulary.txt", "vocabulary.json")
 
 def get_storage_roots() -> Dict[str, Path]:
     return {
@@ -39,8 +45,13 @@ def get_storage_roots() -> Dict[str, Path]:
     }
 
 
-def get_faster_required_files() -> List[str]:
-    return list(_FASTER_REQUIRED_FILES)
+def get_faster_required_files(model_id: str = "", remote_files: Optional[Dict[str, Dict]] = None) -> List[str]:
+    required = list(_FASTER_REQUIRED_FILES)
+    remote = remote_files or {}
+    remote_vocab = next((name for name in _FASTER_VOCAB_FILES if name in remote), "")
+    model_vocab = _FASTER_VOCAB_BY_MODEL.get(str(model_id or "").strip().lower(), "vocabulary.txt")
+    required.append(remote_vocab or model_vocab)
+    return required
 
 
 def get_models_for_backend(backend: str) -> List[str]:
@@ -81,7 +92,7 @@ def build_faster_model_entry(model_id: str) -> Optional[Dict]:
     if not meta:
         return None
     local_dir = _FASTER_STORAGE_ROOT / model_id
-    required_files = get_faster_required_files()
+    required_files = get_faster_required_files(model_id)
     return {
         "model_id": model_id,
         "label": model_id,
