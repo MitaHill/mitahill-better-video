@@ -62,8 +62,8 @@ Returns `{"status":"ok"}` when backend is alive.
 
 ## Transcription APIs
 
-Transcription backend APIs are retained, but frontend transcription entry points
-are currently hidden.
+Transcription backend APIs are exposed through the workbench transcription
+entry and admin transcription tools.
 
 ### POST /api/transcriptions
 **Content-Type**: multipart/form-data

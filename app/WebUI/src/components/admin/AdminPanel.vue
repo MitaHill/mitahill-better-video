@@ -267,6 +267,18 @@ const menuTree = Object.freeze([
           { key: "logs_warn", label: "系统日志", keywords: "log warn error warning 系统 日志" },
         ]),
       },
+      {
+        key: "runtime_transcribe",
+        label: "转录中心",
+        keywords: "transcribe transcription subtitle whisper model translate 转录 字幕 模型 翻译",
+        children: Object.freeze([
+          { key: "transcribe_cfg_model", label: "转录模型设置", keywords: "transcribe whisper model faster 模型 设置" },
+          { key: "transcribe_cfg_translation", label: "翻译源设置", keywords: "translate provider ollama openai 翻译 源" },
+          { key: "transcribe_cfg_catalog", label: "转录模型目录", keywords: "catalog download model transcription 模型 目录 下载" },
+          { key: "debug_model", label: "测试转录模型", keywords: "debug test transcription whisper 调试 测试 转录" },
+          { key: "debug_translate", label: "测试翻译源", keywords: "debug test translate provider 调试 测试 翻译" },
+        ]),
+      },
     ]),
   },
   {
@@ -473,6 +485,10 @@ const loadByMenuKey = async (value) => {
   if (value === "debug_model") {
     await fetchTranscriptionConfig();
     await fetchTranscriptionModels();
+    return;
+  }
+  if (value === "debug_translate") {
+    await fetchTranscriptionConfig();
     return;
   }
   if (value === "logs_warn") {

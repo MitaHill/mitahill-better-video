@@ -1,9 +1,8 @@
 # MitaHill Better Video
 
 Flask + Vue web UI for video/image processing around Real-ESRGAN. The current
-frontend exposes enhancement, conversion, watermark/download workflows, and an
-admin console. Transcription backend APIs still exist, but transcription entry
-points are intentionally hidden from the frontend for now.
+frontend exposes enhancement, conversion, transcription, watermark/download
+workflows, and an admin console.
 
 ## Main capabilities
 

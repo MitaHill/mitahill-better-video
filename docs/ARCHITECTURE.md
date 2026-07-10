@@ -58,8 +58,8 @@
 ## Frontend Maintainability Rule
 - Do not reintroduce large single-file page components.
 - Keep page files focused on composition, move domain logic to composables, and move view sections to dedicated components.
-- Transcription frontend components may remain in the source tree, but
-  transcription entry points are intentionally hidden from the active UI.
+- Transcription frontend components are exposed through the main workbench and
+  admin console; keep future changes modular instead of rebuilding a large page.
 
 ## Storage
 - SQLite: `/workspace/storage/data/tasks.db`
