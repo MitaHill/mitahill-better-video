@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 import requests
 
 
+CONTEXT_WINDOW_SIZE = 20
 _CODE_BLOCK_RE = re.compile(r"```(?:[a-zA-Z]+)?\s*([\s\S]*?)```", re.MULTILINE)
 _THINK_TAG_RE = re.compile(r"<think>[\s\S]*?</think>", re.IGNORECASE)
 _LANGUAGE_NAME_MAP = {
@@ -59,7 +60,7 @@ class BaseTranslator:
         mode = str(fallback_mode or "model_full_text").strip().lower()
         self.fallback_mode = mode if mode in {"model_full_text", "source_text"} else "model_full_text"
 
-    def translate_text(self, text: str, target_language: str) -> str:
+    def translate_text(self, text: str, target_language: str, context_pairs=None) -> str:
         raise NotImplementedError
 
     @staticmethod
@@ -127,20 +128,17 @@ class BaseTranslator:
         code, name, display = cls._resolve_target_language(target_language)
         resolved_custom = cls._render_custom_prompt(custom_prompt, target_language)
         target_line = f"Target language: {display}" if code else f"Target language: {name}"
-        strict_rules = (
-            "You are a professional translation engine for transcription segments.\n"
+        base_prompt = (
+            "You are translating transcription subtitles.\n"
             f"{target_line}\n"
-            "Return translated text only, with no explanations.\n"
-            "Preserve original line breaks and text structure.\n"
-            "Keep numbers, punctuation, URLs, emails, and IDs unchanged unless translation is required.\n"
-            "Do not translate placeholders or markup, such as {name}, [MASK], <tag>, %s, ${VAR}.\n"
-            "If the source text is empty, return an empty string."
+            "Use previous messages only as context.\n"
+            "Translate only the latest user message.\n"
+            "Put the final translation inside one code block.\n"
+            "If you need to explain anything, put it outside the code block."
         )
         if resolved_custom:
-            # 自定义 prompt 放前面，但后面仍强接一段硬约束。
-            # 这样既保留用户定制空间，又尽量防止 prompt 把返回格式带跑偏。
-            return f"{resolved_custom}\n\n{strict_rules}"
-        return strict_rules
+            return f"{resolved_custom}\n\n{base_prompt}"
+        return base_prompt
 
 
 def _strip_known_endpoint_suffix(base_url: str) -> str:
@@ -167,18 +165,31 @@ class OpenAICompatibleTranslator(BaseTranslator):
     def _endpoint(self) -> str:
         return _normalize_openai_compatible_endpoint(self.base_url)
 
-    def translate_text(self, text: str, target_language: str) -> str:
+    @staticmethod
+    def _context_messages(context_pairs):
+        messages = []
+        pairs = context_pairs or []
+        for item in pairs[-CONTEXT_WINDOW_SIZE:]:
+            source = str((item or {}).get("source_text") or "").strip()
+            translated = str((item or {}).get("translated_text") or "").strip()
+            if not source or not translated:
+                continue
+            messages.append({"role": "user", "content": source})
+            messages.append({"role": "assistant", "content": f"```\n{translated}\n```"})
+        return messages
+
+    def translate_text(self, text: str, target_language: str, context_pairs=None) -> str:
         if not self.base_url or not self.model:
             raise ValueError("OpenAI-compatible translator requires translator_base_url and translator_model.")
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        messages = [{"role": "system", "content": self._system_prompt(target_language, self.prompt)}]
+        messages.extend(self._context_messages(context_pairs))
+        messages.append({"role": "user", "content": str(text or "")})
         payload = {
             "model": self.model,
-            "messages": [
-                {"role": "system", "content": self._system_prompt(target_language, self.prompt)},
-                {"role": "user", "content": str(text or "")},
-            ],
+            "messages": messages,
             "temperature": 0.2,
             "stream": False,
         }

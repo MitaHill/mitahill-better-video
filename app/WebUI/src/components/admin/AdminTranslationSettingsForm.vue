@@ -51,11 +51,11 @@
         <code v-pre>{{target_language_code}}</code>（示例: zh）。
       </p>
       <p class="notice" style="margin-top: 6px;">
-        程序执行顺序：变量替换 -> 自动追加系统严格规则 -> 发送给翻译模型。
-        系统严格规则会要求：仅输出译文、保留行结构、保留占位符/标记。
+        程序执行顺序：变量替换 -> 自动追加简短系统规则 -> 携带最近 20 轮上下文发送给翻译模型。
+        模型只需要翻译最后一条用户输入。
       </p>
       <p class="notice" style="margin-top: 6px;">
-        返回解析顺序：若模型输出包含代码块 <code>```...```</code>，优先提取代码块正文；
+        返回解析顺序：若模型输出包含代码块 <code>```译文```</code>，优先提取代码块正文；
         若没有代码块，则按“极端情况回退策略”决定使用“模型返回全文”或“原始待翻译文本”。
       </p>
 
@@ -70,21 +70,18 @@
         <div class="notice mono" style="margin-top: 8px; white-space: pre-wrap;">
 【模板A：通用稳健】
 Translate to {{target_language}}.
-Keep original line breaks and segment boundaries.
-Preserve placeholders and markup exactly: {name}, [MASK], &lt;tag&gt;, %s, ${VAR}.
-Do not add explanations or notes.
+Use recent subtitle context.
+Put the translation in a code block.
 
 【模板B：字幕保形】
 Translate subtitles into {{target_language_name}} ({{target_language_code}}).
-Keep each line aligned to the source line order.
-Do not merge/split lines unless necessary for grammar.
-Keep timestamps, numbers, URLs, emails, IDs unchanged.
+Keep names, numbers, and placeholders stable.
+Put the translation in a code block.
 
 【模板C：术语优先】
 Translate to {{target_language}} with technical accuracy.
-Prefer standard technical terminology in {{target_language_name}}.
-Keep product names, APIs, code identifiers, and file paths unchanged.
-If a term should remain untranslated, keep it as is.
+Use consistent terminology from context.
+Put the translation in a code block.
         </div>
       </details>
 
@@ -103,7 +100,7 @@ If a term should remain untranslated, keep it as is.
         </div>
       </div>
       <div class="field compact">
-        <label>最终系统提示词预览（变量替换 + 严格规则）</label>
+        <label>最终系统提示词预览（变量替换 + 简短规则）</label>
         <textarea :value="previewSystemPrompt" rows="11" readonly />
       </div>
     </div>
@@ -160,21 +157,18 @@ const local = reactive({
 const PROMPT_TEMPLATES = Object.freeze({
   general: [
     "Translate to {{target_language}}.",
-    "Keep original line breaks and segment boundaries.",
-    "Preserve placeholders and markup exactly: {name}, [MASK], <tag>, %s, ${VAR}.",
-    "Do not add explanations or notes.",
+    "Use recent subtitle context.",
+    "Put the translation in a code block.",
   ].join("\n"),
   subtitle: [
     "Translate subtitles into {{target_language_name}} ({{target_language_code}}).",
-    "Keep each line aligned to the source line order.",
-    "Do not merge/split lines unless necessary for grammar.",
-    "Keep timestamps, numbers, URLs, emails, IDs unchanged.",
+    "Keep names, numbers, and placeholders stable.",
+    "Put the translation in a code block.",
   ].join("\n"),
   technical: [
     "Translate to {{target_language}} with technical accuracy.",
-    "Prefer standard technical terminology in {{target_language_name}}.",
-    "Keep product names, APIs, code identifiers, and file paths unchanged.",
-    "If a term should remain untranslated, keep it as is.",
+    "Use consistent terminology from context.",
+    "Put the translation in a code block.",
   ].join("\n"),
 });
 
@@ -231,13 +225,12 @@ const buildStrictRules = (targetLanguage) => {
   const meta = resolveTargetLanguageMeta(targetLanguage);
   const targetLine = meta.code ? `Target language: ${meta.display}` : `Target language: ${meta.name}`;
   return [
-    "You are a professional translation engine for transcription segments.",
+    "You are translating transcription subtitles.",
     targetLine,
-    "Return translated text only, with no explanations.",
-    "Preserve original line breaks and text structure.",
-    "Keep numbers, punctuation, URLs, emails, and IDs unchanged unless translation is required.",
-    "Do not translate placeholders or markup, such as {name}, [MASK], <tag>, %s, ${VAR}.",
-    "If the source text is empty, return an empty string.",
+    "Use previous messages only as context.",
+    "Translate only the latest user message.",
+    "Put the final translation inside one code block.",
+    "If you need to explain anything, put it outside the code block.",
   ].join("\n");
 };
 

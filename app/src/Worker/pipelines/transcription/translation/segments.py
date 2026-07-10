@@ -6,6 +6,8 @@ from typing import Callable, List, Optional
 
 import requests
 
+from .providers import CONTEXT_WINDOW_SIZE
+
 
 logger = logging.getLogger("TRANSCRIBE_TRANSLATION")
 
@@ -63,6 +65,16 @@ def _write_cached_translation(checkpoint_segments, idx, source_text, translated_
     }
 
 
+def _append_context(context_pairs, source_text, translated_text):
+    source = str(source_text or "").strip()
+    translated = str(translated_text or "").strip()
+    if not source or not translated:
+        return
+    context_pairs.append({"source_text": source, "translated_text": translated})
+    if len(context_pairs) > CONTEXT_WINDOW_SIZE:
+        del context_pairs[:-CONTEXT_WINDOW_SIZE]
+
+
 def translate_segments(
     segments,
     translator,
@@ -75,6 +87,7 @@ def translate_segments(
         return list(payload)
 
     translated: List[dict] = []
+    context_pairs = []
     total = len(payload)
     timeout_circuit_open = False
     checkpoint_segments = _load_checkpoint(checkpoint_path)
@@ -86,6 +99,7 @@ def translate_segments(
         if cached_text is not None:
             current["text"] = cached_text
             translated.append(current)
+            _append_context(context_pairs, text, current["text"])
             if progress_callback:
                 progress_callback(idx, total)
             continue
@@ -102,6 +116,7 @@ def translate_segments(
         if timeout_circuit_open:
             current["text"] = translator.fallback_text(text)
             translated.append(current)
+            _append_context(context_pairs, text, current["text"])
             _write_cached_translation(checkpoint_segments, idx, text, current["text"])
             _save_checkpoint(checkpoint_path, checkpoint_segments)
             if progress_callback:
@@ -109,7 +124,7 @@ def translate_segments(
             continue
 
         try:
-            current["text"] = translator.translate_text(text, target_language)
+            current["text"] = translator.translate_text(text, target_language, context_pairs=context_pairs)
         except requests.exceptions.ReadTimeout as exc:
             timeout_circuit_open = True
             logger.warning(
@@ -130,6 +145,7 @@ def translate_segments(
         else:
             current["text"] = _normalize_segment_text(current.get("text", ""))
         translated.append(current)
+        _append_context(context_pairs, text, current["text"])
         _write_cached_translation(checkpoint_segments, idx, text, current["text"])
         _save_checkpoint(checkpoint_path, checkpoint_segments)
         if progress_callback:
