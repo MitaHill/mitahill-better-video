@@ -84,18 +84,9 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     ).strip().lower()
 
     backend_supported = get_models_for_backend(backend)
-    allowed = merged["transcription"].get("allowed_models") or []
-    if not isinstance(allowed, list):
-        allowed = []
-    merged["transcription"]["allowed_models"] = [
-        str(item).strip().lower() for item in allowed if str(item).strip()
-    ]
-    # 模型设置页已移除：管理端不再用白名单限制模型选择。
-    # 这里保留所有已知 Whisper 模型，并允许数据库里的自定义模型 ID 留存。
-    # 任务提交时的模型是否可运行，交给实际本地模型文件和加载流程判断。
-    merged["transcription"]["allowed_models"] = sorted(
-        set(backend_supported) | set(merged["transcription"]["allowed_models"])
-    )
+    if merged["transcription"]["active_model"] not in set(backend_supported):
+        merged["transcription"]["active_model"] = "medium"
+    merged["transcription"]["allowed_models"] = list(backend_supported)
 
     provider = str(merged["translation"].get("provider") or "none").strip().lower()
     if provider in {"openai", "ollama"}:
