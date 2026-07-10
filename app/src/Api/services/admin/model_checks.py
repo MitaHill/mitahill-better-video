@@ -10,7 +10,10 @@ from typing import Dict, List
 
 import requests
 
-from app.src.Worker.pipelines.transcription.compute_type import inspect_faster_whisper_compute_types
+from app.src.Worker.pipelines.transcription.compute_type import (
+    inspect_faster_whisper_compute_types,
+    resolve_faster_whisper_device,
+)
 
 from .transcription_catalog import fetch_hf_model_files, get_model_entry, get_storage_roots
 
@@ -235,7 +238,7 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
     try:
         import torch
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = resolve_faster_whisper_device("cuda" if torch.cuda.is_available() else "cpu")
     except Exception:
         device = "cpu"
 

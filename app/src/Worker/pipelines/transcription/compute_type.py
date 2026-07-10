@@ -6,6 +6,45 @@ _CUDA_PREFERRED = ("float16", "int8_float16", "int8_float32", "int8", "float32")
 _CPU_PREFERRED = ("int8", "int8_float32", "float32")
 
 
+def _cuda_compute_capability():
+    try:
+        import torch
+
+        if not torch.cuda.is_available():
+            return None
+        major, minor = torch.cuda.get_device_capability(0)
+        return int(major), int(minor)
+    except Exception as exc:
+        logger.warning("Unable to query CUDA compute capability: %s", exc)
+        return None
+
+
+def resolve_faster_whisper_device(preferred_device: str = "") -> str:
+    safe_device = str(preferred_device or "").strip().lower()
+    if safe_device not in {"cuda", "cpu"}:
+        try:
+            import torch
+
+            safe_device = "cuda" if torch.cuda.is_available() else "cpu"
+        except Exception:
+            safe_device = "cpu"
+
+    if safe_device != "cuda":
+        return "cpu"
+
+    capability = _cuda_compute_capability()
+    if capability and capability[0] <= 6:
+        logger.warning(
+            "CUDA device compute capability %s.%s is not reliable with faster-whisper/CTranslate2 CUDA wheels; "
+            "falling back to CPU int8.",
+            capability[0],
+            capability[1],
+        )
+        return "cpu"
+
+    return "cuda"
+
+
 def get_supported_compute_types(device: str):
     safe_device = str(device or "cpu").strip().lower()
     try:
@@ -18,7 +57,7 @@ def get_supported_compute_types(device: str):
 
 
 def select_faster_whisper_compute_type(device: str) -> str:
-    safe_device = str(device or "cpu").strip().lower()
+    safe_device = resolve_faster_whisper_device(device)
     preferred = _CUDA_PREFERRED if safe_device == "cuda" else _CPU_PREFERRED
     supported = get_supported_compute_types(safe_device)
 
@@ -35,11 +74,15 @@ def select_faster_whisper_compute_type(device: str) -> str:
 
 
 def inspect_faster_whisper_compute_types(device: str):
-    safe_device = str(device or "cpu").strip().lower()
+    requested_device = str(device or "cpu").strip().lower()
+    safe_device = resolve_faster_whisper_device(requested_device)
     preferred = _CUDA_PREFERRED if safe_device == "cuda" else _CPU_PREFERRED
     supported = sorted(get_supported_compute_types(safe_device))
+    capability = _cuda_compute_capability() if requested_device == "cuda" else None
     return {
+        "requested_device": requested_device,
         "device": safe_device,
+        "cuda_compute_capability": f"{capability[0]}.{capability[1]}" if capability else "",
         "supported": supported,
         "preferred_order": list(preferred),
         "selected": select_faster_whisper_compute_type(safe_device),

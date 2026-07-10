@@ -6,7 +6,10 @@ from typing import Dict, Iterable, List
 import torch
 
 from app.src.Worker.gpu_model_coordinator import is_cuda_oom, prepare_model_load, register_release_hook
-from app.src.Worker.pipelines.transcription.compute_type import select_faster_whisper_compute_type
+from app.src.Worker.pipelines.transcription.compute_type import (
+    resolve_faster_whisper_device,
+    select_faster_whisper_compute_type,
+)
 
 
 _FASTER_ROOT = Path("/workspace/storage/models/transcription/faster-whisper")
@@ -21,7 +24,7 @@ class WhisperEngine:
         self._model_name = ""
         self._model_backend_device = ""
         self._model = None
-        self._device = "cuda" if torch.cuda.is_available() else "cpu"
+        self._device = resolve_faster_whisper_device("cuda" if torch.cuda.is_available() else "cpu")
         _FASTER_ROOT.mkdir(parents=True, exist_ok=True)
         register_release_hook("faster_whisper", self.release)
 
@@ -45,7 +48,8 @@ class WhisperEngine:
 
         model_ref = self._resolve_faster_model_ref(safe_model)
         # 这里不再保留普通 whisper 的分支，整个系统只接受 faster-whisper。
-        # compute_type 必须按 ctranslate2 实际支持选择；旧 NVIDIA 架构可能只支持 float32。
+        # compute_type 必须按 ctranslate2 实际支持选择；旧 NVIDIA 架构会回退 CPU/int8。
+        self._device = resolve_faster_whisper_device("cuda" if torch.cuda.is_available() else "cpu")
         compute_type = select_faster_whisper_compute_type(self._device)
         logger.info("Loading faster-whisper model %s on %s with compute_type=%s", safe_model, self._device, compute_type)
         self._model = WhisperModel(model_ref, device=self._device, compute_type=compute_type)

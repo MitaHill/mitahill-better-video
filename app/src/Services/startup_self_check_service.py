@@ -14,6 +14,7 @@ from app.src.Api.services import create_enhance_task
 from app.src.Config import settings as config
 from app.src.Database import admin as db_admin
 from app.src.Database import core as db
+from app.src.Worker.gpu_model_coordinator import release_all_models
 from app.src.Worker.pipelines.dispatch import process_task
 from app.src.Worker.pipelines.transcription.compute_type import inspect_faster_whisper_compute_types
 
@@ -55,6 +56,7 @@ class StartupSelfCheckService:
             logger.error("Startup self-check traceback:\n%s", traceback.format_exc())
             raise RuntimeError(f"启动自检失败: {exc}") from exc
         finally:
+            release_all_models()
             self._cleanup_task(task_id)
             self.cleanup_workspace()
             self._cleanup_memory()
