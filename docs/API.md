@@ -209,7 +209,7 @@ Request:
 Header:
 - `Authorization: Bearer <token>`
 
-读取“转录模型设置 + 翻译源设置 + aria2下载参数”。
+读取转录与翻译配置。管理页面当前仅暴露翻译源设置；转录模型由任务创建页选择，后端不再提供模型目录下载管理 API。
 
 ### PUT /api/admin/config/transcription-sources
 Header:
@@ -230,45 +230,9 @@ Request (example):
     "base_url": "http://127.0.0.1:8000/v1",
     "model": "qwen2.5:7b",
     "timeout_sec": 120
-  },
-  "download": {
-    "aria2": {
-      "split": 16,
-      "max_connection_per_server": 16,
-      "proxy": "socks5://127.0.0.1:1080"
-    }
   }
 }
 ```
-
-### GET /api/admin/transcription/models
-Header:
-- `Authorization: Bearer <token>`
-
-返回 whisper / faster-whisper 模型目录，以及本地安装状态。
-
-### POST /api/admin/transcription/models/download
-Header:
-- `Authorization: Bearer <token>`
-
-启动模型下载任务（aria2，支持断点续传）。
-
-Request:
-```json
-{ "backend": "faster_whisper", "model_id": "large-v3" }
-```
-
-### GET /api/admin/transcription/models/downloads
-Header:
-- `Authorization: Bearer <token>`
-
-查看模型下载任务列表（状态、进度、错误信息）。
-
-### GET /api/admin/transcription/models/downloads/<job_id>
-Header:
-- `Authorization: Bearer <token>`
-
-查看单个模型下载任务详情。
 
 ### POST /api/admin/debug/test-transcription-model
 Header:

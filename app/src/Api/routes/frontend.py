@@ -1,4 +1,4 @@
-from flask import Blueprint, send_file, send_from_directory
+from flask import Blueprint, jsonify, send_file, send_from_directory
 
 from ..constants import FRONTEND_DIST_DIR
 
@@ -29,6 +29,8 @@ def favicon():
 
 @bp.get("/<path:_path>")
 def spa_fallback(_path):
+    if str(_path or "").startswith("api/"):
+        return jsonify({"error": "api endpoint not found"}), 404
     static_candidate = FRONTEND_DIST_DIR / _path
     if static_candidate.is_file():
         return send_from_directory(FRONTEND_DIST_DIR, _path)

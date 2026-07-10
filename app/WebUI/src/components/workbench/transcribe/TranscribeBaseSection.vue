@@ -113,7 +113,21 @@ const subtitleFormatOptions = computed(() =>
 );
 
 const whisperModelOptions = computed(() =>
-  allowed("whisperModel", ["small", "medium", "large-v3", "distil-large-v2", "distil-large-v3"])
+  allowed("whisperModel", [
+    "tiny",
+    "tiny.en",
+    "base",
+    "base.en",
+    "small",
+    "small.en",
+    "medium",
+    "medium.en",
+    "large-v1",
+    "large-v2",
+    "large-v3",
+    "distil-large-v2",
+    "distil-large-v3",
+  ])
 );
 
 const languageOptions = computed(() => {

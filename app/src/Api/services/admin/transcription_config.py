@@ -15,11 +15,6 @@ _VALID_BACKENDS = {"faster_whisper"}
 _VALID_TRANSLATORS = {"none", "openai_compatible"}
 _VALID_TRANSLATION_FALLBACK_MODES = {"model_full_text", "source_text"}
 
-_DEFAULT_MODEL_BY_BACKEND = {
-    "faster_whisper": "large-v3",
-}
-
-
 def default_transcription_config() -> Dict[str, Any]:
     return {
         "version": 1,
@@ -91,32 +86,19 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
         merged["transcription"].get("active_model") or "large-v3"
     ).strip().lower()
 
+    backend_supported = get_models_for_backend(backend)
     allowed = merged["transcription"].get("allowed_models") or []
     if not isinstance(allowed, list):
         allowed = []
     merged["transcription"]["allowed_models"] = [
         str(item).strip().lower() for item in allowed if str(item).strip()
     ]
-    backend_supported = get_models_for_backend(backend)
-    backend_supported_set = {str(item).strip().lower() for item in backend_supported}
-    merged["transcription"]["allowed_models"] = [
-        item for item in merged["transcription"]["allowed_models"] if item in backend_supported_set
-    ]
-    active_model = str(merged["transcription"].get("active_model") or "").strip().lower()
-    if active_model not in backend_supported_set:
-        # 如果当前活动模型已经不兼容，就按“默认模型 -> 允许列表 -> 后端首选”顺序回退。
-        # 目的不是保留原值，而是保证任何时候都能落到一个可运行模型。
-        compatible_from_allowed = [
-            item for item in merged["transcription"]["allowed_models"] if item in backend_supported_set
-        ]
-        preferred = _DEFAULT_MODEL_BY_BACKEND.get(backend, "large-v3")
-        if preferred in backend_supported_set:
-            fallback_model = preferred
-        elif compatible_from_allowed:
-            fallback_model = compatible_from_allowed[0]
-        else:
-            fallback_model = backend_supported[0] if backend_supported else "large-v3"
-        merged["transcription"]["active_model"] = fallback_model
+    # 模型设置页已移除：管理端不再用白名单限制模型选择。
+    # 这里保留所有已知 faster-whisper 模型，并允许数据库里的自定义模型 ID 留存。
+    # 任务提交时的模型是否可运行，交给实际本地模型文件和加载流程判断。
+    merged["transcription"]["allowed_models"] = sorted(
+        set(backend_supported) | set(merged["transcription"]["allowed_models"])
+    )
 
     provider = str(merged["translation"].get("provider") or "none").strip().lower()
     if provider in {"openai", "ollama"}:

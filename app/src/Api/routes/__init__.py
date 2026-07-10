@@ -3,7 +3,6 @@ from .admin_sections import (
     admin_debug_bp,
     admin_logs_bp,
     admin_transcription_config_bp,
-    admin_transcription_models_bp,
 )
 from .conversions import bp as conversions_bp
 from .downloads import bp as downloads_bp
@@ -18,7 +17,6 @@ def register_routes(app):
     app.register_blueprint(health_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(admin_transcription_config_bp)
-    app.register_blueprint(admin_transcription_models_bp)
     app.register_blueprint(admin_debug_bp)
     app.register_blueprint(admin_logs_bp)
     app.register_blueprint(tasks_bp)

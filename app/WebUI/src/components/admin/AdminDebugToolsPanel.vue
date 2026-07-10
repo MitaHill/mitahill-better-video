@@ -7,15 +7,18 @@
         <div class="param-title">转录模型</div>
         <p class="notice" style="margin-bottom: 10px;">步骤：目标解析 -> HASH 校验 -> GPU 热身识别 5 秒静音音频</p>
         <div class="field compact" style="margin-bottom: 10px;">
-          <label>测试目标（已安装模型）</label>
-          <select v-model="selectedTarget" :disabled="loadingModel || !modelTargetOptions.length">
-            <option v-for="item in modelTargetOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-          </select>
+          <label>测试目标模型 ID</label>
+          <input
+            v-model="selectedModelId"
+            list="admin-debug-transcription-models"
+            :disabled="loadingModel"
+            placeholder="例如: small / medium / large-v3"
+          />
+          <datalist id="admin-debug-transcription-models">
+            <option v-for="model in modelTargetOptions" :key="model" :value="model" />
+          </datalist>
         </div>
-        <p v-if="!modelTargetOptions.length" class="notice" style="color: var(--accent-2); margin-bottom: 10px;">
-          暂无已安装模型，请先在“模型目录与下载”中下载模型。
-        </p>
-        <button type="button" :disabled="loadingModel || !selectedTarget" @click="triggerModelTest">
+        <button type="button" :disabled="loadingModel || !selectedModelId" @click="triggerModelTest">
           {{ loadingModel ? "测试中..." : "开始测试" }}
         </button>
         <div v-if="modelSteps.length" class="debug-step-list">
@@ -187,10 +190,6 @@ const props = defineProps({
     type: Boolean,
     required: true,
   },
-  transcriptionModels: {
-    type: Array,
-    default: () => [],
-  },
   transcriptionConfig: {
     type: Object,
     default: () => ({}),
@@ -229,52 +228,39 @@ const props = defineProps({
   },
 });
 
-const selectedTarget = ref("");
+const selectedModelId = ref("");
 
 const modelTargetOptions = computed(() => {
-  const rows = Array.isArray(props.transcriptionModels) ? props.transcriptionModels : [];
-  const out = [];
-  const seen = new Set();
-  for (const row of rows) {
-    if (!row || !row.installed) continue;
-    const backend = String(row.backend || "").trim().toLowerCase();
-    const modelId = String(row.model_id || "").trim().toLowerCase();
-    if (!backend || !modelId) continue;
-    const key = `${backend}::${modelId}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({
-      value: key,
-      backend,
-      modelId,
-      label: `${backend === "faster_whisper" ? "fast-whisper" : backend} / ${modelId}`,
-    });
-  }
-  out.sort((a, b) => a.label.localeCompare(b.label));
-  return out;
+  const cfg = props.transcriptionConfig || {};
+  const transcription = cfg.transcription || {};
+  const known = Array.isArray(transcription.allowed_models) ? transcription.allowed_models : [];
+  return Array.from(
+    new Set(
+      [transcription.active_model, ...known]
+        .map((item) => String(item || "").trim().toLowerCase())
+        .filter((item) => item.length > 0)
+    )
+  ).sort();
 });
 
 const _ensureSelection = () => {
   const options = modelTargetOptions.value;
   if (!options.length) {
-    selectedTarget.value = "";
+    selectedModelId.value = "";
     return;
   }
 
-  const hasCurrent = options.some((item) => item.value === selectedTarget.value);
+  const hasCurrent = options.some((item) => item === selectedModelId.value);
   if (hasCurrent) return;
 
   const cfg = props.transcriptionConfig || {};
   const transcription = cfg.transcription || {};
-  const backend = String(transcription.backend || "").trim().toLowerCase();
   const modelId = String(transcription.active_model || "").trim().toLowerCase();
-  const preferredKey = `${backend}::${modelId}`;
-  const preferred = options.find((item) => item.value === preferredKey);
-  selectedTarget.value = preferred ? preferred.value : options[0].value;
+  selectedModelId.value = options.includes(modelId) ? modelId : options[0];
 };
 
 watch(
-  () => modelTargetOptions.value.map((item) => item.value).join("|"),
+  () => modelTargetOptions.value.join("|"),
   () => _ensureSelection(),
   { immediate: true }
 );
@@ -285,11 +271,11 @@ watch(
 );
 
 const triggerModelTest = () => {
-  if (!selectedTarget.value) return;
-  const [backend, modelId] = String(selectedTarget.value).split("::");
+  const modelId = String(selectedModelId.value || "").trim().toLowerCase();
+  if (!modelId) return;
   props.onTestModel({
-    backend: String(backend || "").trim().toLowerCase(),
-    modelId: String(modelId || "").trim().toLowerCase(),
+    backend: "faster_whisper",
+    modelId,
   });
 };
 
