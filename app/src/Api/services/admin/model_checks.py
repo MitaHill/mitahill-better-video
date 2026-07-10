@@ -10,7 +10,7 @@ from typing import Dict, List
 
 import requests
 
-from app.src.Worker.pipelines.transcription.compute_type import select_faster_whisper_compute_type
+from app.src.Worker.pipelines.transcription.compute_type import inspect_faster_whisper_compute_types
 
 from .transcription_catalog import fetch_hf_model_files, get_model_entry, get_storage_roots
 
@@ -245,7 +245,8 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
             from faster_whisper import WhisperModel
 
             model_ref = str(local_path) if local_path.exists() else model_id
-            compute_type = select_faster_whisper_compute_type(device)
+            compute_info = inspect_faster_whisper_compute_types(device)
+            compute_type = str(compute_info.get("selected") or "")
             model = WhisperModel(model_ref, device=device, compute_type=compute_type)
             segments, _info = model.transcribe(str(wav_path), beam_size=1, language="en")
             list(segments)
@@ -258,6 +259,8 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
             "backend": backend,
             "model_id": model_id,
             "device": device,
+            "compute_type": compute_type,
+            "supported_compute_types": compute_info.get("supported") or [],
             "elapsed_sec": round(elapsed, 3),
             "message": "热身成功，模型可调用",
         }
@@ -269,6 +272,8 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
             "backend": backend,
             "model_id": model_id,
             "device": device,
+            "compute_type": locals().get("compute_type", ""),
+            "supported_compute_types": (locals().get("compute_info") or {}).get("supported") or [],
             "elapsed_sec": round(elapsed, 3),
             "message": str(exc),
         }

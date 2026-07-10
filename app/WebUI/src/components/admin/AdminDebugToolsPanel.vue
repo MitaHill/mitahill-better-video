@@ -55,6 +55,10 @@
               <span>设备</span>
               <strong>{{ modelResultSummary.device }}</strong>
             </div>
+            <div class="debug-kv" v-if="modelResultSummary.computeType">
+              <span>加载方式</span>
+              <strong>{{ modelResultSummary.computeType }}</strong>
+            </div>
             <div class="debug-kv" v-if="modelResultSummary.elapsedSec !== null">
               <span>耗时</span>
               <strong>{{ modelResultSummary.elapsedSec }}s</strong>
@@ -65,6 +69,9 @@
             </div>
           </div>
           <p class="notice" style="margin: 6px 0 0;">{{ modelResultSummary.message }}</p>
+          <p v-if="modelResultSummary.supportedComputeTypes" class="notice" style="margin: 4px 0 0;">
+            当前设备支持：{{ modelResultSummary.supportedComputeTypes }}
+          </p>
         </div>
 
         <div v-if="modelHashChecks.length" class="hash-table-wrap">
@@ -307,6 +314,10 @@ const modelResultSummary = computed(() => {
     mode: String(payload.mode || "-"),
     message: String(payload.message || payload.error || (payload.ok ? "执行成功" : "执行失败")),
     device: String(warmupStep.device || ""),
+    computeType: String(warmupStep.compute_type || ""),
+    supportedComputeTypes: Array.isArray(warmupStep.supported_compute_types)
+      ? warmupStep.supported_compute_types.join(", ")
+      : "",
     elapsedSec: Number.isFinite(Number(warmupStep.elapsed_sec)) ? Number(warmupStep.elapsed_sec) : null,
     hashPassed,
     hashTotal,

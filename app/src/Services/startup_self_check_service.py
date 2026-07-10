@@ -15,6 +15,7 @@ from app.src.Config import settings as config
 from app.src.Database import admin as db_admin
 from app.src.Database import core as db
 from app.src.Worker.pipelines.dispatch import process_task
+from app.src.Worker.pipelines.transcription.compute_type import inspect_faster_whisper_compute_types
 
 
 logger = logging.getLogger("STARTUP_SELF_CHECK")
@@ -45,6 +46,7 @@ class StartupSelfCheckService:
         try:
             self.workspace.mkdir(parents=True, exist_ok=True)
             self._check_nvidia_smi()
+            self._check_transcription_compute_types()
             task_id = self._create_probe_task()
             self._run_probe_task(task_id)
             logger.info("Startup self-check completed successfully, task_id=%s", task_id)
@@ -71,6 +73,16 @@ class StartupSelfCheckService:
             detail = (result.stderr or result.stdout or "").strip()
             raise RuntimeError(f"nvidia-smi failed: {detail}")
         logger.info("Self-check [GPU] nvidia-smi passed.")
+
+    def _check_transcription_compute_types(self):
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        info = inspect_faster_whisper_compute_types(device)
+        logger.info(
+            "Self-check [Transcription] CTranslate2 compute types on %s: supported=%s, selected=%s",
+            info.get("device"),
+            ",".join(info.get("supported") or []) or "-",
+            info.get("selected") or "-",
+        )
 
     def _create_probe_image(self) -> Path:
         image_path = self.workspace / "startup_probe.png"
