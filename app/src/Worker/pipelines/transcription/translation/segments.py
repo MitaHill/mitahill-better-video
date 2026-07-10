@@ -72,7 +72,7 @@ def _append_context(context_pairs, source_text, translated_text):
         return
     context_pairs.append({"source_text": source, "translated_text": translated})
     if len(context_pairs) > CONTEXT_WINDOW_SIZE:
-        del context_pairs[:-CONTEXT_WINDOW_SIZE]
+        del context_pairs[1:-(CONTEXT_WINDOW_SIZE - 1)]
 
 
 def translate_segments(

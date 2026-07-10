@@ -159,10 +159,16 @@ class OpenAICompatibleTranslator(BaseTranslator):
         return _normalize_openai_compatible_endpoint(self.base_url)
 
     @staticmethod
+    def _windowed_context_pairs(context_pairs):
+        pairs = list(context_pairs or [])
+        if len(pairs) <= CONTEXT_WINDOW_SIZE:
+            return pairs
+        return [pairs[0], *pairs[-(CONTEXT_WINDOW_SIZE - 1):]]
+
+    @staticmethod
     def _context_messages(context_pairs):
         messages = []
-        pairs = context_pairs or []
-        for item in pairs[-CONTEXT_WINDOW_SIZE:]:
+        for item in OpenAICompatibleTranslator._windowed_context_pairs(context_pairs):
             source = str((item or {}).get("source_text") or "").strip()
             translated = str((item or {}).get("translated_text") or "").strip()
             if not source or not translated:
