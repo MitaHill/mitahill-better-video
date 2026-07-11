@@ -15,7 +15,6 @@ const applyConversionDefaultsByProbe = (convertForm, info) => {
   if (!info) return;
 
   const hasVideo = info.has_video === true || Number(info.width) > 0 || Number(info.height) > 0 || Number(info.fps) > 0;
-  const hasAudio = info.has_audio === true || Number(info.audio_sample_rate) > 0 || Number(info.audio_bitrate) > 0 || Number(info.audio_channels) > 0;
 
   if (hasVideo && info.fps && Number(info.fps) > 0) {
     convertForm.frameRate = Math.round(Number(info.fps));
@@ -37,17 +36,6 @@ const applyConversionDefaultsByProbe = (convertForm, info) => {
     } else if (codec) {
       convertForm.videoCodec = "h264";
     }
-  }
-  if (hasAudio && info.audio_sample_rate && Number(info.audio_sample_rate) > 0) {
-    convertForm.audioSampleRate = Number(info.audio_sample_rate);
-  }
-  if (hasAudio && info.audio_bitrate && Number(info.audio_bitrate) > 0) {
-    convertForm.audioBitrateK = Math.max(32, Math.round(Number(info.audio_bitrate) / 1000));
-  }
-  if (hasAudio && info.audio_channels === 1) {
-    convertForm.audioChannelsMode = "mono";
-  } else if (hasAudio && info.audio_channels >= 2) {
-    convertForm.audioChannelsMode = "stereo";
   }
 };
 

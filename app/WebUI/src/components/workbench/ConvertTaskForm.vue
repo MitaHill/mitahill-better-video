@@ -8,7 +8,6 @@
     />
 
     <ConvertVideoSection :convert-form="convertForm" :get-field-policy="getFieldPolicy" />
-    <ConvertAudioSection :convert-form="convertForm" :get-field-policy="getFieldPolicy" />
 
     <ConvertMetadataWatermarkSection
       :convert-form="convertForm"
@@ -24,7 +23,6 @@
 </template>
 
 <script setup>
-import ConvertAudioSection from "./convert/ConvertAudioSection.vue";
 import ConvertBaseSection from "./convert/ConvertBaseSection.vue";
 import ConvertExportFramesSection from "./convert/ConvertExportFramesSection.vue";
 import ConvertMetadataWatermarkSection from "./convert/ConvertMetadataWatermarkSection.vue";

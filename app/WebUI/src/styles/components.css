@@ -560,37 +560,6 @@ button:hover {
   border-bottom: none;
 }
 
-.haas-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.haas-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-}
-
-.haas-controls {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
-
-.haas-input {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.haas-input input {
-  width: 110px;
-}
-
 .progress {
   height: 8px;
   background: var(--surface-strong);

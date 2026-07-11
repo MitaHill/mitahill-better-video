@@ -18,13 +18,10 @@ def process_conversion_task(task):
     run_dir.mkdir(parents=True, exist_ok=True)
 
     video_files = params.get("video_files") or []
-    audio_files = params.get("audio_files") or []
     mode = (params.get("convert_mode") or "transcode").lower()
 
     video_paths = [Path(item.get("upload_path")) for item in video_files if item.get("upload_path")]
-    audio_paths = [Path(item.get("upload_path")) for item in audio_files if item.get("upload_path")]
     video_paths = [p for p in video_paths if p.exists()]
-    audio_paths = [p for p in audio_paths if p.exists()]
 
     if not video_paths:
         raise RuntimeError("No uploaded videos for conversion.")
@@ -38,7 +35,7 @@ def process_conversion_task(task):
         outputs = []
         total = max(1, len(video_paths))
         for idx, video_path in enumerate(video_paths, start=1):
-            outputs.append(render_single_video(task_id, video_path, audio_paths, params, run_dir, idx, total))
+            outputs.append(render_single_video(task_id, video_path, params, run_dir, idx, total))
         if len(outputs) == 1:
             result_path = outputs[0]
         else:

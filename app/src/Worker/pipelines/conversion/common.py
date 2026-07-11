@@ -6,7 +6,6 @@ GPU_CODEC_MAP = {
     "hevc": ("hevc_nvenc", "libx265"),
 }
 VALID_FORMATS = {"mp4", "mkv", "mov", "avi"}
-VALID_AUDIO_MODES = {"keep_original", "replace_uploaded", "mix_uploaded"}
 VALID_WATERMARK_POSITIONS = {
     "top_left",
     "top_right",

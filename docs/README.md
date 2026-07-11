@@ -12,6 +12,8 @@ workflows, and an admin console.
 - Batch image upload with ZIP download.
 - Video output with original audio copied by default, CRF, dynamic GPU codec
   options, tiling, and FP16 controls.
+- Conversion tasks focus on video processing; transcode outputs copy the source
+  audio stream when present and do not expose audio processing parameters.
 - Admin console for task overview, cancellation/deletion, maintenance mode,
   real IP configuration, GPU usage, logs, and password management.
 

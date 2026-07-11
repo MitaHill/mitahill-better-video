@@ -61,6 +61,8 @@ def create_conversion_task(
     videos, audios, unknown = classify_media(saved)
     if unknown:
         return None, f"unsupported media files: {', '.join(item['filename'] for item in unknown)}"
+    if audios:
+        return None, "audio-only files are not supported for conversion"
     if not videos:
         return None, "at least one valid video file is required"
 
@@ -69,7 +71,6 @@ def create_conversion_task(
         return None, err
 
     params["video_files"] = videos
-    params["audio_files"] = audios
     params["watermark_images"] = watermark_images
 
     first_video = Path(videos[0]["upload_path"])
@@ -79,7 +80,6 @@ def create_conversion_task(
         "upload_path": videos[0]["upload_path"],
         "size_mb": videos[0]["size_mb"],
         "video_count": len(videos),
-        "audio_count": len(audios),
         **first_info,
     }
     db.create_task(task_id, client_ip, params, video_info, task_category="convert")

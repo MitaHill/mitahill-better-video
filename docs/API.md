@@ -62,6 +62,40 @@ current GPU:
 { "enhance_output_codecs": ["h264", "h265", "av1"] }
 ```
 
+## Conversion APIs
+
+### POST /api/conversions
+**Content-Type**: multipart/form-data
+
+Fields:
+- `media_files` (required, multiple video files)
+- `convert_mode` (`transcode` | `export_frames` | `demux_streams`)
+- `output_format` (`mp4` | `mkv` | `mov` | `avi`)
+- `video_codec` (`h264` | `h265`)
+- `frame_rate`
+- `aspect_ratio`
+- `second_pass_reencode`
+- `deinterlace`
+- `flip_horizontal`
+- `flip_vertical`
+- `video_fade_in_sec`
+- `video_fade_out_sec`
+- `crf`
+- `video_bitrate_k`
+- `target_size_mb`
+- `target_width`
+- `target_height`
+- watermark and metadata fields
+- frame export fields
+
+Audio-only uploads are rejected. Transcode outputs copy the first source audio
+stream when present and do not expose audio processing parameters.
+
+Response:
+```json
+{ "task_id": "<uuid>" }
+```
+
 ## Transcription APIs
 
 Transcription backend APIs are exposed through the workbench transcription

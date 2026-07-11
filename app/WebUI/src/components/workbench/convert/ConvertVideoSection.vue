@@ -47,7 +47,6 @@
       <label class="check-inline"><input type="checkbox" v-model="convertForm.deinterlace" :disabled="isDisabled('deinterlace')" />反交错</label>
       <label class="check-inline"><input type="checkbox" v-model="convertForm.flipHorizontal" :disabled="isDisabled('flipHorizontal')" />左右颠倒</label>
       <label class="check-inline"><input type="checkbox" v-model="convertForm.flipVertical" :disabled="isDisabled('flipVertical')" />上下颠倒</label>
-      <label class="check-inline"><input type="checkbox" v-model="convertForm.muteAudio" :disabled="isDisabled('muteAudio')" />关闭声音</label>
     </div>
     <div class="inline-grid two">
       <div class="field compact"><label>视频淡入(秒)</label><input v-model.number="convertForm.videoFadeInSec" type="number" :min="numMin('videoFadeInSec', 0)" :max="numMax('videoFadeInSec', 30)" :step="numStep('videoFadeInSec', 0.1)" :disabled="isDisabled('videoFadeInSec')" /></div>

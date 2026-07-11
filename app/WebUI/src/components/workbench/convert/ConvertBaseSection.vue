@@ -8,8 +8,8 @@
       </select>
     </div>
     <div class="field">
-      <label>上传音频或视频（可多选）</label>
-      <input type="file" multiple accept="video/*,audio/*" @change="onConvertMediaChange" />
+      <label>上传视频（可多选）</label>
+      <input type="file" multiple accept="video/*" @change="onConvertMediaChange" />
     </div>
     <div class="media-list" v-if="convertMediaInfo.length">
       <div class="media-row" v-for="item in convertMediaInfo" :key="item.filename + ':' + item.size_mb">
