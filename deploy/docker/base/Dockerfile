@@ -14,26 +14,29 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 
+ARG INSTALL_PREBUILT_FFMPEG=0
 ARG FFMPEG_BUILD_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
 ARG FFMPEG_BUILD_SHA256=c5156dd8059afc7b42b4ea19ae0b7df67b8361036ccef110aa0078196ac00028
 
 # Core system dependencies and tooling
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 python3.10-dev python3.10-distutils python3.10-venv \
-    git wget curl ca-certificates xz-utils build-essential pkg-config \
+    ffmpeg git wget curl ca-certificates xz-utils build-essential pkg-config \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxfixes3 libxkbcommon0 \
     nano vim less lsof htop tmux unzip zip rsync openssh-client aria2 \
     iputils-ping net-tools tzdata \
  && ln -s /usr/bin/python3.10 /usr/bin/python \
  && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /tmp/ffmpeg-build && \
-    wget -q -O /tmp/ffmpeg.tar.xz "$FFMPEG_BUILD_URL" && \
-    echo "$FFMPEG_BUILD_SHA256  /tmp/ffmpeg.tar.xz" | sha256sum -c - && \
-    tar -xf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg-build --strip-components=1 && \
-    install -m 0755 /tmp/ffmpeg-build/bin/ffmpeg /usr/local/bin/ffmpeg && \
-    install -m 0755 /tmp/ffmpeg-build/bin/ffprobe /usr/local/bin/ffprobe && \
-    rm -rf /tmp/ffmpeg-build /tmp/ffmpeg.tar.xz && \
+RUN if [ "$INSTALL_PREBUILT_FFMPEG" = "1" ]; then \
+        mkdir -p /tmp/ffmpeg-build && \
+        wget -q -O /tmp/ffmpeg.tar.xz "$FFMPEG_BUILD_URL" && \
+        echo "$FFMPEG_BUILD_SHA256  /tmp/ffmpeg.tar.xz" | sha256sum -c - && \
+        tar -xf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg-build --strip-components=1 && \
+        install -m 0755 /tmp/ffmpeg-build/bin/ffmpeg /usr/local/bin/ffmpeg && \
+        install -m 0755 /tmp/ffmpeg-build/bin/ffprobe /usr/local/bin/ffprobe && \
+        rm -rf /tmp/ffmpeg-build /tmp/ffmpeg.tar.xz; \
+    fi && \
     ffmpeg -hide_banner -version && \
     ffmpeg -hide_banner -encoders | grep -E "h264_nvenc|hevc_nvenc" >/dev/null
 

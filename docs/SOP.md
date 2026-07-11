@@ -87,9 +87,10 @@ Model packaging rule:
   model volume, not in the source repository.
 - Enhancement keeps original audio by default. Audio enhancement models such as
   VoiceFixer and DeepFilterNet are not part of the default image.
-- FFmpeg is installed from a checksum-verified prebuilt Linux archive during
-  the base image build. The app exposes only codecs that pass a tiny NVENC
-  encode test on the current GPU.
+- FFmpeg uses the Ubuntu package by default for old NVIDIA driver
+  compatibility. A checksum-verified prebuilt FFmpeg archive can be enabled at
+  build time, but newer FFmpeg builds may require newer NVIDIA drivers. The app
+  exposes only codecs that pass a tiny NVENC encode test on the current GPU.
 
 Deploy from `pre-run/`:
 
