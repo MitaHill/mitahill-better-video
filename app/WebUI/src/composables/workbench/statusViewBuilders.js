@@ -107,10 +107,6 @@ export const buildParamRows = (status) => {
     { label: "放大倍率", value: params.upscale ? `${params.upscale}x` : "-" },
     { label: "切片大小", value: params.tile ?? "-" },
     { label: "降噪强度", value: params.denoise_strength ?? "-" },
-    { label: "保留原音轨", value: params.keep_audio !== undefined ? formatBool(params.keep_audio) : "-" },
-    { label: "音频增强", value: params.audio_enhance !== undefined ? formatBool(params.audio_enhance) : "-" },
-    { label: "前置降噪", value: params.pre_denoise_mode || "-" },
-    { label: "反交错", value: params.deinterlace !== undefined ? formatBool(params.deinterlace) : "-" },
     { label: "输出编码", value: params.output_codec ? params.output_codec.toUpperCase() : "-" },
     { label: "CRF 质量", value: params.crf ?? "-" },
   ];

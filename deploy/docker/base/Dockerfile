@@ -14,15 +14,28 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 
+ARG FFMPEG_BUILD_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+ARG FFMPEG_BUILD_SHA256=c5156dd8059afc7b42b4ea19ae0b7df67b8361036ccef110aa0078196ac00028
+
 # Core system dependencies and tooling
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 python3.10-dev python3.10-distutils python3.10-venv \
-    ffmpeg git wget curl ca-certificates build-essential pkg-config \
+    git wget curl ca-certificates xz-utils build-essential pkg-config \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxfixes3 libxkbcommon0 \
     nano vim less lsof htop tmux unzip zip rsync openssh-client aria2 \
     iputils-ping net-tools tzdata \
  && ln -s /usr/bin/python3.10 /usr/bin/python \
  && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /tmp/ffmpeg-build && \
+    wget -q -O /tmp/ffmpeg.tar.xz "$FFMPEG_BUILD_URL" && \
+    echo "$FFMPEG_BUILD_SHA256  /tmp/ffmpeg.tar.xz" | sha256sum -c - && \
+    tar -xf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg-build --strip-components=1 && \
+    install -m 0755 /tmp/ffmpeg-build/bin/ffmpeg /usr/local/bin/ffmpeg && \
+    install -m 0755 /tmp/ffmpeg-build/bin/ffprobe /usr/local/bin/ffprobe && \
+    rm -rf /tmp/ffmpeg-build /tmp/ffmpeg.tar.xz && \
+    ffmpeg -hide_banner -version && \
+    ffmpeg -hide_banner -encoders | grep -E "h264_nvenc|hevc_nvenc" >/dev/null
 
 WORKDIR /workspace
 
@@ -42,17 +55,10 @@ RUN uv export --locked --no-emit-project --no-default-groups --group base \
     rm -f /tmp/base-requirements.txt
 
 # Pre-download Real-ESRGAN weights (huge layer, fixed)
-RUN mkdir -p /workspace/app/models/video /workspace/app/models/audio/voicefixer && \
+RUN mkdir -p /workspace/app/models/video && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/RealESRNet_x4plus.pth && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth
-
-# Pre-download VoiceFixer weights into the layout expected by voicefixer.
-# Full VoiceFixer weights are about 597 MiB, so they stay in the base image layer
-# instead of being committed to the source repository.
-RUN mkdir -p /workspace/app/models/audio/voicefixer/synthesis_module/44100 && \
-    wget -q -O /workspace/app/models/audio/voicefixer/analysis_module.ckpt https://huggingface.co/Diogodiogod/voicefixer-models/resolve/main/vf.ckpt && \
-    wget -q -O /workspace/app/models/audio/voicefixer/synthesis_module/44100/model.ckpt-1490000_trimed.pt https://huggingface.co/Diogodiogod/voicefixer-models/resolve/main/model.ckpt-1490000_trimed.pt

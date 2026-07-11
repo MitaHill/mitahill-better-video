@@ -40,13 +40,6 @@
         :disabled="isDisabled('denoise')"
       />
     </div>
-    <div class="field" v-if="enhanceForm.inputType === 'Video'">
-      <label>反交错</label>
-      <select v-model="enhanceForm.deinterlace" :disabled="isDisabled('deinterlace')">
-        <option :value="false">关闭</option>
-        <option :value="true">启用</option>
-      </select>
-    </div>
   </div>
 </template>
 

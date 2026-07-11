@@ -10,15 +10,8 @@ Fields:
 - `upscale` (2/3/4)
 - `tile`
 - `denoise_strength`
-- `keep_audio`
-- `audio_enhance`
-- `pre_denoise_mode`
-- `haas_enabled`
-- `haas_delay_ms`
-- `haas_lead`
 - `crf`
-- `output_codec` (h264 | h265)
-- `deinterlace` (true | false)
+- `output_codec` (available values come from `/api/config/recommendations`)
 - `tile_pad`
 - `fp16`
 
@@ -59,6 +52,15 @@ Returns output file if task is completed.
 
 ## GET /api/health
 Returns `{"status":"ok"}` when backend is alive.
+
+## GET /api/config/recommendations
+Returns runtime recommendations. Enhancement output codecs are detected from
+the FFmpeg encoders available inside the container and verified against the
+current GPU:
+
+```json
+{ "enhance_output_codecs": ["h264", "h265", "av1"] }
+```
 
 ## Transcription APIs
 

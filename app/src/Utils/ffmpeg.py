@@ -2,6 +2,7 @@ import subprocess
 import json
 import logging
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 
 logger = logging.getLogger("FFMPEG")
@@ -115,3 +116,73 @@ def get_gpu_utilization():
     except Exception:
         pass
     return None
+
+
+_CODEC_ENCODERS = {
+    "h264": ("h264_nvenc", "libx264"),
+    "h265": ("hevc_nvenc", "libx265"),
+    "av1": ("av1_nvenc", "libaom-av1"),
+}
+
+
+def get_ffmpeg_encoders():
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-encoders"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+        )
+    except Exception:
+        return set()
+    text = f"{result.stdout}\n{result.stderr}"
+    known = {encoder for pair in _CODEC_ENCODERS.values() for encoder in pair}
+    return {name for name in {item for line in text.splitlines() for item in line.split()} if name in known}
+
+
+@lru_cache(maxsize=None)
+def _can_use_encoder(encoder):
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "lavfi", "-i", "color=size=128x128:rate=1",
+                "-frames:v", "1", "-c:v", encoder, "-f", "null", "-"
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10,
+        )
+    except Exception:
+        return False
+    if result.returncode != 0:
+        logger.info("FFmpeg encoder unavailable: %s (%s)", encoder, (result.stderr or "").strip())
+        return False
+    return True
+
+
+def get_available_output_codecs():
+    encoders = get_ffmpeg_encoders()
+    return [
+        codec
+        for codec, (gpu_encoder, _cpu_encoder) in _CODEC_ENCODERS.items()
+        if gpu_encoder in encoders and _can_use_encoder(gpu_encoder)
+    ]
+
+
+def normalize_output_codec(value):
+    codec = (value or "h264").lower()
+    if codec == "hevc":
+        codec = "h265"
+    available = get_available_output_codecs()
+    if not available:
+        return None
+    return codec if codec in available else available[0]
+
+
+def get_video_encoder(codec, prefer_gpu=True):
+    normalized = "h265" if codec == "hevc" else (codec or "h264")
+    gpu_encoder, cpu_encoder = _CODEC_ENCODERS.get(normalized, _CODEC_ENCODERS["h264"])
+    return gpu_encoder if prefer_gpu else cpu_encoder

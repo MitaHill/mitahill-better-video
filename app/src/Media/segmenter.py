@@ -5,7 +5,7 @@ import logging
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from app.src.Utils.ffmpeg import run_ffmpeg, get_video_fps, get_gpu_utilization
+from app.src.Utils.ffmpeg import run_ffmpeg, get_video_fps, get_gpu_utilization, get_video_encoder, normalize_output_codec, get_audio_channels
 from app.src.Utils.preview_cache import set_preview_from_path
 from app.src.Database import core as db
 from app.src.Config import settings as config
@@ -150,28 +150,21 @@ def process_video_with_model(
             try:
                 run_ffmpeg(["ffmpeg", "-y", "-i", str(input_path), "-vn", "-acodec", "copy", str(audio_path)])
             except Exception:
-                logger.warning(f"Audio extraction failed for {input_path.name}, continuing without audio.")
+                if get_audio_channels(input_path) > 0:
+                    raise
+                logger.warning(f"No audio stream copied for {input_path.name}; continuing without audio.")
 
         # 2. Extract Frames (align with upstream pipeline)
         if not any(frames_in.glob("f_*.jpg")):
             hwaccel = ["-hwaccel", "cuda"] if config.FFMPEG_USE_GPU else []
-            deinterlace = bool(params.get("deinterlace"))
-            vf = None
-            if deinterlace:
-                vf = "yadif_cuda=mode=send_frame:parity=auto:deint=all" if config.FFMPEG_USE_GPU else "yadif=mode=send_frame:parity=auto:deint=all"
             cmd = [
                 "ffmpeg", "-y", *hwaccel, "-i", str(input_path),
                 "-vsync", "0", "-q:v", "2"
             ]
-            if vf:
-                cmd += ["-vf", vf]
             cmd += ["-f", "image2", str(frames_in / "f_%06d.jpg")]
             fallback = None
-            if hwaccel or vf:
-                fb_vf = "yadif=mode=send_frame:parity=auto:deint=all" if deinterlace else None
+            if hwaccel:
                 fallback = ["ffmpeg", "-y", "-i", str(input_path), "-vsync", "0", "-q:v", "2"]
-                if fb_vf:
-                    fallback += ["-vf", fb_vf]
                 fallback += ["-f", "image2", str(frames_in / "f_%06d.jpg")]
             run_ffmpeg(cmd, fallback_args=fallback)
 
@@ -299,35 +292,23 @@ def process_video_with_model(
         if audio_path.exists() and params.get('keep_audio', True):
             cmd += ["-i", str(audio_path), "-map", "0:v:0", "-map", "1:a:0?", "-c:a", "copy"]
         
-        output_codec = (params.get("output_codec") or "h264").lower()
+        output_codec = normalize_output_codec(params.get("output_codec"))
+        if not output_codec:
+            raise RuntimeError("No available NVIDIA FFmpeg encoder.")
         crf = params.get("crf", 18)
         if config.FFMPEG_USE_GPU:
-            if output_codec in ("h265", "hevc"):
-                nvenc_cmd = cmd + [
-                    "-c:v", "hevc_nvenc", "-preset", "p4", "-rc:v", "vbr",
-                    "-cq:v", str(crf), "-b:v", "0", "-pix_fmt", "yuv420p",
-                    str(output_path)
-                ]
-                fallback_cmd = cmd + [
-                    "-c:v", "libx265", "-crf", str(crf), "-pix_fmt", "yuv420p",
-                    str(output_path)
-                ]
-            else:
-                nvenc_cmd = cmd + [
-                    "-c:v", "h264_nvenc", "-preset", "p4", "-rc:v", "vbr",
-                    "-cq:v", str(crf), "-b:v", "0", "-pix_fmt", "yuv420p",
-                    str(output_path)
-                ]
-                fallback_cmd = cmd + [
-                    "-c:v", "libx264", "-crf", str(crf), "-pix_fmt", "yuv420p",
-                    str(output_path)
-                ]
+            nvenc_cmd = cmd + [
+                "-c:v", get_video_encoder(output_codec, prefer_gpu=True), "-preset", "p4", "-rc:v", "vbr",
+                "-cq:v", str(crf), "-b:v", "0", "-pix_fmt", "yuv420p",
+                str(output_path)
+            ]
+            fallback_cmd = cmd + [
+                "-c:v", get_video_encoder(output_codec, prefer_gpu=False), "-crf", str(crf), "-pix_fmt", "yuv420p",
+                str(output_path)
+            ]
             run_ffmpeg(nvenc_cmd, fallback_args=fallback_cmd)
         else:
-            if output_codec in ("h265", "hevc"):
-                cmd += ["-c:v", "libx265", "-crf", str(crf), "-pix_fmt", "yuv420p", str(output_path)]
-            else:
-                cmd += ["-c:v", "libx264", "-crf", str(crf), "-pix_fmt", "yuv420p", str(output_path)]
+            cmd += ["-c:v", get_video_encoder(output_codec, prefer_gpu=False), "-crf", str(crf), "-pix_fmt", "yuv420p", str(output_path)]
             run_ffmpeg(cmd)
 
     finally:

@@ -7,11 +7,11 @@ export const useWorkbenchRecommendations = ({ enhanceForm }) => {
       if (payload?.tile_size) {
         enhanceForm.tile = Number(payload.tile_size);
       }
-      if (typeof payload?.audio_enhancement_default === "boolean") {
-        enhanceForm.audioEnhance = payload.audio_enhancement_default;
-      }
-      if (payload?.pre_denoise_default) {
-        enhanceForm.preDenoiseMode = payload.pre_denoise_default;
+      if (Array.isArray(payload?.enhance_output_codecs) && payload.enhance_output_codecs.length) {
+        enhanceForm.outputCodecOptions = payload.enhance_output_codecs;
+        if (!enhanceForm.outputCodecOptions.includes(enhanceForm.outputCodec)) {
+          enhanceForm.outputCodec = enhanceForm.outputCodecOptions[0];
+        }
       }
     } catch (_err) {
       // ignore recommendation failures

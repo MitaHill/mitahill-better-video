@@ -24,15 +24,9 @@ export const useWorkbenchFormsState = () => {
     upscale: 3,
     tile: 256,
     denoise: 0.5,
-    keepAudio: true,
-    audioEnhance: false,
-    preDenoiseMode: "off",
-    haasEnabled: false,
-    haasDelayMs: 0,
-    haasLead: "left",
     crf: 18,
-    outputCodec: "h264",
-    deinterlace: false,
+    outputCodec: "",
+    outputCodecOptions: [],
     files: [],
   });
 

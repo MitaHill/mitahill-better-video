@@ -43,8 +43,8 @@ process restart loops and import-time resource contention.
   the process.
 - It may run one tiny GPU-backed task through existing project service/worker
   modules, then delete the task row and temporary files.
-- It must not run broad multi-module validation, download models from the
-  internet, or depend on optional heavyweight components such as VoiceFixer.
+- It must not run broad multi-module validation or download models from the
+  internet.
 - Deeper validation belongs in admin debug tools or manual smoke tests after the
   service has started.
 
@@ -85,8 +85,11 @@ Model packaging rule:
   repeatable builds.
 - Large model weights should stay in the Docker base image layer or an explicit
   model volume, not in the source repository.
-- VoiceFixer currently needs about 597 MiB of weights, so it is packaged in the
-  base image layer and linked into `/root/.cache/voicefixer` by the app image.
+- Enhancement keeps original audio by default. Audio enhancement models such as
+  VoiceFixer and DeepFilterNet are not part of the default image.
+- FFmpeg is installed from a checksum-verified prebuilt Linux archive during
+  the base image build. The app exposes only codecs that pass a tiny NVENC
+  encode test on the current GPU.
 
 Deploy from `pre-run/`:
 

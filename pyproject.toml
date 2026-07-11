@@ -12,7 +12,6 @@ base = [
     "numpy==1.24.4",
     "torch==1.13.1+cu116",
     "torchvision==0.14.1+cu116",
-    "torchaudio==0.13.1+cu116",
     "cython==0.29.36",
     "openai-whisper==20231117",
     "basicsr==1.4.2",
@@ -26,7 +25,6 @@ base = [
     "pyyaml==6.0",
     "flask==2.3.3",
     "gunicorn==21.2.0",
-    "voicefixer",
     "python-dotenv==1.0.1",
 ]
 app = [
@@ -35,8 +33,6 @@ app = [
     "flask-socketio==5.3.6",
     "eventlet==0.36.1",
     "yt-dlp==2026.2.4",
-    "voicefixer",
-    "deepfilternet",
     "python-dotenv==1.0.1",
     "basicsr==1.4.2",
 ]
@@ -52,7 +48,6 @@ explicit = true
 [tool.uv.sources]
 torch = { index = "pytorch-cu116" }
 torchvision = { index = "pytorch-cu116" }
-torchaudio = { index = "pytorch-cu116" }
 
 [tool.uv]
 package = false

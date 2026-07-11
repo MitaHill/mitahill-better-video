@@ -10,8 +10,8 @@ workflows, and an admin console.
 - Models: `realesrgan-x4plus`, `realesrnet-x4plus`, `realesr-general-x4v3`.
 - Denoise control for `realesr-general-x4v3` through DNI blending.
 - Batch image upload with ZIP download.
-- Video output with optional original/enhanced audio, CRF, codec, deinterlace,
-  tiling, and FP16 controls.
+- Video output with original audio copied by default, CRF, dynamic GPU codec
+  options, tiling, and FP16 controls.
 - Admin console for task overview, cancellation/deletion, maintenance mode,
   real IP configuration, GPU usage, logs, and password management.
 

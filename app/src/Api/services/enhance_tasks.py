@@ -46,11 +46,6 @@ def create_enhance_task(upload, params, client_ip, output_root, upload_root, max
     if input_type == "Video":
         video_codec = (video_info.get("video_codec") or "").lower()
         audio_codec = (video_info.get("audio_codec") or "").lower()
-        if video_codec == "mpeg2video" and not params.get("deinterlace"):
-            params["deinterlace"] = True
-            params["mpeg2_adapted"] = True
-        else:
-            params["mpeg2_adapted"] = False
         if video_codec == "mpeg2video" and audio_codec == "mp2":
             logger.info("MPEG2 + MP2 detected for task %s; allowing non-AAC audio.", task_id)
 

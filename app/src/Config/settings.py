@@ -6,6 +6,7 @@ import platform
 import hashlib
 import yaml
 from pathlib import Path
+from app.src.Utils.ffmpeg import get_available_output_codecs
 from dotenv import load_dotenv
 from app.src.Utils.client_ip import parse_trusted_proxies
 
@@ -253,9 +254,7 @@ def initialize_context():
         "tile_size": DEFAULT_SMART_TILE_SIZE,
         "vram_gb": vram,
         "source": source,
-        "audio_enhancement_enabled": ENABLE_AUDIO_ENHANCEMENT,
-        "audio_enhancement_default": ENABLE_AUDIO_ENHANCEMENT,
-        "pre_denoise_default": PRE_DENOISE_MODE,
+        "enhance_output_codecs": get_available_output_codecs(),
     }
     return _init_info
 
@@ -264,9 +263,7 @@ def get_init_info():
         "tile_size": DEFAULT_SMART_TILE_SIZE,
         "vram_gb": None,
         "source": "unknown",
-        "audio_enhancement_enabled": ENABLE_AUDIO_ENHANCEMENT,
-        "audio_enhancement_default": ENABLE_AUDIO_ENHANCEMENT,
-        "pre_denoise_default": PRE_DENOISE_MODE,
+        "enhance_output_codecs": get_available_output_codecs(),
     }
 
 if __name__ == "__main__":

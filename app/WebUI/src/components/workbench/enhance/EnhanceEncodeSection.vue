@@ -3,7 +3,8 @@
     <div class="param-title">编码参数</div>
     <div class="field">
       <label>输出编码</label>
-      <select v-model="enhanceForm.outputCodec" :disabled="isDisabled('outputCodec')">
+      <select v-model="enhanceForm.outputCodec" :disabled="isDisabled('outputCodec') || codecOptions.length === 0">
+        <option v-if="codecOptions.length === 0" value="">无可用 GPU 编码器</option>
         <option v-for="item in codecOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
       </select>
     </div>
@@ -50,9 +51,9 @@ const numMax = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.maxValue
 const numStep = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.step, fallback);
 
 const codecOptions = computed(() =>
-  allowed("outputCodec", ["h264", "h265"]).map((value) => ({
+  allowed("outputCodec", props.enhanceForm.outputCodecOptions || []).map((value) => ({
     value,
-    label: String(value || "").toUpperCase(),
+    label: value === "h265" ? "H.265/HEVC" : value === "av1" ? "AV1" : String(value || "").toUpperCase(),
   }))
 );
 </script>
