@@ -24,7 +24,6 @@
           :on-convert-media-change="onConvertMediaChange"
           :on-transcribe-media-change="onTranscribeMediaChange"
           :on-watermark-images-change="onWatermarkImagesChange"
-          :on-watermark-lua-file-change="onWatermarkLuaFileChange"
           :on-probe-download-source="probeDownloadSource"
           :add-watermark-segment="addWatermarkSegment"
           :remove-watermark-segment="removeWatermarkSegment"
@@ -96,7 +95,6 @@ const {
   onConvertMediaChange,
   onTranscribeMediaChange,
   onWatermarkImagesChange,
-  onWatermarkLuaFileChange,
   probeDownloadSource,
   addWatermarkSegment,
   removeWatermarkSegment,

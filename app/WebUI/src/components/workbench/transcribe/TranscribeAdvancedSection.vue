@@ -55,6 +55,8 @@
 </template>
 
 <script setup>
+import { useFieldPolicy } from "../../../composables/workbench/useFieldPolicy";
+
 const props = defineProps({
   transcribeForm: {
     type: Object,
@@ -66,15 +68,6 @@ const props = defineProps({
   },
 });
 
-const readPolicy = (fieldKey) => props.getFieldPolicy("transcribe", fieldKey) || null;
-const isDisabled = (fieldKey) => Boolean(readPolicy(fieldKey)?.disabled);
-const toFiniteOr = (value, fallback) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-
-const numMin = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.minValue, fallback);
-const numMax = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.maxValue, fallback);
-const numStep = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.step, fallback);
+const { isDisabled, numMin, numMax, numStep } = useFieldPolicy(props.getFieldPolicy, "transcribe");
 
 </script>

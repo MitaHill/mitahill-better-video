@@ -63,7 +63,7 @@ export const useWorkbenchController = () => {
     disposeRealtime,
   } = useWorkbenchStatus({ parseJsonSafe });
 
-  const { onEnhanceFileChange, onConvertMediaChange, onTranscribeMediaChange, onWatermarkImagesChange, onWatermarkLuaFileChange } = useWorkbenchUploads({
+  const { onEnhanceFileChange, onConvertMediaChange, onTranscribeMediaChange, onWatermarkImagesChange } = useWorkbenchUploads({
     enhanceForm,
     convertForm,
     convertMediaInfo,
@@ -249,7 +249,6 @@ export const useWorkbenchController = () => {
     onConvertMediaChange,
     onTranscribeMediaChange,
     onWatermarkImagesChange,
-    onWatermarkLuaFileChange,
     probeDownloadSource,
     addWatermarkSegment,
     removeWatermarkSegment,

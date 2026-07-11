@@ -193,8 +193,6 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
 
 def test_translation_provider(translation_config: Dict) -> Dict:
     provider = str(translation_config.get("provider") or "none").strip().lower()
-    if provider in {"openai", "ollama"}:
-        provider = "openai_compatible"
     base_url = str(translation_config.get("base_url") or "").strip().rstrip("/")
     model = str(translation_config.get("model") or "").strip()
     api_key = str(translation_config.get("api_key") or "").strip()

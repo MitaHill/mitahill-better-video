@@ -1,7 +1,7 @@
 from app.src.Config import settings as config
 from app.src.Utils.ffmpeg import normalize_output_codec
 
-from .common import bool_from_form, int_from_form, float_from_form, merge_unparsed_form_fields
+from .common import bool_from_form, int_from_form, float_from_form
 
 
 def parse_enhance_task_params(form):
@@ -18,14 +18,4 @@ def parse_enhance_task_params(form):
         "tile_pad": int_from_form(form, "tile_pad", config.DEFAULT_TILE_PADDING),
         "fp16": bool_from_form(form, "fp16", config.DEFAULT_FP16),
     }
-    merged = merge_unparsed_form_fields(form, parsed)
-    for key in (
-        "audio_enhance",
-        "pre_denoise_mode",
-        "haas_enabled",
-        "haas_delay_ms",
-        "haas_lead",
-        "deinterlace",
-    ):
-        merged.pop(key, None)
-    return merged
+    return parsed

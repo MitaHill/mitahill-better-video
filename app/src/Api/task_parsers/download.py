@@ -1,4 +1,4 @@
-from .common import bool_from_form, float_from_form, get_list_field, int_from_form, merge_unparsed_form_fields
+from .common import bool_from_form, float_from_form, get_list_field, int_from_form
 
 
 def _extract_subtitle_languages(form):
@@ -31,4 +31,4 @@ def parse_download_task_params(form):
         "subtitle_include_auto": bool_from_form(form, "subtitle_include_auto", True),
         "subtitle_languages": _extract_subtitle_languages(form),
     }
-    return merge_unparsed_form_fields(form, parsed)
+    return parsed

@@ -14,7 +14,6 @@ const buildSegment = (label = "A") => ({
   yExpr: "H-h-24",
   rotationDeg: 0,
   alpha: 0.45,
-  animation: "none",
 });
 
 export const useWorkbenchFormsState = () => {
@@ -56,8 +55,6 @@ export const useWorkbenchFormsState = () => {
     watermarkAlpha: 0.45,
     watermarkImages: [],
     watermarkTimeline: [],
-    watermarkLuaEnabled: false,
-    watermarkLuaScript: "",
     frameExportFps: 0,
     frameExportFpsMode: "manual",
     frameExportFormat: "jpg",

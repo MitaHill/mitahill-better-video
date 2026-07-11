@@ -12,7 +12,6 @@
     <ConvertMetadataWatermarkSection
       :convert-form="convertForm"
       :on-watermark-images-change="onWatermarkImagesChange"
-      :on-watermark-lua-file-change="onWatermarkLuaFileChange"
       :add-watermark-segment="addWatermarkSegment"
       :remove-watermark-segment="removeWatermarkSegment"
       :get-field-policy="getFieldPolicy"
@@ -42,10 +41,6 @@ defineProps({
     required: true,
   },
   onWatermarkImagesChange: {
-    type: Function,
-    required: true,
-  },
-  onWatermarkLuaFileChange: {
     type: Function,
     required: true,
   },

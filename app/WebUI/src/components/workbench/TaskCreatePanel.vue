@@ -15,7 +15,6 @@
       :convert-media-info="convertMediaInfo"
       :on-convert-media-change="onConvertMediaChange"
       :on-watermark-images-change="onWatermarkImagesChange"
-      :on-watermark-lua-file-change="onWatermarkLuaFileChange"
       :add-watermark-segment="addWatermarkSegment"
       :remove-watermark-segment="removeWatermarkSegment"
       :get-field-policy="getFieldPolicy"
@@ -102,10 +101,6 @@ const props = defineProps({
     required: true,
   },
   onWatermarkImagesChange: {
-    type: Function,
-    required: true,
-  },
-  onWatermarkLuaFileChange: {
     type: Function,
     required: true,
   },

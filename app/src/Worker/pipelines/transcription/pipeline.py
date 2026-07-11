@@ -193,7 +193,6 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 translator,
                 options.get("translate_to", ""),
                 progress_callback=_translation_progress,
-                checkpoint_path=output_root / "translation_checkpoint.json",
             )
 
             translated_subtitle = write_subtitle_file(

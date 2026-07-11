@@ -50,8 +50,6 @@ def normalize_transcription_options(raw):
 
     translate_to = (options.get("translate_to") or "").strip()
     provider = (options.get("translator_provider") or config.TRANSCRIPTION_TRANSLATOR_PROVIDER or "none").strip().lower()
-    if provider in {"ollama", "openai"}:
-        provider = "openai_compatible"
     if provider not in VALID_TRANSLATOR_PROVIDERS:
         provider = "none"
     fallback_mode = (options.get("translator_fallback_mode") or "model_full_text").strip().lower()

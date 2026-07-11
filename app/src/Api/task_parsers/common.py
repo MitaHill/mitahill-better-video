@@ -57,22 +57,11 @@ def parse_watermark_timeline(raw):
                 "y_expr": str(item.get("y_expr", "")).strip(),
                 "rotation_deg": float(item.get("rotation_deg", 0.0) or 0.0),
                 "alpha": float(item.get("alpha", 0.45) or 0.45),
-                "animation": str(item.get("animation", "none")).strip().lower(),
                 "font_size": int(item.get("font_size", 26) or 26),
                 "font_color": str(item.get("font_color", "white")).strip(),
             }
         )
     return out
-
-
-def merge_unparsed_form_fields(form, parsed):
-    """Keep unknown form fields so task params stay extensible without parser rewrites."""
-    for key in form.keys():
-        if key in parsed:
-            continue
-        values = form.getlist(key)
-        parsed[key] = values if len(values) > 1 else form.get(key)
-    return parsed
 
 
 def get_list_field(form, key):

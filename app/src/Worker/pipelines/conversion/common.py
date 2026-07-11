@@ -14,7 +14,6 @@ VALID_WATERMARK_POSITIONS = {
     "center",
     "custom",
 }
-VALID_WATERMARK_ANIMATIONS = {"none", "swing", "dvd_bounce"}
 
 
 def to_bool(value, default=False):

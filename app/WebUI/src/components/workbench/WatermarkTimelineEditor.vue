@@ -19,10 +19,9 @@
           <div class="field compact"><label>旋转角度</label><input v-model.number="seg.rotationDeg" type="number" min="-180" max="180" step="1" /></div>
           <div class="field compact"><label>透明度</label><input v-model.number="seg.alpha" type="number" min="0.05" max="1" step="0.05" /></div>
         </div>
-        <div class="inline-grid three" v-if="seg.position === 'custom' || seg.animation === 'none'">
+        <div class="inline-grid two" v-if="seg.position === 'custom'">
           <div class="field compact"><label>X 表达式</label><input v-model="seg.xExpr" placeholder="例如: W-w-24" /></div>
           <div class="field compact"><label>Y 表达式</label><input v-model="seg.yExpr" placeholder="例如: H-h-24" /></div>
-          <div class="field compact"><label>动画</label><select v-model="seg.animation"><option value="none">静态</option><option value="swing">不断摆动</option><option value="dvd_bounce">DVD 图标撞墙</option></select></div>
         </div>
         <div class="wm-actions">
           <label class="check-inline"><input type="checkbox" v-model="seg.enabled" />启用该分段</label>
@@ -31,19 +30,6 @@
       </div>
     </div>
 
-    <div class="field">
-      <label>高级 Lua 自定义</label>
-      <div class="inline-grid two">
-        <label class="check-inline"><input type="radio" name="watermark-lua-enable" :value="false" v-model="convertForm.watermarkLuaEnabled" />关闭</label>
-        <label class="check-inline"><input type="radio" name="watermark-lua-enable" :value="true" v-model="convertForm.watermarkLuaEnabled" />启用</label>
-      </div>
-    </div>
-    <div class="field" v-if="convertForm.watermarkLuaEnabled">
-      <label>Lua Table 风格脚本（填写后将覆盖上方分段配置）</label>
-      <textarea v-model="convertForm.watermarkLuaScript" rows="6" placeholder="return { {label='A', source_type='text', text='WM', start_sec=0, end_sec=3, position='bottom_right', rotation_deg=10, animation='swing'} }"></textarea>
-      <label>导入脚本文件</label>
-      <input type="file" accept=".lua,.txt,text/plain" @change="onWatermarkLuaFileChange" />
-    </div>
   </div>
 </template>
 
@@ -58,10 +44,6 @@ defineProps({
     required: true,
   },
   removeWatermarkSegment: {
-    type: Function,
-    required: true,
-  },
-  onWatermarkLuaFileChange: {
     type: Function,
     required: true,
   },

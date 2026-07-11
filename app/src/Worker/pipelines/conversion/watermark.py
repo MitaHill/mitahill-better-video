@@ -1,6 +1,4 @@
-import json
 import logging
-import re
 import shutil
 from pathlib import Path
 
@@ -9,7 +7,6 @@ from PIL import Image, ImageDraw, ImageFont
 from app.src.Utils.ffmpeg import run_ffmpeg
 
 from .common import (
-    VALID_WATERMARK_ANIMATIONS,
     VALID_WATERMARK_POSITIONS,
     to_bool,
     to_float,
@@ -55,41 +52,6 @@ def _render_text_overlay_image(text, out_path, font_size, font_color):
     return out_path
 
 
-def _parse_lua_like_segments(script):
-    script = (script or "").strip()
-    if not script:
-        return []
-    cleaned = []
-    for line in script.splitlines():
-        stripped = line.split("--", 1)[0].strip()
-        if stripped:
-            cleaned.append(stripped)
-    payload = " ".join(cleaned)
-    if "return" in payload:
-        payload = payload.split("return", 1)[1].strip()
-    start = payload.find("{")
-    end = payload.rfind("}")
-    if start < 0 or end <= start:
-        return []
-    table = payload[start : end + 1]
-    table = re.sub(r"([A-Za-z_][A-Za-z0-9_]*)\s*=", r'"\1":', table)
-    table = table.replace("'", '"').replace("nil", "null")
-    try:
-        parsed = json.loads(table)
-    except Exception:
-        logger.warning("Failed to parse watermark_lua_script; fallback to timeline.")
-        return []
-    if isinstance(parsed, dict):
-        parsed = [parsed]
-    if not isinstance(parsed, list):
-        return []
-    out = []
-    for item in parsed:
-        if isinstance(item, dict):
-            out.append(item)
-    return out
-
-
 def _resolve_position_expr(position, x_expr, y_expr):
     if position not in VALID_WATERMARK_POSITIONS:
         position = "bottom_right"
@@ -106,26 +68,8 @@ def _resolve_position_expr(position, x_expr, y_expr):
     return "W-w-24", "H-h-24"
 
 
-def _resolve_animation_expr(animation, base_x, base_y, x_expr, y_expr):
-    animation = (animation or "none").lower()
-    if animation not in VALID_WATERMARK_ANIMATIONS:
-        animation = "none"
-    if animation == "swing":
-        return f"({base_x})+18*sin(2*PI*t)", f"({base_y})+6*sin(3*PI*t)"
-    if animation == "dvd_bounce":
-        x = "abs(mod((t*120),(2*(W-w)))-(W-w))"
-        y = "abs(mod((t*90),(2*(H-h)))-(H-h))"
-        return x, y
-    if x_expr and y_expr:
-        return x_expr, y_expr
-    return base_x, base_y
-
-
 def _build_watermark_segments(options, run_dir, duration_seconds):
     segments = options.get("watermark_timeline") or []
-    script_segments = _parse_lua_like_segments(options.get("watermark_lua_script"))
-    if script_segments:
-        segments = script_segments
 
     enable_text = to_bool(options.get("watermark_enable_text"), False)
     enable_image = to_bool(options.get("watermark_enable_image"), False)
@@ -145,7 +89,6 @@ def _build_watermark_segments(options, run_dir, duration_seconds):
                     "position": "bottom_right",
                     "alpha": alpha_default,
                     "rotation_deg": 0,
-                    "animation": "none",
                     "font_size": 26,
                     "font_color": "white",
                 }
@@ -162,7 +105,6 @@ def _build_watermark_segments(options, run_dir, duration_seconds):
                     "position": "bottom_right",
                     "alpha": alpha_default,
                     "rotation_deg": 0,
-                    "animation": "none",
                 }
             ]
 
@@ -193,9 +135,7 @@ def _build_watermark_segments(options, run_dir, duration_seconds):
         position = str(raw.get("position", "bottom_right")).lower()
         x_expr = (raw.get("x_expr") or "").strip()
         y_expr = (raw.get("y_expr") or "").strip()
-        base_x, base_y = _resolve_position_expr(position, x_expr, y_expr)
-        anim = str(raw.get("animation", "none")).lower()
-        x_final, y_final = _resolve_animation_expr(anim, base_x, base_y, x_expr, y_expr)
+        x_final, y_final = _resolve_position_expr(position, x_expr, y_expr)
         rotation = to_float(raw.get("rotation_deg"), 0.0, min_value=-180.0, max_value=180.0)
 
         if source_type == "image":

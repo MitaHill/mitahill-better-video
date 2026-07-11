@@ -26,6 +26,7 @@
 
 <script setup>
 import { computed } from "vue";
+import { useFieldPolicy } from "../../../composables/workbench/useFieldPolicy";
 
 const props = defineProps({
   convertForm: {
@@ -46,12 +47,7 @@ const props = defineProps({
   },
 });
 
-const readPolicy = (fieldKey) => props.getFieldPolicy("convert", fieldKey) || null;
-const isDisabled = (fieldKey) => Boolean(readPolicy(fieldKey)?.disabled);
-const allowed = (fieldKey, fallback = []) => {
-  const values = readPolicy(fieldKey)?.allowedValues;
-  return Array.isArray(values) && values.length ? values : fallback;
-};
+const { isDisabled, allowed } = useFieldPolicy(props.getFieldPolicy, "convert");
 
 const convertModeOptions = computed(() =>
   allowed("convertMode", ["transcode", "export_frames", "demux_streams"]).map((value) => ({

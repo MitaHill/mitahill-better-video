@@ -2,7 +2,6 @@ from .common import (
     bool_from_form,
     float_from_form,
     int_from_form,
-    merge_unparsed_form_fields,
     parse_watermark_timeline,
 )
 
@@ -35,29 +34,8 @@ def parse_conversion_task_params(form):
         "watermark_alpha": float_from_form(form, "watermark_alpha", 0.45),
         "watermark_timeline": parse_watermark_timeline(form.get("watermark_timeline")),
         "watermark_yaml_config": form.get("watermark_yaml_config", ""),
-        "watermark_lua_script": form.get("watermark_lua_script", ""),
         "frame_export_fps": int_from_form(form, "frame_export_fps", 0),
         "frame_export_fps_mode": (form.get("frame_export_fps_mode", "manual") or "manual").lower(),
         "frame_export_format": (form.get("frame_export_format", "jpg") or "jpg").lower(),
     }
-    merged = merge_unparsed_form_fields(form, parsed)
-    for key in (
-        "audio_source_mode",
-        "audio_channels_mode",
-        "audio_sample_rate",
-        "audio_bitrate_k",
-        "mute_audio",
-        "audio_fade_in_sec",
-        "audio_fade_out_sec",
-        "audio_echo",
-        "audio_echo_delay_ms",
-        "audio_echo_decay",
-        "audio_denoise",
-        "audio_reverse",
-        "audio_volume",
-        "haas_enabled",
-        "haas_delay_ms",
-        "haas_lead",
-    ):
-        merged.pop(key, None)
-    return merged
+    return parsed

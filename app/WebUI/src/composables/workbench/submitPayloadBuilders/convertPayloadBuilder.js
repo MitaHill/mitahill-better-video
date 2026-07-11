@@ -12,7 +12,6 @@ const toTimelinePayload = (timeline) =>
     y_expr: seg.yExpr,
     rotation_deg: seg.rotationDeg,
     alpha: seg.alpha,
-    animation: seg.animation,
   }));
 
 export const buildConvertTaskFormData = (convertForm) => {
@@ -44,7 +43,6 @@ export const buildConvertTaskFormData = (convertForm) => {
   data.append("watermark_default_text", convertForm.watermarkDefaultText || "");
   data.append("watermark_alpha", String(convertForm.watermarkAlpha));
   data.append("watermark_timeline", JSON.stringify(toTimelinePayload(convertForm.watermarkTimeline)));
-  data.append("watermark_lua_script", convertForm.watermarkLuaEnabled ? convertForm.watermarkLuaScript || "" : "");
   data.append("frame_export_fps", String(convertForm.frameExportFps));
   data.append("frame_export_fps_mode", String(convertForm.frameExportFpsMode || "manual"));
   data.append("frame_export_format", String(convertForm.frameExportFormat || "jpg"));

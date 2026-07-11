@@ -37,6 +37,7 @@
 <script setup>
 import { computed } from "vue";
 import { TRANSCRIPTION_TARGET_LANGUAGE_CODES, TRANSCRIPTION_TARGET_LANGUAGE_OPTIONS } from "../../../constants/transcriptionLanguages";
+import { useFieldPolicy } from "../../../composables/workbench/useFieldPolicy";
 
 const props = defineProps({
   transcribeForm: {
@@ -53,12 +54,7 @@ const props = defineProps({
   },
 });
 
-const readPolicy = (fieldKey) => props.getFieldPolicy("transcribe", fieldKey) || null;
-const isDisabled = (fieldKey) => Boolean(readPolicy(fieldKey)?.disabled);
-const allowed = (fieldKey, fallback = []) => {
-  const values = readPolicy(fieldKey)?.allowedValues;
-  return Array.isArray(values) && values.length ? values : fallback;
-};
+const { isDisabled, allowed } = useFieldPolicy(props.getFieldPolicy, "transcribe");
 
 const translateTargetOptions = computed(() => {
   const constrained = allowed("translateTo", TRANSCRIPTION_TARGET_LANGUAGE_CODES);

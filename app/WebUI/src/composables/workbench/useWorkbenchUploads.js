@@ -1,4 +1,4 @@
-import { validateFiles, isFilenameSafe } from "./utils";
+import { validateFiles } from "./utils";
 
 const probeMedia = async (file, parseJsonSafe) => {
   const data = new FormData();
@@ -113,26 +113,6 @@ export const useWorkbenchUploads = ({
     }
   };
 
-  const onWatermarkLuaFileChange = async (event) => {
-    const file = (event.target.files || [])[0];
-    if (!file) return;
-    if (!isFilenameSafe(file.name)) {
-      submitError.value = "Lua 脚本文件名包含非法字符或过长。";
-      event.target.value = "";
-      return;
-    }
-    try {
-      convertForm.watermarkLuaScript = await file.text();
-    } catch (_err) {
-      submitError.value = "读取 Lua 脚本文件失败。";
-    } finally {
-      if (typeof enforceCategory === "function") {
-        enforceCategory("convert");
-      }
-      event.target.value = "";
-    }
-  };
-
   const onTranscribeMediaChange = async (event) => {
     submitError.value = "";
     submitWarnings.value = "";
@@ -170,6 +150,5 @@ export const useWorkbenchUploads = ({
     onConvertMediaChange,
     onTranscribeMediaChange,
     onWatermarkImagesChange,
-    onWatermarkLuaFileChange,
   };
 };

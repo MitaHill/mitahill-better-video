@@ -88,8 +88,6 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     merged["transcription"]["allowed_models"] = list(backend_supported)
 
     provider = str(merged["translation"].get("provider") or "none").strip().lower()
-    if provider in {"openai", "ollama"}:
-        provider = "openai_compatible"
     if provider not in _VALID_TRANSLATORS:
         provider = "none"
     merged["translation"]["provider"] = provider

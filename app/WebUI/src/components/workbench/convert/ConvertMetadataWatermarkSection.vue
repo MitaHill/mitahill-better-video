@@ -23,23 +23,20 @@
       :convert-form="convertForm"
       :add-watermark-segment="addWatermarkSegment"
       :remove-watermark-segment="removeWatermarkSegment"
-      :on-watermark-lua-file-change="onWatermarkLuaFileChange"
       :get-field-policy="getFieldPolicy"
     />
   </div>
 </template>
 
 <script setup>
+import { useFieldPolicy } from "../../../composables/workbench/useFieldPolicy";
+
 const props = defineProps({
   convertForm: {
     type: Object,
     required: true,
   },
   onWatermarkImagesChange: {
-    type: Function,
-    required: true,
-  },
-  onWatermarkLuaFileChange: {
     type: Function,
     required: true,
   },
@@ -59,13 +56,5 @@ const props = defineProps({
 
 import WatermarkTimelineEditor from "../WatermarkTimelineEditor.vue";
 
-const readPolicy = (fieldKey) => props.getFieldPolicy("convert", fieldKey) || null;
-const isDisabled = (fieldKey) => Boolean(readPolicy(fieldKey)?.disabled);
-const toFiniteOr = (value, fallback) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-const numMin = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.minValue, fallback);
-const numMax = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.maxValue, fallback);
-const numStep = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.step, fallback);
+const { isDisabled, numMin, numMax, numStep } = useFieldPolicy(props.getFieldPolicy, "convert");
 </script>

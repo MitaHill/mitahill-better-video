@@ -1,6 +1,6 @@
 from app.src.Config import settings as config
 
-from .common import float_from_form, int_from_form, merge_unparsed_form_fields
+from .common import float_from_form, int_from_form
 
 try:
     from app.src.Api.services.admin.transcription_config import get_parser_defaults
@@ -25,8 +25,6 @@ def parse_transcription_task_params(form):
     ).strip().lower()
     translate_to = (form.get("translate_to", "") or "").strip()
     requested_provider = default_provider if translate_to else "none"
-    if requested_provider in {"openai", "ollama"}:
-        requested_provider = "openai_compatible"
     if requested_provider not in {"none", "openai_compatible"}:
         requested_provider = "none"
     default_base_url = (
@@ -73,4 +71,4 @@ def parse_transcription_task_params(form):
         "beam_size": int_from_form(form, "beam_size", 5),
         "best_of": int_from_form(form, "best_of", 5),
     }
-    return merge_unparsed_form_fields(form, parsed)
+    return parsed
