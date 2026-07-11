@@ -82,8 +82,6 @@ def normalize_transcription_options(raw):
         "best_of": _to_int(options.get("best_of"), 5, min_value=1, max_value=20),
         "prepend_timestamps": _to_bool(options.get("prepend_timestamps"), False),
         "max_line_chars": _to_int(options.get("max_line_chars"), 42, min_value=0, max_value=200),
-        "output_video_codec": (options.get("output_video_codec") or "h264").strip().lower() or "h264",
-        "output_audio_bitrate_k": _to_int(options.get("output_audio_bitrate_k"), 192, min_value=32, max_value=1024),
         "translate_to": translate_to,
         "translator_provider": provider,
         "translator_base_url": translator_base_url,
@@ -103,12 +101,6 @@ def normalize_transcription_options(raw):
             or ""
         ).strip(),
         "translator_fallback_mode": fallback_mode,
-        "translator_timeout_sec": _to_float(
-            options.get("translator_timeout_sec"),
-            config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS,
-            min_value=1.0,
-            max_value=1200.0,
-        ),
         "generate_bilingual": _to_bool(options.get("generate_bilingual"), True),
         "export_json": _to_bool(options.get("export_json"), False),
     }

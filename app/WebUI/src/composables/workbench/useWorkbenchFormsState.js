@@ -94,7 +94,6 @@ export const useWorkbenchFormsState = () => {
     language: "auto",
     translateTo: "",
     translatorProvider: "none",
-    translatorTimeoutSec: 120,
     generateBilingual: true,
     exportJson: false,
     prependTimestamps: false,
@@ -102,8 +101,6 @@ export const useWorkbenchFormsState = () => {
     temperature: 0,
     beamSize: 5,
     bestOf: 5,
-    outputVideoCodec: "h264",
-    outputAudioBitrateK: 192,
     mediaFiles: [],
   });
   const transcribeMediaInfo = ref([]);

@@ -255,8 +255,6 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                     media_path,
                     subtitle_for_video,
                     video_dir / "subtitled.mp4",
-                    options.get("output_video_codec", "h264"),
-                    options.get("output_audio_bitrate_k", 192),
                 )
             )
 

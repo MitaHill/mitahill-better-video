@@ -41,7 +41,6 @@ def default_transcription_config() -> Dict[str, Any]:
             "base_url": config.TRANSCRIPTION_TRANSLATOR_BASE_URL,
             "model": config.TRANSCRIPTION_TRANSLATOR_MODEL,
             "api_key": config.TRANSCRIPTION_TRANSLATOR_API_KEY,
-            "timeout_sec": config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS,
             "prompt": config.TRANSCRIPTION_TRANSLATOR_PROMPT,
             "fallback_mode": "model_full_text",
         },
@@ -102,11 +101,7 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     if fallback_mode not in _VALID_TRANSLATION_FALLBACK_MODES:
         fallback_mode = "model_full_text"
     merged["translation"]["fallback_mode"] = fallback_mode
-    try:
-        timeout_sec = float(merged["translation"].get("timeout_sec") or 120.0)
-    except (TypeError, ValueError):
-        timeout_sec = 120.0
-    merged["translation"]["timeout_sec"] = max(1.0, min(timeout_sec, 1200.0))
+    merged["translation"].pop("timeout_sec", None)
 
     aria2 = merged["download"].get("aria2") or {}
     try:
@@ -179,5 +174,4 @@ def get_parser_defaults() -> Dict[str, Any]:
         "translator_api_key": str(translation.get("api_key") or "").strip(),
         "translator_prompt": str(translation.get("prompt") or "").strip(),
         "translator_fallback_mode": str(translation.get("fallback_mode") or "model_full_text").strip().lower(),
-        "translator_timeout_sec": float(translation.get("timeout_sec") or 120.0),
     }

@@ -50,44 +50,13 @@
           :disabled="isDisabled('maxLineChars')"
         />
       </div>
-      <div class="field compact">
-        <label>输出音频码率 (k)</label>
-        <input
-          v-model.number="transcribeForm.outputAudioBitrateK"
-          type="number"
-          :min="numMin('outputAudioBitrateK', 32)"
-          :max="numMax('outputAudioBitrateK', 1024)"
-          :step="numStep('outputAudioBitrateK', 1)"
-          :disabled="isDisabled('outputAudioBitrateK')"
-        />
-      </div>
-    </div>
-
-    <div class="inline-grid two">
       <label class="check-inline">
         <input v-model="transcribeForm.prependTimestamps" type="checkbox" :disabled="isDisabled('prependTimestamps')" />
         文本附带时间戳
       </label>
-      <div class="field compact" v-if="transcribeForm.transcribeMode === 'subtitled_video'">
-        <label>视频编码</label>
-        <select v-model="transcribeForm.outputVideoCodec" :disabled="isDisabled('outputVideoCodec')">
-          <option v-for="item in outputVideoCodecOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-        </select>
-      </div>
     </div>
 
     <div class="inline-grid two">
-      <div class="field compact">
-        <label>翻译超时(秒)</label>
-        <input
-          v-model.number="transcribeForm.translatorTimeoutSec"
-          type="number"
-          :min="numMin('translatorTimeoutSec', 1)"
-          :max="numMax('translatorTimeoutSec', 1200)"
-          :step="numStep('translatorTimeoutSec', 1)"
-          :disabled="isDisabled('translatorTimeoutSec')"
-        />
-      </div>
       <label class="check-inline">
         <input v-model="transcribeForm.generateBilingual" type="checkbox" :disabled="isDisabled('generateBilingual')" />
         生成双语字幕
@@ -102,8 +71,6 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
-
 const props = defineProps({
   transcribeForm: {
     type: Object,
@@ -117,11 +84,6 @@ const props = defineProps({
 
 const readPolicy = (fieldKey) => props.getFieldPolicy("transcribe", fieldKey) || null;
 const isDisabled = (fieldKey) => Boolean(readPolicy(fieldKey)?.disabled);
-const allowed = (fieldKey, fallback = []) => {
-  const values = readPolicy(fieldKey)?.allowedValues;
-  return Array.isArray(values) && values.length ? values : fallback;
-};
-
 const toFiniteOr = (value, fallback) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -130,12 +92,5 @@ const toFiniteOr = (value, fallback) => {
 const numMin = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.minValue, fallback);
 const numMax = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.maxValue, fallback);
 const numStep = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.step, fallback);
-
-const outputVideoCodecOptions = computed(() =>
-  allowed("outputVideoCodec", ["h264", "h265"]).map((value) => ({
-    value,
-    label: String(value || "").toUpperCase(),
-  }))
-);
 
 </script>

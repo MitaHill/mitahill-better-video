@@ -9,7 +9,7 @@ const STAGE_LABELS = {
   transcribe: "语音识别中",
   write_subtitle: "写入字幕",
   translate: "翻译中",
-  render_video: "合成字幕视频",
+  render_video: "封装字幕视频",
   download: "下载中",
   package: "封装处理中",
   completed: "已完成",
@@ -79,8 +79,6 @@ export const buildParamRows = (status) => {
       { label: "导出JSON", value: formatBool(params.export_json) },
       { label: "时间戳文本", value: formatBool(params.prepend_timestamps) },
       { label: "最大行宽", value: params.max_line_chars ?? "-" },
-      { label: "视频输出编码", value: (params.output_video_codec || "-").toUpperCase() },
-      { label: "音频码率", value: params.output_audio_bitrate_k ? `${params.output_audio_bitrate_k}k` : "-" },
     ];
   }
   if (params.task_category === "download") {

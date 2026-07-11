@@ -4,7 +4,6 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from app.src.Config import settings as config
 from app.src.Utils.ffmpeg import run_ffmpeg
 from app.src.Utils.http import ffprobe_info
 
@@ -64,15 +63,7 @@ def write_json_file(path, payload):
     return file_path
 
 
-def _subtitle_filter_arg(subtitle_path):
-    escaped = str(subtitle_path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
-    # 之前容器里缺 CJK 字体时，中文字幕烧录会直接变成方块。
-    # 这里明确指定一个稳定存在的中文字体名，避免 ffmpeg/libass 自己乱选 fallback。
-    force_style = "FontName=Noto Sans CJK SC"
-    return f"subtitles='{escaped}':force_style='{force_style}'"
-
-
-def render_subtitled_video(video_path, subtitle_path, output_path, codec_key, audio_bitrate_k):
+def render_subtitled_video(video_path, subtitle_path, output_path):
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     source_subtitle = Path(subtitle_path)
@@ -83,44 +74,31 @@ def render_subtitled_video(video_path, subtitle_path, output_path, codec_key, au
     render_subtitle = subtitle_tmp_dir / f"render_subtitle_{subtitle_hash}{subtitle_suffix}"
     render_subtitle.unlink(missing_ok=True)
     shutil.copy2(source_subtitle, render_subtitle)
-    gpu_codec = "h264_nvenc"
-    cpu_codec = "libx264"
-    if (codec_key or "").lower() in {"h265", "hevc"}:
-        gpu_codec = "hevc_nvenc"
-        cpu_codec = "libx265"
-    video_codec = gpu_codec if config.FFMPEG_USE_GPU else cpu_codec
-    base_cmd = [
+    cmd = [
         "ffmpeg",
         "-y",
         "-i",
         str(video_path),
-        "-vf",
-        _subtitle_filter_arg(render_subtitle),
-        "-c:v",
-        video_codec,
-        "-c:a",
-        "aac",
-        "-b:a",
-        f"{max(32, int(audio_bitrate_k or 192))}k",
-        str(output_path),
-    ]
-    fallback_cmd = [
-        "ffmpeg",
-        "-y",
         "-i",
-        str(video_path),
-        "-vf",
-        _subtitle_filter_arg(render_subtitle),
-        "-c:v",
-        cpu_codec,
-        "-c:a",
-        "aac",
-        "-b:a",
-        f"{max(32, int(audio_bitrate_k or 192))}k",
+        str(render_subtitle),
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a?",
+        "-map",
+        "1:0",
+        "-c",
+        "copy",
+        "-c:s",
+        "mov_text",
+        "-metadata:s:s:0",
+        "language=und",
+        "-disposition:s:0",
+        "default",
         str(output_path),
     ]
     try:
-        run_ffmpeg(base_cmd, fallback_args=fallback_cmd)
+        run_ffmpeg(cmd)
     finally:
         render_subtitle.unlink(missing_ok=True)
     return output_path

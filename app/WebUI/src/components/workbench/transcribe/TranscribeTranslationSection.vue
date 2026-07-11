@@ -32,17 +32,6 @@
     </div>
 
     <div v-if="transcribeForm.translateTo" class="inline-grid two">
-      <div class="field compact">
-        <label>翻译超时(秒)</label>
-        <input
-          v-model.number="transcribeForm.translatorTimeoutSec"
-          type="number"
-          :min="numMin('translatorTimeoutSec', 1)"
-          :max="numMax('translatorTimeoutSec', 1200)"
-          :step="numStep('translatorTimeoutSec', 1)"
-          :disabled="isDisabled('translatorTimeoutSec')"
-        />
-      </div>
       <label class="check-inline transcribe-check-card">
         <input v-model="transcribeForm.generateBilingual" type="checkbox" :disabled="isDisabled('generateBilingual')" />
         生成双语字幕
@@ -77,13 +66,6 @@ const allowed = (fieldKey, fallback = []) => {
   const values = readPolicy(fieldKey)?.allowedValues;
   return Array.isArray(values) && values.length ? values : fallback;
 };
-const toFiniteOr = (value, fallback) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-const numMin = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.minValue, fallback);
-const numMax = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.maxValue, fallback);
-const numStep = (fieldKey, fallback) => toFiniteOr(readPolicy(fieldKey)?.step, fallback);
 
 const translateTargetOptions = computed(() => {
   const constrained = allowed("translateTo", TRANSCRIPTION_TARGET_LANGUAGE_CODES);

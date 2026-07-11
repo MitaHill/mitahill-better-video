@@ -6,6 +6,7 @@ import requests
 
 
 CONTEXT_WINDOW_SIZE = 20
+TRANSLATION_TIMEOUT_SECONDS = 30.0
 CORE_TRANSLATION_PROMPT = "Place the translation in a code block; do not add explanations. For example: ```Translation```"
 _LEGACY_PLACEHOLDER_RULE = "Preserve placeholders and markup exactly: {name}, [MASK], <tag>, %s, ${VAR}."
 _CODE_BLOCK_RE = re.compile(r"```(?:[a-zA-Z]+\n)?\s*([\s\S]*?)```", re.MULTILINE)
@@ -51,14 +52,13 @@ class BaseTranslator:
         model: str,
         api_key: str,
         prompt: str,
-        timeout_sec: float,
         fallback_mode: str = "model_full_text",
     ):
         self.base_url = (base_url or "").strip()
         self.model = (model or "").strip()
         self.api_key = (api_key or "").strip()
         self.prompt = (prompt or "").strip()
-        self.timeout_sec = float(timeout_sec or 120.0)
+        self.timeout_sec = TRANSLATION_TIMEOUT_SECONDS
         mode = str(fallback_mode or "model_full_text").strip().lower()
         self.fallback_mode = mode if mode in {"model_full_text", "source_text"} else "model_full_text"
 
@@ -219,6 +219,5 @@ def create_translator(options) -> Optional[BaseTranslator]:
         "api_key": options.get("translator_api_key", ""),
         "prompt": options.get("translator_prompt", ""),
         "fallback_mode": options.get("translator_fallback_mode", "model_full_text"),
-        "timeout_sec": options.get("translator_timeout_sec", 120.0),
     }
     return OpenAICompatibleTranslator(**kwargs)

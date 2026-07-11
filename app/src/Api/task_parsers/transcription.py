@@ -65,11 +65,6 @@ def parse_transcription_task_params(form):
             or defaults.get("translator_fallback_mode", "model_full_text")
             or "model_full_text"
         ).strip().lower(),
-        "translator_timeout_sec": float_from_form(
-            form,
-            "translator_timeout_sec",
-            defaults.get("translator_timeout_sec", config.TRANSCRIPTION_TRANSLATOR_TIMEOUT_SECONDS),
-        ),
         "generate_bilingual": bool_from_form(form, "generate_bilingual", True),
         "export_json": bool_from_form(form, "export_json", False),
         "prepend_timestamps": bool_from_form(form, "prepend_timestamps", False),
@@ -77,7 +72,5 @@ def parse_transcription_task_params(form):
         "temperature": float_from_form(form, "temperature", 0.0),
         "beam_size": int_from_form(form, "beam_size", 5),
         "best_of": int_from_form(form, "best_of", 5),
-        "output_video_codec": (form.get("output_video_codec", "h264") or "h264").lower(),
-        "output_audio_bitrate_k": int_from_form(form, "output_audio_bitrate_k", 192),
     }
     return merge_unparsed_form_fields(form, parsed)

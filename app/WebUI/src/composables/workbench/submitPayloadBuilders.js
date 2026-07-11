@@ -105,7 +105,6 @@ export const buildTranscriptionTaskFormData = (transcribeForm) => {
   data.append("language", transcribeForm.language);
   data.append("translate_to", transcribeForm.translateTo || "");
   data.append("translator_provider", transcribeForm.translateTo ? "openai_compatible" : "none");
-  data.append("translator_timeout_sec", String(transcribeForm.translatorTimeoutSec || 120));
   data.append("generate_bilingual", String(transcribeForm.generateBilingual));
   data.append("export_json", String(transcribeForm.exportJson));
   data.append("prepend_timestamps", String(transcribeForm.prependTimestamps));
@@ -113,8 +112,6 @@ export const buildTranscriptionTaskFormData = (transcribeForm) => {
   data.append("temperature", String(transcribeForm.temperature));
   data.append("beam_size", String(transcribeForm.beamSize));
   data.append("best_of", String(transcribeForm.bestOf));
-  data.append("output_video_codec", transcribeForm.outputVideoCodec);
-  data.append("output_audio_bitrate_k", String(transcribeForm.outputAudioBitrateK));
 
   return data;
 };

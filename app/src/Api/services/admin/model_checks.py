@@ -198,7 +198,6 @@ def test_translation_provider(translation_config: Dict) -> Dict:
     base_url = str(translation_config.get("base_url") or "").strip().rstrip("/")
     model = str(translation_config.get("model") or "").strip()
     api_key = str(translation_config.get("api_key") or "").strip()
-    timeout_sec = float(translation_config.get("timeout_sec") or 60.0)
 
     if provider == "none":
         return {"ok": False, "provider": provider, "error": "翻译提供器未启用"}
@@ -213,7 +212,7 @@ def test_translation_provider(translation_config: Dict) -> Dict:
         base_url=base_url,
         model=model,
         api_key=api_key,
-        timeout_sec=max(1.0, min(timeout_sec, 60.0)),
+        timeout_sec=30.0,
     )
 
 

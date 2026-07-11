@@ -3,15 +3,9 @@
     <h2>翻译源设置</h2>
     <p class="notice" style="margin-bottom: 10px;">用于配置转录后的翻译链路，调试菜单可直接测试当前配置。</p>
 
-    <div class="inline-grid two">
-      <div class="field compact">
-        <label>翻译提供器</label>
-        <input :value="'OpenAI 兼容格式'" disabled />
-      </div>
-      <div class="field compact">
-        <label>超时(s)</label>
-        <input v-model.number="local.timeoutSec" :disabled="loading" type="number" min="1" max="1200" />
-      </div>
+    <div class="field compact">
+      <label>翻译提供器</label>
+      <input :value="'OpenAI 兼容格式'" disabled />
     </div>
 
     <div class="field compact">
@@ -121,7 +115,6 @@ const local = reactive({
   baseUrl: "",
   model: "",
   apiKey: "",
-  timeoutSec: 120,
   prompt: "",
   fallbackMode: "model_full_text",
   previewTargetLanguage: "zh",
@@ -198,7 +191,6 @@ const applyFromProps = () => {
   local.baseUrl = translation.base_url || "";
   local.model = translation.model || "";
   local.apiKey = translation.api_key || "";
-  local.timeoutSec = Number(translation.timeout_sec ?? 120);
   const prompt = cleanPrompt(translation.prompt);
   local.prompt = prompt || CORE_TRANSLATION_PROMPT;
   local.fallbackMode = translation.fallback_mode || "model_full_text";
@@ -219,7 +211,6 @@ const save = async () => {
       base_url: String(local.baseUrl || "").trim(),
       model: String(local.model || "").trim(),
       api_key: String(local.apiKey || "").trim(),
-      timeout_sec: Number(local.timeoutSec || 120),
       prompt: cleanPrompt(local.prompt),
       fallback_mode: String(local.fallbackMode || "model_full_text").trim().toLowerCase(),
     },
