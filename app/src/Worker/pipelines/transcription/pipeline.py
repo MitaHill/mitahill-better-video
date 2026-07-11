@@ -99,7 +99,6 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
     output_root = run_dir / "results" / stem
     subtitle_dir = output_root / "subtitles"
     text_dir = output_root / "texts"
-    json_dir = output_root / "json"
     video_dir = output_root / "video"
 
     emit_progress(
@@ -157,17 +156,9 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
             write_text_file(
                 text_dir / "original.txt",
                 source_segments,
-                prepend_timestamps=options.get("prepend_timestamps", False),
+                prepend_timestamps=False,
             )
         )
-        if options.get("export_json"):
-            text_outputs.append(
-                write_json_file(
-                    json_dir / "original.json",
-                    {"media": media_item, "segments": source_segments},
-                )
-            )
-
         translated_segments = None
         translated_subtitle = None
         bilingual_subtitle = None
@@ -216,27 +207,19 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 write_text_file(
                     text_dir / "translated.txt",
                     translated_segments,
-                    prepend_timestamps=options.get("prepend_timestamps", False),
+                    prepend_timestamps=False,
                 )
             )
-            if options.get("generate_bilingual"):
-                # 双语字幕始终基于“原文段落 + 已翻译段落”重新配对生成，
-                # 不复用单语写出的字幕文本，避免中间格式化差异把双语行宽搞乱。
-                bilingual_segments = build_bilingual_segments(source_segments, translated_segments)
-                bilingual_subtitle = write_subtitle_file(
-                    subtitle_dir / f"bilingual.{subtitle_ext}",
-                    bilingual_segments,
-                    subtitle_format=options.get("subtitle_format", "srt"),
-                    max_line_chars=options.get("max_line_chars", 42),
-                )
-                text_outputs.append(bilingual_subtitle)
-            if options.get("export_json"):
-                text_outputs.append(
-                    write_json_file(
-                        json_dir / "translated.json",
-                        {"media": media_item, "segments": translated_segments},
-                    )
-                )
+            # 双语字幕始终基于“原文段落 + 已翻译段落”重新配对生成，
+            # 不复用单语写出的字幕文本，避免中间格式化差异把双语行宽搞乱。
+            bilingual_segments = build_bilingual_segments(source_segments, translated_segments)
+            bilingual_subtitle = write_subtitle_file(
+                subtitle_dir / f"bilingual.{subtitle_ext}",
+                bilingual_segments,
+                subtitle_format=options.get("subtitle_format", "srt"),
+                max_line_chars=options.get("max_line_chars", 42),
+            )
+            text_outputs.append(bilingual_subtitle)
 
         mode = options.get("transcribe_mode", "subtitle_zip")
         video_outputs = []
@@ -249,14 +232,16 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 file_count=total,
                 stage="render_video",
             )
-            subtitle_for_video = bilingual_subtitle or translated_subtitle or original_subtitle
-            subtitle_title = "双语字幕" if bilingual_subtitle else ("译文字幕" if translated_subtitle else "原文字幕")
+            subtitle_tracks = [{"path": original_subtitle, "title": "原文字幕", "default": not translated_subtitle}]
+            if translated_subtitle:
+                subtitle_tracks.append({"path": translated_subtitle, "title": "译文字幕", "default": True})
+            if bilingual_subtitle:
+                subtitle_tracks.append({"path": bilingual_subtitle, "title": "双语字幕", "default": False})
             video_outputs.append(
                 render_subtitled_video(
                     media_path,
-                    subtitle_for_video,
+                    subtitle_tracks,
                     video_dir / "subtitled.mp4",
-                    subtitle_title=subtitle_title,
                 )
             )
 

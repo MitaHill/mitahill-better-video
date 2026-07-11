@@ -57,9 +57,10 @@ process restart loops and import-time resource contention.
 - After each task, registered GPU models must be released immediately, then
   Python and CUDA memory should be cleaned with `gc.collect()` and
   `torch.cuda.empty_cache()`.
-- Transcription video output must add subtitles as a soft subtitle stream and
-  copy existing video/audio streams; unsupported source streams should fail
-  clearly instead of being transcoded implicitly.
+- Transcription video output must add subtitles as soft subtitle streams and
+  copy existing video/audio streams; translated videos contain original,
+  translated, and bilingual subtitle tracks, while untranslated videos contain
+  only the original subtitle track.
 - Subtitle muxing must use a safe temporary subtitle path under
   `/workspace/storage/tmp/subtitles/`, such as `render_subtitle_<hash>.srt`,
   and delete it immediately after ffmpeg exits.

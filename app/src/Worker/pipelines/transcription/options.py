@@ -7,14 +7,6 @@ VALID_TRANSLATOR_FALLBACK_MODES = {"model_full_text", "source_text"}
 VALID_TRANSCRIPTION_BACKENDS = {"whisper"}
 
 
-def _to_bool(value, default=False):
-    if value is None:
-        return default
-    if isinstance(value, bool):
-        return value
-    return str(value).strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _to_int(value, default=0, min_value=None, max_value=None):
     try:
         parsed = int(value)
@@ -80,7 +72,7 @@ def normalize_transcription_options(raw):
         "temperature": _to_float(options.get("temperature"), 0.0, min_value=0.0, max_value=1.0),
         "beam_size": _to_int(options.get("beam_size"), 5, min_value=1, max_value=20),
         "best_of": _to_int(options.get("best_of"), 5, min_value=1, max_value=20),
-        "prepend_timestamps": _to_bool(options.get("prepend_timestamps"), False),
+        "prepend_timestamps": False,
         "max_line_chars": _to_int(options.get("max_line_chars"), 42, min_value=0, max_value=200),
         "translate_to": translate_to,
         "translator_provider": provider,
@@ -101,7 +93,7 @@ def normalize_transcription_options(raw):
             or ""
         ).strip(),
         "translator_fallback_mode": fallback_mode,
-        "generate_bilingual": _to_bool(options.get("generate_bilingual"), True),
-        "export_json": _to_bool(options.get("export_json"), False),
+        "generate_bilingual": True,
+        "export_json": False,
     }
     return normalized

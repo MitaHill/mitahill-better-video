@@ -82,8 +82,6 @@ Fields:
 - `translator_base_url`
 - `translator_model`
 - `translator_api_key`
-- `generate_bilingual`
-- `export_json`
 
 Response:
 ```json

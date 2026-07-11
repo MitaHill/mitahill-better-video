@@ -1,6 +1,6 @@
 from app.src.Config import settings as config
 
-from .common import bool_from_form, float_from_form, int_from_form, merge_unparsed_form_fields
+from .common import float_from_form, int_from_form, merge_unparsed_form_fields
 
 try:
     from app.src.Api.services.admin.transcription_config import get_parser_defaults
@@ -65,9 +65,9 @@ def parse_transcription_task_params(form):
             or defaults.get("translator_fallback_mode", "model_full_text")
             or "model_full_text"
         ).strip().lower(),
-        "generate_bilingual": bool_from_form(form, "generate_bilingual", True),
-        "export_json": bool_from_form(form, "export_json", False),
-        "prepend_timestamps": bool_from_form(form, "prepend_timestamps", False),
+        "generate_bilingual": True,
+        "export_json": False,
+        "prepend_timestamps": False,
         "max_line_chars": int_from_form(form, "max_line_chars", 42),
         "temperature": float_from_form(form, "temperature", 0.0),
         "beam_size": int_from_form(form, "beam_size", 5),

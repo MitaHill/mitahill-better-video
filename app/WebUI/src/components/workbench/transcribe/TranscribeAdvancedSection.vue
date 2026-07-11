@@ -50,23 +50,7 @@
           :disabled="isDisabled('maxLineChars')"
         />
       </div>
-      <label class="check-inline">
-        <input v-model="transcribeForm.prependTimestamps" type="checkbox" :disabled="isDisabled('prependTimestamps')" />
-        文本附带时间戳
-      </label>
     </div>
-
-    <div class="inline-grid two">
-      <label class="check-inline">
-        <input v-model="transcribeForm.generateBilingual" type="checkbox" :disabled="isDisabled('generateBilingual')" />
-        生成双语字幕
-      </label>
-    </div>
-
-    <label class="check-inline">
-      <input v-model="transcribeForm.exportJson" type="checkbox" :disabled="isDisabled('exportJson')" />
-      导出 JSON 分段
-    </label>
   </div>
 </template>
 

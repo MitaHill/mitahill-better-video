@@ -75,9 +75,6 @@ export const buildParamRows = (status) => {
       { label: "温度", value: params.temperature ?? "-" },
       { label: "Beam Size", value: params.beam_size ?? "-" },
       { label: "Best Of", value: params.best_of ?? "-" },
-      { label: "双语字幕", value: formatBool(params.generate_bilingual) },
-      { label: "导出JSON", value: formatBool(params.export_json) },
-      { label: "时间戳文本", value: formatBool(params.prepend_timestamps) },
       { label: "最大行宽", value: params.max_line_chars ?? "-" },
     ];
   }

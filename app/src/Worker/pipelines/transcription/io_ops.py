@@ -63,48 +63,63 @@ def write_json_file(path, payload):
     return file_path
 
 
-def render_subtitled_video(video_path, subtitle_path, output_path, subtitle_title="字幕"):
+def render_subtitled_video(video_path, subtitle_tracks, output_path):
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    source_subtitle = Path(subtitle_path)
-    subtitle_suffix = source_subtitle.suffix or ".srt"
     subtitle_tmp_dir = Path("/workspace/storage/tmp/subtitles")
     subtitle_tmp_dir.mkdir(parents=True, exist_ok=True)
     subtitle_hash = hashlib.sha1(str(output_path).encode("utf-8")).hexdigest()[:12]
-    render_subtitle = subtitle_tmp_dir / f"render_subtitle_{subtitle_hash}{subtitle_suffix}"
-    render_subtitle.unlink(missing_ok=True)
-    shutil.copy2(source_subtitle, render_subtitle)
+    render_subtitles = []
+
+    for idx, track in enumerate(subtitle_tracks or []):
+        source_subtitle = Path(track["path"])
+        subtitle_suffix = source_subtitle.suffix or ".srt"
+        render_subtitle = subtitle_tmp_dir / f"render_subtitle_{subtitle_hash}_{idx}{subtitle_suffix}"
+        render_subtitle.unlink(missing_ok=True)
+        shutil.copy2(source_subtitle, render_subtitle)
+        render_subtitles.append((render_subtitle, track))
+
     cmd = [
         "ffmpeg",
         "-y",
         "-i",
         str(video_path),
-        "-i",
-        str(render_subtitle),
+    ]
+    for render_subtitle, _track in render_subtitles:
+        cmd.extend(["-i", str(render_subtitle)])
+
+    cmd.extend([
         "-map",
         "0:v:0",
         "-map",
         "0:a?",
-        "-map",
-        "1:0",
-        "-c",
-        "copy",
-        "-c:s",
-        "mov_text",
-        "-metadata:s:s:0",
-        "language=und",
-        "-metadata:s:s:0",
-        f"title={subtitle_title or '字幕'}",
-        "-metadata:s:s:0",
-        f"handler_name={subtitle_title or '字幕'}",
-        "-disposition:s:0",
-        "default",
-        str(output_path),
-    ]
+    ])
+    for idx, _item in enumerate(render_subtitles, start=1):
+        cmd.extend(["-map", f"{idx}:0"])
+
+    cmd.extend(["-c", "copy", "-c:s", "mov_text"])
+    for idx, (_render_subtitle, track) in enumerate(render_subtitles):
+        title = str(track.get("title") or "字幕")
+        disposition = "default" if track.get("default") else "0"
+        cmd.extend(
+            [
+                f"-metadata:s:s:{idx}",
+                "language=und",
+                f"-metadata:s:s:{idx}",
+                f"title={title}",
+                f"-metadata:s:s:{idx}",
+                f"handler_name={title}",
+                f"-disposition:s:{idx}",
+                disposition,
+            ]
+        )
+    cmd.append(str(output_path))
+
     try:
         run_ffmpeg(cmd)
     finally:
-        render_subtitle.unlink(missing_ok=True)
+        for render_subtitle, _track in render_subtitles:
+            render_subtitle.unlink(missing_ok=True)
     return output_path
 
 

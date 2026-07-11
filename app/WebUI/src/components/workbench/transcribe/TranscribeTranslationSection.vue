@@ -31,13 +31,6 @@
       </div>
     </div>
 
-    <div v-if="transcribeForm.translateTo" class="inline-grid two">
-      <label class="check-inline transcribe-check-card">
-        <input v-model="transcribeForm.generateBilingual" type="checkbox" :disabled="isDisabled('generateBilingual')" />
-        生成双语字幕
-      </label>
-    </div>
-
   </div>
 </template>
 
