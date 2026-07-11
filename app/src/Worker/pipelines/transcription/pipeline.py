@@ -170,6 +170,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
 
         translated_segments = None
         translated_subtitle = None
+        bilingual_subtitle = None
         if translator and (options.get("translate_to") or "").strip():
             emit_progress(
                 task_id,
@@ -222,14 +223,13 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 # 双语字幕始终基于“原文段落 + 已翻译段落”重新配对生成，
                 # 不复用单语写出的字幕文本，避免中间格式化差异把双语行宽搞乱。
                 bilingual_segments = build_bilingual_segments(source_segments, translated_segments)
-                text_outputs.append(
-                    write_subtitle_file(
-                        subtitle_dir / f"bilingual.{subtitle_ext}",
-                        bilingual_segments,
-                        subtitle_format=options.get("subtitle_format", "srt"),
-                        max_line_chars=options.get("max_line_chars", 42),
-                    )
+                bilingual_subtitle = write_subtitle_file(
+                    subtitle_dir / f"bilingual.{subtitle_ext}",
+                    bilingual_segments,
+                    subtitle_format=options.get("subtitle_format", "srt"),
+                    max_line_chars=options.get("max_line_chars", 42),
                 )
+                text_outputs.append(bilingual_subtitle)
             if options.get("export_json"):
                 text_outputs.append(
                     write_json_file(
@@ -249,12 +249,14 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 file_count=total,
                 stage="render_video",
             )
-            subtitle_for_video = translated_subtitle or original_subtitle
+            subtitle_for_video = bilingual_subtitle or translated_subtitle or original_subtitle
+            subtitle_title = "双语字幕" if bilingual_subtitle else ("译文字幕" if translated_subtitle else "原文字幕")
             video_outputs.append(
                 render_subtitled_video(
                     media_path,
                     subtitle_for_video,
                     video_dir / "subtitled.mp4",
+                    subtitle_title=subtitle_title,
                 )
             )
 

@@ -63,7 +63,7 @@ def write_json_file(path, payload):
     return file_path
 
 
-def render_subtitled_video(video_path, subtitle_path, output_path):
+def render_subtitled_video(video_path, subtitle_path, output_path, subtitle_title="字幕"):
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     source_subtitle = Path(subtitle_path)
@@ -93,6 +93,10 @@ def render_subtitled_video(video_path, subtitle_path, output_path):
         "mov_text",
         "-metadata:s:s:0",
         "language=und",
+        "-metadata:s:s:0",
+        f"title={subtitle_title or '字幕'}",
+        "-metadata:s:s:0",
+        f"handler_name={subtitle_title or '字幕'}",
         "-disposition:s:0",
         "default",
         str(output_path),
