@@ -309,6 +309,19 @@ input[type="file"] {
   display: none;
 }
 
+.file-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.selected-file-count {
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 button {
   border: none;
   padding: 12px 16px;

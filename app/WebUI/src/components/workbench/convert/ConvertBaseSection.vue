@@ -10,7 +10,12 @@
     <div class="field">
       <label>上传视频（可多选）</label>
       <input ref="mediaInput" class="file-input-hidden" type="file" multiple accept="video/*" @change="onConvertMediaChange" />
-      <button type="button" class="secondary" @click="openMediaPicker">选择文件</button>
+      <div class="file-picker-row">
+        <button type="button" class="secondary" @click="openMediaPicker">
+          {{ selectedFileCount ? "重新选择文件" : "选择文件" }}
+        </button>
+        <span v-if="selectedFileCount" class="selected-file-count">已选择 {{ selectedFileCount }} 个文件</span>
+      </div>
     </div>
     <div class="media-list" v-if="convertMediaInfo.length">
       <div class="media-row" v-for="item in convertMediaInfo" :key="item.filename + ':' + item.size_mb">
@@ -54,6 +59,11 @@ const mediaInput = ref(null);
 const openMediaPicker = () => {
   mediaInput.value?.click();
 };
+
+const selectedFileCount = computed(() => {
+  const files = props.convertForm?.mediaFiles;
+  return Array.isArray(files) ? files.length : 0;
+});
 
 const convertModeOptions = computed(() =>
   allowed("convertMode", ["transcode", "export_frames", "demux_streams"]).map((value) => ({
