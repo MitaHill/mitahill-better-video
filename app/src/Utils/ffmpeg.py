@@ -147,7 +147,7 @@ def _can_use_encoder(encoder):
         result = subprocess.run(
             [
                 "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-                "-f", "lavfi", "-i", "color=size=128x128:rate=1",
+                "-f", "lavfi", "-i", "color=size=640x360:rate=1",
                 "-frames:v", "1", "-c:v", encoder, "-f", "null", "-"
             ],
             stdout=subprocess.PIPE,
