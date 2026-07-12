@@ -444,6 +444,30 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     }
   };
 
+  const removeTranscriptionModel = async (backend, modelId) => {
+    if (!auth.token || !backend || !modelId) return;
+    transcriptionModels.error = "";
+    transcriptionModels.message = "";
+    try {
+      const res = await fetch(
+        `/api/admin/transcription/models/${encodeURIComponent(backend)}/${encodeURIComponent(modelId)}`,
+        {
+          method: "DELETE",
+          headers: _authHeaders(),
+        }
+      );
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "移除模型失败");
+      }
+      transcriptionModels.message = `已移除模型: ${backend}/${modelId}`;
+      await fetchTranscriptionModels();
+    } catch (error) {
+      transcriptionModels.error = error.message;
+    }
+  };
+
   const cancelModelDownloadJob = async (jobId) => {
     if (!auth.token || !jobId) return;
     transcriptionModels.error = "";
@@ -689,6 +713,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     fetchModelDownloadJobs,
     fetchModelDownloadJob,
     startModelDownload,
+    removeTranscriptionModel,
     cancelModelDownloadJob,
     deleteModelDownloadJob,
     testTranscriptionModel,

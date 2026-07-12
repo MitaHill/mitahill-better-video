@@ -4,7 +4,8 @@
 
     <div class="field">
       <label>上传音频或视频（可多选）</label>
-      <input type="file" multiple accept="video/*,audio/*" @change="onTranscribeMediaChange" />
+      <input ref="mediaInput" class="file-input-hidden" type="file" multiple accept="video/*,audio/*" @change="onTranscribeMediaChange" />
+      <button type="button" class="secondary" @click="openMediaPicker">选择文件</button>
     </div>
 
     <div class="media-list" v-if="transcribeMediaInfo.length">
@@ -58,7 +59,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import {
   TRANSCRIPTION_LANGUAGE_CODES,
   TRANSCRIPTION_LANGUAGE_OPTIONS,
@@ -91,6 +92,11 @@ const props = defineProps({
 });
 
 const { isDisabled, allowed } = useFieldPolicy(props.getFieldPolicy, "transcribe");
+const mediaInput = ref(null);
+
+const openMediaPicker = () => {
+  mediaInput.value?.click();
+};
 
 const transcribeModeOptions = computed(() =>
   allowed("transcribeMode", ["subtitle_zip", "subtitled_video", "subtitle_and_video_zip"]).map((value) => ({

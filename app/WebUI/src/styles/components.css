@@ -305,6 +305,10 @@ input[type="file"] {
   padding: 8px;
 }
 
+.file-input-hidden {
+  display: none;
+}
+
 button {
   border: none;
   padding: 12px 16px;

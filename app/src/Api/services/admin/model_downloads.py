@@ -260,6 +260,24 @@ def start_model_download(model_id: str, backend: str, request_payload: Optional[
     return payload
 
 
+def remove_model_file(model_id: str, backend: str) -> Dict:
+    backend = str(backend or "").strip().lower()
+    model_id = str(model_id or "").strip().lower()
+    model_entry = get_model_entry(backend, model_id)
+    if not model_entry:
+        raise ValueError(f"未找到模型: {backend}/{model_id}")
+
+    path = Path(model_entry.get("local_path") or "")
+    if not path.exists():
+        raise ValueError("模型文件不存在")
+    if not path.is_file():
+        raise ValueError("模型路径不是文件")
+
+    path.unlink()
+    model_entry["installed"] = False
+    return model_entry
+
+
 def cancel_download_job(job_id: str) -> Dict:
     payload = db_transcription.get_model_download_job(job_id)
     if not payload:

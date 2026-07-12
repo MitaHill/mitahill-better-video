@@ -22,6 +22,16 @@
           <tr v-for="item in models" :key="`${item.backend}:${item.model_id}`">
             <td>
               <button
+                v-if="item.installed"
+                type="button"
+                class="secondary"
+                :disabled="loading"
+                @click="onRemove(item.backend, item.model_id)"
+              >
+                移除
+              </button>
+              <button
+                v-else
                 type="button"
                 :disabled="loading"
                 @click="onDownload(item.backend, item.model_id)"
@@ -136,6 +146,10 @@ defineProps({
     required: true,
   },
   onDownload: {
+    type: Function,
+    required: true,
+  },
+  onRemove: {
     type: Function,
     required: true,
   },

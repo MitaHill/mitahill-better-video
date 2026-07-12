@@ -4,6 +4,7 @@ from .model_downloads import (
     delete_download_job,
     get_download_job,
     list_download_jobs,
+    remove_model_file,
     start_model_download,
 )
 from .transcription_catalog import list_transcription_models
@@ -16,6 +17,7 @@ __all__ = [
     "delete_download_job",
     "get_download_job",
     "list_download_jobs",
+    "remove_model_file",
     "start_model_download",
     "list_transcription_models",
     "get_transcription_config",

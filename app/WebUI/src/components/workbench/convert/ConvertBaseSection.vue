@@ -9,7 +9,8 @@
     </div>
     <div class="field">
       <label>上传视频（可多选）</label>
-      <input type="file" multiple accept="video/*" @change="onConvertMediaChange" />
+      <input ref="mediaInput" class="file-input-hidden" type="file" multiple accept="video/*" @change="onConvertMediaChange" />
+      <button type="button" class="secondary" @click="openMediaPicker">选择文件</button>
     </div>
     <div class="media-list" v-if="convertMediaInfo.length">
       <div class="media-row" v-for="item in convertMediaInfo" :key="item.filename + ':' + item.size_mb">
@@ -25,7 +26,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useFieldPolicy } from "../../../composables/workbench/useFieldPolicy";
 
 const props = defineProps({
@@ -48,6 +49,11 @@ const props = defineProps({
 });
 
 const { isDisabled, allowed } = useFieldPolicy(props.getFieldPolicy, "convert");
+const mediaInput = ref(null);
+
+const openMediaPicker = () => {
+  mediaInput.value?.click();
+};
 
 const convertModeOptions = computed(() =>
   allowed("convertMode", ["transcode", "export_frames", "demux_streams"]).map((value) => ({

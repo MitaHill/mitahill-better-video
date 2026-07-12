@@ -9,13 +9,14 @@
     </div>
     <div class="field">
       <label>上传文件（支持批量）</label>
-      <input type="file" multiple @change="onEnhanceFileChange" />
+      <input ref="fileInput" class="file-input-hidden" type="file" multiple @change="onEnhanceFileChange" />
+      <button type="button" class="secondary" @click="openFilePicker">选择文件</button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useFieldPolicy } from "../../../composables/workbench/useFieldPolicy";
 
 const props = defineProps({
@@ -34,6 +35,11 @@ const props = defineProps({
 });
 
 const { isDisabled, allowed } = useFieldPolicy(props.getFieldPolicy, "enhance");
+const fileInput = ref(null);
+
+const openFilePicker = () => {
+  fileInput.value?.click();
+};
 
 const inputTypeOptions = computed(() =>
   allowed("inputType", ["Video", "Image"]).map((value) => ({
