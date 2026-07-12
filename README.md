@@ -1,11 +1,3 @@
-通过本[项目（点击前往Github）](https://github.com/MitaHill/mitahill-better-video)，你可以在一个页面即可完成：
-**视频超分辨率**、**从视频中转录字幕文件**、**将外语翻译为目标语言**、**从Youtube等网站下载视频**
-
-**通过Docker运行**，**支持nvidia GPU加速**。*能够运行什么模型，根据显卡本身能力决定。*
-
-<!--more-->
-
-
 # MitaHill Better Video - 自部署视频增强、转换与转录平台
 
 ![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)
