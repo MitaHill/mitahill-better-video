@@ -1,6 +1,6 @@
 FROM ghcr.io/astral-sh/uv:0.8.13 AS uv
 
-FROM nvidia/cuda:12.4.1-base-ubuntu22.04
+FROM python:3.10-slim-bookworm
 
 # Keep this Dockerfile compatible with the legacy docker builder:
 # no BuildKit-only syntax, heredocs, cache mounts, or frontend directives.
@@ -11,7 +11,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
     UV_NO_CACHE=1 \
-    LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/torch/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64
+    LD_LIBRARY_PATH=/usr/local/lib/python3.10/site-packages/torch/lib:/usr/local/lib/python3.10/dist-packages/torch/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 
@@ -21,11 +21,9 @@ ARG FFMPEG_BUILD_SHA256=c5156dd8059afc7b42b4ea19ae0b7df67b8361036ccef110aa007819
 
 # Core system dependencies and tooling
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.10 python3.10-dev python3.10-distutils python3.10-venv \
     ffmpeg git wget curl ca-certificates xz-utils build-essential pkg-config \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxfixes3 libxkbcommon0 \
     unzip aria2 tzdata \
- && ln -s /usr/bin/python3.10 /usr/bin/python \
  && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$INSTALL_PREBUILT_FFMPEG" = "1" ]; then \
