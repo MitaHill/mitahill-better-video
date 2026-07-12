@@ -21,6 +21,7 @@ from app.src.Worker.pipelines.dispatch import process_task
 
 
 logger = logging.getLogger("STARTUP_SELF_CHECK")
+SELF_CHECK_TASK_ID = "0000"
 
 
 class StartupSelfCheckService:
@@ -46,9 +47,10 @@ class StartupSelfCheckService:
         self.run()
 
     def run(self):
-        task_id = ""
+        task_id = SELF_CHECK_TASK_ID
         try:
             self.workspace.mkdir(parents=True, exist_ok=True)
+            self._cleanup_task(task_id)
             self._check_nvidia_smi()
             task_id = self._create_probe_task()
             self._run_probe_task(task_id)
@@ -107,6 +109,7 @@ class StartupSelfCheckService:
                 max_video_mb=config.MAX_VIDEO_SIZE_MB,
                 max_image_mb=config.MAX_IMAGE_SIZE_MB,
                 logger=logger,
+                reserved_task_id=SELF_CHECK_TASK_ID,
             )
         if err:
             raise RuntimeError(f"自检任务创建失败: {err}")
@@ -141,6 +144,8 @@ class StartupSelfCheckService:
                 db.update_task_status(task_id, "FAILED", message="startup self-check cleanup")
             if db.get_task(task_id):
                 db_admin.delete_task(task_id)
+            for root in (Path("/workspace/storage/output"), Path("/workspace/storage/upload")):
+                shutil.rmtree(root / f"run_{task_id}", ignore_errors=True)
         except Exception:
             logger.warning("Failed to cleanup startup self-check task: %s", task_id, exc_info=True)
 

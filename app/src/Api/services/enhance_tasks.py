@@ -6,11 +6,21 @@ from app.src.Utils.http import ffprobe_info, is_filename_safe, secure_filename
 from .uploads import new_task_dirs
 
 
-def create_enhance_task(upload, params, client_ip, output_root, upload_root, max_video_mb, max_image_mb, logger):
+def create_enhance_task(
+    upload,
+    params,
+    client_ip,
+    output_root,
+    upload_root,
+    max_video_mb,
+    max_image_mb,
+    logger,
+    reserved_task_id=None,
+):
     if not upload.filename or not is_filename_safe(upload.filename):
         return None, "invalid filename"
 
-    task_id, run_dir, upload_dir = new_task_dirs(output_root, upload_root)
+    task_id, run_dir, upload_dir = new_task_dirs(output_root, upload_root, reserved_task_id=reserved_task_id)
 
     filename = secure_filename(upload.filename)
     input_path = upload_dir / filename
