@@ -41,17 +41,9 @@ COPY app/ /workspace/app/
 
 # 2. Install web backend dependencies
 COPY pyproject.toml uv.lock /workspace/
-RUN uv export --locked --no-emit-project --no-default-groups --group base --group app \
+RUN uv export --locked --no-emit-project --no-default-groups --group app \
         --format requirements.txt --no-hashes --output-file /tmp/app-requirements.txt && \
-    uv pip install --system setuptools==69.5.1 wheel==0.45.1 numpy==1.24.4 cython==0.29.36 && \
-    uv pip install --system \
-        --index https://download.pytorch.org/whl/cu116 \
-        --index-strategy unsafe-best-match \
-        --no-build-isolation-package openai-whisper \
-        --no-build-isolation-package basicsr \
-        --no-build-isolation-package facexlib \
-        --no-build-isolation-package gfpgan \
-        --requirements /tmp/app-requirements.txt && \
+    uv pip install --system --requirements /tmp/app-requirements.txt && \
     rm -f /tmp/app-requirements.txt
 
 # 4. Copy built frontend assets
