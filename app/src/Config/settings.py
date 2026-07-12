@@ -175,7 +175,12 @@ try:
     TRANSCRIPTION_TRANSLATOR_API_KEY = os.getenv("TRANSCRIPTION_TRANSLATOR_API_KEY", "").strip()
     TRANSCRIPTION_TRANSLATOR_PROMPT = os.getenv(
         "TRANSCRIPTION_TRANSLATOR_PROMPT",
-        "Place the translation in a code block; do not add explanations. For example: ```Translation```",
+        "\n".join([
+            "Translate to {{target_language}}.",
+            "Keep original line breaks and segment boundaries.",
+            "Do not add explanations or notes.",
+            "Place the translation in a code block; do not add explanations. For example: ```Translation```",
+        ]),
     ).strip()
 except Exception as e:
     logger.critical(f"[FAILED] Configuration error: {e}")

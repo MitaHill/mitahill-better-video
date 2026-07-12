@@ -7,7 +7,6 @@ import requests
 
 CONTEXT_WINDOW_SIZE = 20
 TRANSLATION_TIMEOUT_SECONDS = 30.0
-CORE_TRANSLATION_PROMPT = "Place the translation in a code block; do not add explanations. For example: ```Translation```"
 _LEGACY_PLACEHOLDER_RULE = "Preserve placeholders and markup exactly: {name}, [MASK], <tag>, %s, ${VAR}."
 _CODE_BLOCK_RE = re.compile(r"```(?:[a-zA-Z]+\n)?\s*([\s\S]*?)```", re.MULTILINE)
 _THINK_TAG_RE = re.compile(r"<think>[\s\S]*?</think>", re.IGNORECASE)
@@ -131,7 +130,9 @@ class BaseTranslator:
     @classmethod
     def _system_prompt(cls, target_language: str, custom_prompt: str = "") -> str:
         resolved_custom = cls._render_custom_prompt(custom_prompt, target_language)
-        return resolved_custom or CORE_TRANSLATION_PROMPT
+        if not resolved_custom:
+            raise ValueError("Translator system prompt is empty.")
+        return resolved_custom
 
 
 def _strip_known_endpoint_suffix(base_url: str) -> str:

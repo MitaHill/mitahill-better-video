@@ -55,6 +55,11 @@ def normalize_transcription_options(raw):
     fallback_mode = (options.get("translator_fallback_mode") or "model_full_text").strip().lower()
     if fallback_mode not in VALID_TRANSLATOR_FALLBACK_MODES:
         fallback_mode = "model_full_text"
+    translator_prompt = (
+        options["translator_prompt"]
+        if "translator_prompt" in options
+        else config.TRANSCRIPTION_TRANSLATOR_PROMPT
+    )
     translator_base_url = (
         options.get("translator_base_url")
         or config.TRANSCRIPTION_TRANSLATOR_BASE_URL
@@ -85,11 +90,7 @@ def normalize_transcription_options(raw):
             or config.TRANSCRIPTION_TRANSLATOR_API_KEY
             or ""
         ).strip(),
-        "translator_prompt": (
-            options.get("translator_prompt")
-            or config.TRANSCRIPTION_TRANSLATOR_PROMPT
-            or ""
-        ).strip(),
+        "translator_prompt": str(translator_prompt or "").strip(),
         "translator_fallback_mode": fallback_mode,
         "generate_bilingual": True,
         "export_json": False,

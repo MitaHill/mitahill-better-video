@@ -120,7 +120,6 @@ const local = reactive({
   previewTargetLanguage: "zh",
 });
 
-const CORE_TRANSLATION_PROMPT = "Place the translation in a code block; do not add explanations. For example: ```Translation```";
 const LEGACY_PLACEHOLDER_RULE = "Preserve placeholders and markup exactly: {name}, [MASK], <tag>, %s, ${VAR}.";
 
 const TARGET_LANGUAGE_NAME_MAP = Object.freeze({
@@ -181,7 +180,7 @@ function cleanPrompt(rawPrompt) {
 }
 
 const previewSystemPrompt = computed(() => {
-  return renderCustomPrompt(local.prompt, local.previewTargetLanguage) || CORE_TRANSLATION_PROMPT;
+  return renderCustomPrompt(local.prompt, local.previewTargetLanguage);
 });
 
 const applyFromProps = () => {
@@ -191,8 +190,7 @@ const applyFromProps = () => {
   local.baseUrl = translation.base_url || "";
   local.model = translation.model || "";
   local.apiKey = translation.api_key || "";
-  const prompt = cleanPrompt(translation.prompt);
-  local.prompt = prompt || CORE_TRANSLATION_PROMPT;
+  local.prompt = cleanPrompt(translation.prompt);
   local.fallbackMode = translation.fallback_mode || "model_full_text";
 };
 
