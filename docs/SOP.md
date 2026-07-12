@@ -90,8 +90,9 @@ Model packaging rule:
   VoiceFixer and DeepFilterNet are not part of the default image.
 - FFmpeg uses the Ubuntu package by default for old NVIDIA driver
   compatibility. A checksum-verified prebuilt FFmpeg archive can be enabled at
-  build time, but newer FFmpeg builds may require newer NVIDIA drivers. The app
-  exposes only codecs that pass a tiny NVENC encode test on the current GPU.
+  build time; this optional archive is pinned near early 2025 instead of
+  tracking the moving `latest` build. The app exposes only codecs that pass a
+  tiny NVENC encode test on the current GPU.
 
 Deploy from `pre-run/`:
 
