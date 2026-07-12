@@ -10,7 +10,17 @@
     <div class="field">
       <label>上传文件（支持批量）</label>
       <input ref="fileInput" class="file-input-hidden" type="file" multiple @change="onEnhanceFileChange" />
-      <button type="button" class="secondary" @click="openFilePicker">选择文件</button>
+      <div class="file-picker-row">
+        <button type="button" class="secondary" @click="openFilePicker">
+          {{ selectedFileCount ? "重新选择文件" : "选择文件" }}
+        </button>
+        <span v-if="selectedFileCount" class="selected-file-count">已选择 {{ selectedFileCount }} 个文件</span>
+      </div>
+      <div class="media-list" v-if="selectedFiles.length">
+        <div class="media-row" v-for="file in selectedFiles" :key="file.name + ':' + file.size">
+          <span>{{ file.name }}</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -40,6 +50,9 @@ const fileInput = ref(null);
 const openFilePicker = () => {
   fileInput.value?.click();
 };
+
+const selectedFiles = computed(() => (Array.isArray(props.enhanceForm?.files) ? props.enhanceForm.files : []));
+const selectedFileCount = computed(() => selectedFiles.value.length);
 
 const inputTypeOptions = computed(() =>
   allowed("inputType", ["Video", "Image"]).map((value) => ({

@@ -5,7 +5,12 @@
     <div class="field">
       <label>上传音频或视频（可多选）</label>
       <input ref="mediaInput" class="file-input-hidden" type="file" multiple accept="video/*,audio/*" @change="onTranscribeMediaChange" />
-      <button type="button" class="secondary" @click="openMediaPicker">选择文件</button>
+      <div class="file-picker-row">
+        <button type="button" class="secondary" @click="openMediaPicker">
+          {{ selectedFileCount ? "重新选择文件" : "选择文件" }}
+        </button>
+        <span v-if="selectedFileCount" class="selected-file-count">已选择 {{ selectedFileCount }} 个文件</span>
+      </div>
     </div>
 
     <div class="media-list" v-if="transcribeMediaInfo.length">
@@ -97,6 +102,11 @@ const mediaInput = ref(null);
 const openMediaPicker = () => {
   mediaInput.value?.click();
 };
+
+const selectedFileCount = computed(() => {
+  const files = props.transcribeForm?.mediaFiles;
+  return Array.isArray(files) ? files.length : 0;
+});
 
 const transcribeModeOptions = computed(() =>
   allowed("transcribeMode", ["subtitle_zip", "subtitled_video", "subtitle_and_video_zip"]).map((value) => ({
