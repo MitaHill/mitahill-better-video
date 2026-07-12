@@ -1,3 +1,5 @@
+name: mitahill-better-video
+
 services:
   better_video:
     image: better_video:latest
