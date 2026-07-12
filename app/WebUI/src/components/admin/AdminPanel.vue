@@ -131,6 +131,7 @@
             :message="transcriptionModels.message"
             :on-refresh="refreshTranscriptionCatalog"
             :on-download="startTranscriptionModelDownload"
+            :on-remove="removeInstalledTranscriptionModel"
             :on-cancel-job="cancelTranscriptionModelDownloadJob"
             :on-delete-job="deleteTranscriptionModelDownloadJob"
           />
@@ -221,6 +222,7 @@ const {
   fetchTranscriptionModels,
   fetchModelDownloadJobs,
   startModelDownload,
+  removeTranscriptionModel,
   cancelModelDownloadJob,
   deleteModelDownloadJob,
   testTranscriptionModel,
@@ -329,6 +331,12 @@ const refreshTranscriptionCatalog = async () => {
 
 const startTranscriptionModelDownload = async (backend, modelId) => {
   await startModelDownload(backend, modelId);
+  await fetchModelDownloadJobs();
+};
+
+const removeInstalledTranscriptionModel = async (backend, modelId) => {
+  if (!window.confirm(`确认移除模型 ${backend}/${modelId}？模型文件将被删除。`)) return;
+  await removeTranscriptionModel(backend, modelId);
   await fetchModelDownloadJobs();
 };
 

@@ -6,6 +6,7 @@ from ...services.admin import (
     get_download_job,
     list_download_jobs,
     list_transcription_models,
+    remove_model_file,
     start_model_download,
 )
 from ...services.admin_auth import get_admin_session
@@ -36,6 +37,18 @@ def admin_start_model_download():
     except Exception as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify({"ok": True, "job": job})
+
+
+@bp.delete("/api/admin/transcription/models/<backend>/<model_id>")
+def admin_remove_transcription_model(backend: str, model_id: str):
+    _session, err = get_admin_session(request)
+    if err:
+        return jsonify({"error": err}), 401
+    try:
+        model = remove_model_file(model_id=model_id, backend=backend)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, "model": model})
 
 
 @bp.get("/api/admin/transcription/models/downloads")
