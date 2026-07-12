@@ -23,8 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 python3.10-dev python3.10-distutils python3.10-venv \
     ffmpeg git wget curl ca-certificates xz-utils build-essential pkg-config \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxfixes3 libxkbcommon0 \
-    nano vim less lsof htop tmux unzip zip rsync openssh-client aria2 \
-    iputils-ping net-tools tzdata \
+    unzip aria2 tzdata \
  && ln -s /usr/bin/python3.10 /usr/bin/python \
  && rm -rf /var/lib/apt/lists/*
 

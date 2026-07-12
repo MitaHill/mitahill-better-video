@@ -28,13 +28,9 @@ base = [
     "python-dotenv==1.0.1",
 ]
 app = [
-    "flask==2.3.3",
-    "gunicorn==21.2.0",
     "flask-socketio==5.3.6",
     "eventlet==0.36.1",
     "yt-dlp==2026.2.4",
-    "python-dotenv==1.0.1",
-    "basicsr==1.4.2",
 ]
 dev = [
     "uv==0.8.13",

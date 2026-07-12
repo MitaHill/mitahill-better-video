@@ -546,12 +546,8 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 app = [
-    { name = "basicsr" },
     { name = "eventlet" },
-    { name = "flask" },
     { name = "flask-socketio" },
-    { name = "gunicorn" },
-    { name = "python-dotenv" },
     { name = "yt-dlp" },
 ]
 base = [
@@ -583,12 +579,8 @@ dev = [
 
 [package.metadata.requires-dev]
 app = [
-    { name = "basicsr", specifier = "==1.4.2" },
     { name = "eventlet", specifier = "==0.36.1" },
-    { name = "flask", specifier = "==2.3.3" },
     { name = "flask-socketio", specifier = "==5.3.6" },
-    { name = "gunicorn", specifier = "==21.2.0" },
-    { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "yt-dlp", specifier = "==2026.2.4" },
 ]
 base = [
