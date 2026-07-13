@@ -303,6 +303,7 @@ def process_download_task(task):
         {
             "task_id": task_id,
             "task_category": "download",
+            "status": "COMPLETED",
             "progress": 100,
             "message": "下载任务已完成",
             "stage": "completed",
