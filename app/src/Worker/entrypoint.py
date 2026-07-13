@@ -5,7 +5,7 @@ Flow:
 - Initializes config + database context in worker loop
 - Polls SQLite for pending tasks with an atomic pick
 - Processes frames (segmenting videos when needed), writes previews and outputs
-- Reports progress back to SQLite for API/UI polling
+- Reports progress back to SQLite and realtime UI events
 """
 
 import sys
