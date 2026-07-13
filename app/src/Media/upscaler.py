@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from basicsr.archs.rrdbnet_arch import RRDBNet
 
+from .hat_runtime import HATUpscaler
 from .realesrgan_runtime import RealESRGANer, SRVGGNetCompact
 
 logger = logging.getLogger("UPSCALER")
@@ -13,6 +14,15 @@ class Upscaler:
     def __init__(self, model_name, scale, tile, tile_pad, fp16, weights_dir, denoise_strength=None):
         logger.info(f"Initializing model {model_name} (scale: {scale}, fp16: {fp16})")
         self.model_name = model_name
+        if model_name == 'real-hat-gan-x4':
+            self.upsampler = HATUpscaler(
+                weights_dir / 'Real_HAT_GAN_SRx4.pth',
+                tile=tile,
+                tile_pad=tile_pad,
+                half=fp16,
+            )
+            logger.info("HAT model loaded and ready.")
+            return
         model_scale = 4
         dni_weight = None
         

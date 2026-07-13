@@ -155,11 +155,12 @@ pre-run/
 
 ### 增强模型
 
-项目内置 Real-ESRGAN 相关加载逻辑，常用模型包括：
+项目内置 Real-ESRGAN 与 HAT 相关加载逻辑，常用模型包括：
 
 - `realesrgan-x4plus`
 - `realesrnet-x4plus`
 - `realesr-general-x4v3`
+- `real-hat-gan-x4`
 
 ### 转录模型
 

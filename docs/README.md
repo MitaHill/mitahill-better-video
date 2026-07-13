@@ -9,6 +9,7 @@
 - [API 说明](API.md)：任务、管理、转录、下载等接口。
 - [WSL2 部署提示](WSL2.md)：WSL2 下 NVIDIA / Docker 常见问题。
 - [真实 IP 部署](DEPLOY_REAL_IP.md)：Nginx、FRP、Proxy Protocol 配置。
+- [第三方代码与模型](THIRD_PARTY.md)：外部代码、模型来源和许可证。
 - [Compose 工作流](../deploy/compose/README.md)：构建、开发、测试 Compose 文件。
 
 ## 标准运行入口

@@ -62,4 +62,5 @@ RUN mkdir -p /workspace/app/models/video && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth && \
-    wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth
+    wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth && \
+    wget -q -O /workspace/app/models/video/Real_HAT_GAN_SRx4.pth https://huggingface.co/jaideepsingh/upscale_models/resolve/867e7c0ad519aba5d36b5bb4ef4a4a91781914c4/HAT/Real_HAT_GAN_SRx4.pth
