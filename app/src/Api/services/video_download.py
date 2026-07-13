@@ -134,12 +134,21 @@ def yt_dlp_conservative_args() -> list[str]:
 
 def _summarize_yt_dlp_error(text: str) -> str:
     raw = str(text or "").strip()
+    lower = raw.lower()
     if "provided YouTube account cookies are no longer valid" in raw:
         return "YouTube Cookie 已失效，请重新导出 cookies.txt 后再试。"
     if "No supported JavaScript runtime could be found" in raw:
         return "yt-dlp 缺少 JavaScript runtime，请重新构建包含 Deno 的应用镜像。"
     if "Sign in to confirm your age" in raw:
         return "该 YouTube 视频需要登录或年龄验证，请上传有效 YouTube Cookie。"
+    if "rate-limited" in lower or "rate limited" in lower:
+        return "当前会话被站点限流，请稍后再试，或降低批量下载频率。"
+    if "http error 403" in lower or "403 forbidden" in lower:
+        return "站点拒绝访问该资源，请检查链接、Cookie 或稍后重试。"
+    if "private video" in lower or "this video is private" in lower:
+        return "该视频为私有内容，请使用有访问权限的账号重新导出 Cookie。"
+    if "video unavailable" in lower or "this video is unavailable" in lower:
+        return "视频当前不可用，请检查链接是否有效，或稍后重试。"
     return "\n".join(raw.splitlines()[-50:])
 
 
