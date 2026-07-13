@@ -158,12 +158,18 @@ export const useWorkbenchController = () => {
     downloadForm.probeMessage = "";
     downloadForm.probeLoading = true;
     try {
-      const url = String(downloadForm.sourceUrl || "").trim();
+      const url = String(downloadForm.sourceUrl || "")
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .find(Boolean);
       if (!url) {
         throw new Error("请先输入下载链接。");
       }
       const payload = new FormData();
       payload.append("url", url);
+      if (downloadForm.cookieFile) {
+        payload.append("cookie_file", downloadForm.cookieFile);
+      }
       const res = await fetch("/api/downloads/probe", { method: "POST", body: payload });
       const data = await parseJsonSafe(res);
       if (!res.ok) {

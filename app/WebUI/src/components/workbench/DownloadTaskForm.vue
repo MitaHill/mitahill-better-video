@@ -3,13 +3,13 @@
     <div class="param-section">
       <div class="param-title">视频下载来源</div>
       <div class="field">
-        <label>视频链接（支持 YouTube 等）</label>
-        <input
+        <label>视频链接（支持批量，一行一个）</label>
+        <textarea
           :value="downloadForm.sourceUrl"
-          type="text"
-          placeholder="https://www.youtube.com/watch?v=..."
+          rows="4"
+          placeholder="https://www.youtube.com/watch?v=...\nhttps://www.youtube.com/watch?v=..."
           @input="onUrlInput"
-        />
+        ></textarea>
       </div>
 
       <div class="status-row" style="gap: 8px;">
@@ -19,6 +19,17 @@
         <span class="notice" v-if="downloadForm.maxQualityLabel">
           免登录可用最高：{{ downloadForm.maxQualityLabel }}
         </span>
+      </div>
+      <div class="field compact">
+        <label>Cookie 文件（可选）</label>
+        <div class="file-picker-row">
+          <input ref="cookieInput" class="file-input-hidden" type="file" accept=".txt,text/plain" @change="onCookieFileChange" />
+          <button type="button" class="secondary" @click="openCookiePicker">
+            {{ downloadForm.cookieFile ? "重新选择 Cookie" : "选择 Cookie" }}
+          </button>
+          <span v-if="downloadForm.cookieFile" class="selected-file-count">{{ downloadForm.cookieFile.name }}</span>
+        </div>
+        <p class="notice">用于需要登录态的视频解析与下载。上传后会持久保存，之后默认复用；再次选择文件会覆盖旧 Cookie。</p>
       </div>
       <p v-if="downloadForm.probeError" class="notice" style="color: var(--accent-2);">{{ downloadForm.probeError }}</p>
       <p v-if="downloadForm.probeMessage" class="notice">{{ downloadForm.probeMessage }}</p>
@@ -106,6 +117,8 @@
 </template>
 
 <script setup>
+import { ref } from "vue";
+
 const props = defineProps({
   downloadForm: {
     type: Object,
@@ -117,8 +130,23 @@ const props = defineProps({
   },
 });
 
+const cookieInput = ref(null);
+
+const openCookiePicker = () => {
+  cookieInput.value?.click();
+};
+
+const onCookieFileChange = (event) => {
+  const file = Array.from(event.target.files || [])[0] || null;
+  props.downloadForm.cookieFile = file;
+  props.downloadForm.probeReady = false;
+  props.downloadForm.probeMessage = file ? `已选择 Cookie：${file.name}，解析或创建任务时会更新服务器 Cookie。` : "";
+  event.target.value = "";
+};
+
 const onUrlInput = (event) => {
   props.downloadForm.sourceUrl = event.target.value;
+  props.downloadForm.probeReady = false;
 };
 
 const onProbeSource = () => {

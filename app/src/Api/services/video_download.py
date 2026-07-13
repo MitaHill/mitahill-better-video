@@ -1,12 +1,15 @@
 import os
 import shutil
 import subprocess
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
 
 DOWNLOAD_ROOT = Path("/workspace/storage/downloads/manual")
+DOWNLOAD_COOKIE_PATH = Path("/workspace/storage/data/download_cookies.txt")
+MAX_COOKIE_SIZE = 5 * 1024 * 1024
 _MB = 1024 * 1024
 
 
@@ -48,6 +51,86 @@ def normalize_download_url(value: str) -> str:
     return raw
 
 
+def split_download_urls(value: str) -> list[str]:
+    rows = []
+    seen = set()
+    for line in str(value or "").splitlines():
+        raw = line.strip()
+        if not raw or raw in seen:
+            continue
+        rows.append(normalize_download_url(raw))
+        seen.add(raw)
+    if not rows:
+        raise ValueError("url is required")
+    return rows
+
+
+def save_download_cookie_file(cookie_file) -> str:
+    if not cookie_file or not getattr(cookie_file, "filename", ""):
+        return ""
+
+    cookie_file.stream.seek(0, 2)
+    size = cookie_file.stream.tell()
+    cookie_file.stream.seek(0)
+    if size <= 0:
+        raise ValueError("Cookie 文件为空")
+    if size > MAX_COOKIE_SIZE:
+        raise ValueError("Cookie 文件过大，最大支持 5MB")
+
+    DOWNLOAD_COOKIE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = tempfile.NamedTemporaryFile(
+        prefix="download_cookies_",
+        suffix=".txt",
+        dir=str(DOWNLOAD_COOKIE_PATH.parent),
+        delete=False,
+    )
+    tmp_path = Path(tmp.name)
+    tmp.close()
+    try:
+        cookie_file.save(tmp_path)
+        tmp_path.replace(DOWNLOAD_COOKIE_PATH)
+    finally:
+        tmp_path.unlink(missing_ok=True)
+    return str(DOWNLOAD_COOKIE_PATH)
+
+
+def get_download_cookie_path() -> str:
+    return str(DOWNLOAD_COOKIE_PATH) if DOWNLOAD_COOKIE_PATH.is_file() else ""
+
+
+def snapshot_download_cookie(run_dir: Path) -> str:
+    if not DOWNLOAD_COOKIE_PATH.is_file():
+        return ""
+    run_dir.mkdir(parents=True, exist_ok=True)
+    target = run_dir / "download_cookies.txt"
+    shutil.copy2(DOWNLOAD_COOKIE_PATH, target)
+    return str(target)
+
+
+def yt_dlp_cookie_args(cookie_path=None) -> list[str]:
+    path = get_download_cookie_path() if cookie_path is None else str(cookie_path or "")
+    return ["--cookies", path] if path else []
+
+
+def yt_dlp_conservative_args() -> list[str]:
+    return [
+        "--concurrent-fragments",
+        "1",
+        "--limit-rate",
+        "4M",
+        "--sleep-requests",
+        "1",
+        "--sleep-interval",
+        "2",
+        "--max-sleep-interval",
+        "5",
+        "--retries",
+        "10",
+        "--fragment-retries",
+        "10",
+    ]
+
+
 def _collect_files(root: Path):
     rows = []
     if not root.exists():
@@ -74,7 +157,7 @@ def ensure_yt_dlp_ready():
         raise RuntimeError("未找到 ffmpeg，请先在镜像中安装。")
 
 
-def _run_probe_json(url: str) -> Dict:
+def _run_probe_json(url: str, cookie_path: str = "") -> Dict:
     ensure_yt_dlp_ready()
     safe_url = normalize_download_url(url)
     cmd = [
@@ -82,8 +165,11 @@ def _run_probe_json(url: str) -> Dict:
         "--dump-single-json",
         "--skip-download",
         "--no-playlist",
-        safe_url,
     ]
+    if cookie_path:
+        cmd.extend(["--cookies", str(cookie_path)])
+    cmd.extend(yt_dlp_conservative_args())
+    cmd.append(safe_url)
     proc = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
@@ -246,8 +332,8 @@ def _build_subtitle_languages(subtitles: Dict, automatic_captions: Dict) -> list
     return out
 
 
-def probe_download_source(url: str) -> Dict:
-    payload = _run_probe_json(url)
+def probe_download_source(url: str, cookie_path: str = "") -> Dict:
+    payload = _run_probe_json(url, cookie_path=cookie_path)
     quality_options, max_quality = _build_quality_options(payload.get("formats") or [])
     source_metrics = _resolve_source_metrics(payload)
     subtitle_languages = _build_subtitle_languages(

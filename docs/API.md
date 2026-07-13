@@ -122,6 +122,50 @@ Response:
 { "task_id": "<uuid>" }
 ```
 
+## Download APIs
+
+### POST /api/downloads/probe
+**Content-Type**: `multipart/form-data`
+
+Fields:
+- `url` or `source_url` (required)
+- `cookie_file` (optional, Netscape cookies.txt format, max 5MB)
+
+`cookie_file` is saved to `/workspace/storage/data/download_cookies.txt` and
+will be reused by later probe/download requests. Uploading a new file replaces
+the old one.
+
+### POST /api/downloads/tasks
+**Content-Type**: `multipart/form-data`
+
+Fields:
+- `source_url` (required, one URL per line for batch download)
+- `download_mode` (`video` | `audio` | `subtitle_only`)
+- `quality_selector`
+- `video_output_format`
+- `audio_output_format`
+- `subtitle_output_format`
+- `subtitle_languages`
+- `subtitle_include_auto`
+- `cookie_file` (optional, Netscape cookies.txt format, max 5MB)
+
+When present, `cookie_file` updates the persistent download Cookie. If the
+stored Cookie exists but no longer works for a source, the download fails
+directly.
+Created tasks use a per-task Cookie snapshot, so later Cookie uploads do not
+change already queued tasks.
+
+yt-dlp downloads use conservative defaults: one fragment at a time, limited
+download rate, short request sleeps, and retry enabled.
+
+Response:
+```json
+{ "task_id": "<uuid>", "task_ids": ["<uuid>", "..."], "errors": [{ "url": "...", "error": "..." }] }
+```
+
+`errors` is only present for batch requests with partial invalid URLs. A `201`
+response means at least one task was created.
+
 ## Admin APIs (Password Auth)
 
 ### POST /api/admin/login

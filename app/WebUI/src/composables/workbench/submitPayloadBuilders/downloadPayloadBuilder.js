@@ -13,6 +13,9 @@ export const buildDownloadTaskFormData = (downloadForm) => {
   data.append("audio_output_format", String(downloadForm.audioOutputFormat || "mp3"));
   data.append("subtitle_output_format", String(downloadForm.subtitleOutputFormat || "srt"));
   data.append("subtitle_include_auto", String(Boolean(downloadForm.subtitleIncludeAuto)));
+  if (downloadForm.cookieFile) {
+    data.append("cookie_file", downloadForm.cookieFile);
+  }
   const langs = Array.isArray(downloadForm.subtitleLanguages) ? downloadForm.subtitleLanguages : [];
   if (langs.length) {
     langs.forEach((item) => data.append("subtitle_languages", String(item || "").trim()));
