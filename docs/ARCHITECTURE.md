@@ -73,10 +73,11 @@
 
 ## Storage
 - SQLite: `/workspace/storage/data/tasks.db`
-- Outputs: `/workspace/storage/output/sr_*`
+- Outputs: `/workspace/storage/output/run_<task_id>/results/`
 - Run scratch: `/workspace/storage/output/run_<task_id>/`
 - Uploads: `/workspace/storage/upload/run_<task_id>/`
-- Task categories in unified queue: `enhance` / `convert` / `transcribe`
+- Persistent download Cookie: `/workspace/storage/data/download_cookies.txt`
+- Task categories in unified queue: `enhance` / `convert` / `transcribe` / `download`
 - Transcription model cache roots:
   - `whisper`: `/workspace/storage/models/transcription/whisper/*.pt`
 
