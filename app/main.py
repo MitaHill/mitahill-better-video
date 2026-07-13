@@ -67,6 +67,21 @@ def main():
         task_id = (data or {}).get("task_id")
         if task_id:
             join_room(task_id)
+            task = db.get_task(task_id)
+            if task:
+                socketio.emit(
+                    "frame",
+                    {
+                        "task_id": task_id,
+                        "task_category": task.get("task_category"),
+                        "status": task.get("status"),
+                        "progress": task.get("progress"),
+                        "message": task.get("message"),
+                        "stage": str(task.get("status") or "").lower(),
+                        "updated_at": task.get("updated_at"),
+                    },
+                    room=task_id,
+                )
 
     socketio.run(app, host="0.0.0.0", port=8501)
 

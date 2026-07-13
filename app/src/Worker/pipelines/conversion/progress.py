@@ -37,6 +37,7 @@ def emit_progress(
         {
             "task_id": task_id,
             "task_category": "convert",
+            "status": "PROCESSING",
             "progress": progress_value,
             "message": message,
             "stage": str(stage or "").strip().lower(),

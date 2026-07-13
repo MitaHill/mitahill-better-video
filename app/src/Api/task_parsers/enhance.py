@@ -9,7 +9,7 @@ def parse_enhance_task_params(form):
         "task_category": "enhance",
         "input_type": form.get("input_type", "Video"),
         "model_name": form.get("model_name", "realesrgan-x4plus"),
-        "upscale": int_from_form(form, "upscale", 3),
+        "upscale": int_from_form(form, "upscale", config.DEFAULT_SMART_UPSCALE_FACTOR),
         "tile": int_from_form(form, "tile", config.DEFAULT_SMART_TILE_SIZE),
         "denoise_strength": float_from_form(form, "denoise_strength", 0.5),
         "keep_audio": True,

@@ -48,6 +48,7 @@ def process_conversion_task(task):
         {
             "task_id": task_id,
             "task_category": "convert",
+            "status": "COMPLETED",
             "progress": 100,
             "message": "转换任务已完成",
             "stage": "completed",

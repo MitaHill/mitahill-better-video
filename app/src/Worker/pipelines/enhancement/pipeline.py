@@ -1,6 +1,7 @@
 import json
 import shutil
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from PIL import Image
 import numpy as np
@@ -18,6 +19,7 @@ from app.src.Utils.ffmpeg import (
 )
 from app.src.Utils.preview_cache import set_preview_from_path, clear_task as clear_preview_cache
 from app.src.Media.upscaler import build_model
+from app.src.Notifications.events import send_event
 from app.src.Worker.gpu_model_coordinator import is_cuda_oom, prepare_model_load, register_release_hook
 from .preview import generate_previews
 
@@ -28,6 +30,19 @@ def process_enhancement_task(task):
     logger.info(f"=== Starting Task Processor: {task_id} ===")
     model_holder = {}
 
+    def _emit_status(progress, message, stage):
+        send_event(
+            {
+                "task_id": task_id,
+                "task_category": "enhance",
+                "status": "PROCESSING",
+                "progress": progress,
+                "message": message,
+                "stage": stage,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+
     def _release_realesrgan():
         model_holder.pop("upsampler", None)
         if torch.cuda.is_available():
@@ -37,6 +52,7 @@ def process_enhancement_task(task):
     
     try:
         db.update_task_status(task_id, "PROCESSING", 0, "Initializing...")
+        _emit_status(0, "Initializing...", "prepare")
         params = json.loads(task['task_params'])
         video_info = json.loads(task.get('video_info') or "{}")
         output_root = Path("/workspace/storage/output")
@@ -54,6 +70,7 @@ def process_enhancement_task(task):
 
         # 1. Load Model ONCE
         db.update_task_status(task_id, "PROCESSING", 5, "Loading Model...")
+        _emit_status(5, "Loading Model...", "prepare")
         prepare_model_load("realesrgan")
         try:
             upsampler = build_model(
@@ -97,6 +114,7 @@ def process_enhancement_task(task):
             if duration > config.SEGMENT_TIME_SECONDS:
                 # Segmented processing
                 db.update_task_status(task_id, "PROCESSING", 10, "Splitting Video...")
+                _emit_status(10, "Splitting Video...", "prepare")
                 logger.info("Segmenting video: %.2fs per segment", config.SEGMENT_TIME_SECONDS)
                 segments_dir = run_dir / "segments"
                 segments_dir.mkdir(exist_ok=True)
@@ -237,10 +255,31 @@ def process_enhancement_task(task):
 
         db.update_task_result(task_id, output_root / out_name)
         db.update_task_status(task_id, "COMPLETED", 100, f"Completed: {out_name}")
+        send_event(
+            {
+                "task_id": task_id,
+                "task_category": "enhance",
+                "status": "COMPLETED",
+                "progress": 100,
+                "message": "增强任务已完成",
+                "stage": "completed",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
 
     except Exception as e:
         logger.error(f"Task failed: {e}", exc_info=True)
         db.update_task_status(task_id, "FAILED", message=str(e))
+        send_event(
+            {
+                "task_id": task_id,
+                "task_category": "enhance",
+                "status": "FAILED",
+                "message": str(e),
+                "stage": "failed",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
     finally:
         clear_preview_cache(task_id)
         model_holder.pop("upsampler", None)

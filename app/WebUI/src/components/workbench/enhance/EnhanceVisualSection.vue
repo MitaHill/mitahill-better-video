@@ -1,6 +1,9 @@
 <template>
   <div class="param-section">
     <div class="param-title">画面参数</div>
+    <div v-if="enhanceForm.recommendationText" class="auto-tile-note">
+      {{ enhanceForm.recommendationText }}，可手动调整。
+    </div>
     <div class="field">
       <label>模型</label>
       <select v-model="enhanceForm.modelName" :disabled="isDisabled('modelName')">
@@ -59,11 +62,13 @@ const props = defineProps({
 });
 
 const MODEL_LABELS = Object.freeze({
-  "realesrgan-x4plus": "通用（高清）",
-  "realesrnet-x4plus": "降噪（慢速）",
-  "realesrgan-x4plus-anime": "二次元",
-  "realesr-animevideov3": "二次元视频（快）",
-  "realesr-general-x4v3": "通用（快速）",
+  "realesrgan-x4plus": "通用高清 / realesrgan-x4plus",
+  "realesrnet-x4plus": "降噪慢速 / realesrnet-x4plus",
+  "realesrgan-x4plus-anime": "二次元 / realesrgan-x4plus-anime",
+  "realesr-animevideov3": "二次元视频快速 / realesr-animevideov3",
+  "realesr-general-x4v3": "通用快速 / realesr-general-x4v3",
+  "real-hat-gan-x4": "高质量真实图像 / real-hat-gan-x4",
+  "hat-l-srx4": "高质量大模型慢速 / hat-l-srx4",
 });
 
 const { isDisabled, allowed, numMin, numMax, numStep } = useFieldPolicy(props.getFieldPolicy, "enhance");
@@ -75,3 +80,11 @@ const modelOptions = computed(() =>
   }))
 );
 </script>
+
+<style scoped>
+.auto-tile-note {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  margin-bottom: 12px;
+}
+</style>

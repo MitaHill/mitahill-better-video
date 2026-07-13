@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,6 +37,15 @@ def _build_item_progress(index, total, inner):
     clamped_inner = max(0.0, min(1.0, float(inner or 0.0)))
     base = (index - 1) / total_items
     return int(5 + (base + clamped_inner / total_items) * 90)
+
+
+def _build_transcribe_progress(index, total, ratio, has_translation):
+    scale = 0.5 if has_translation else 1.0
+    return _build_item_progress(index, total, ratio * scale)
+
+
+def _build_translate_progress(index, total, ratio):
+    return _build_item_progress(index, total, 0.5 + ratio * 0.5)
 
 
 def _safe_stem(index, media_path):
@@ -100,10 +110,11 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
     subtitle_dir = output_root / "subtitles"
     text_dir = output_root / "texts"
     video_dir = output_root / "video"
+    has_translation = bool(translator and (options.get("translate_to") or "").strip())
 
     emit_progress(
         task_id,
-        _build_item_progress(index, total, 0.05),
+        _build_transcribe_progress(index, total, 0.02, has_translation),
         f"转录文件 {index}/{total}: 准备中",
         file_index=index,
         file_count=total,
@@ -112,9 +123,36 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
     audio_path, info, created_temp_audio = extract_transcribe_audio(media_path, run_dir)
 
     try:
+        last_transcribe_emit = {"time": 0.0, "ratio": -1.0}
+
+        def _transcribe_progress(done, total_count):
+            if total_count <= 0:
+                return
+            ratio = max(0.0, min(1.0, float(done) / float(total_count)))
+            now = time.monotonic()
+            if (
+                ratio < 1.0
+                and now - last_transcribe_emit["time"] < 1.0
+                and ratio - last_transcribe_emit["ratio"] < 0.01
+            ):
+                return
+            last_transcribe_emit["time"] = now
+            last_transcribe_emit["ratio"] = ratio
+            emit_progress(
+                task_id,
+                _build_transcribe_progress(index, total, ratio, has_translation),
+                f"转录文件 {index}/{total}: 语音识别中 {done}/{total_count}",
+                file_index=index,
+                file_count=total,
+                stage="transcribe",
+                unit_done=done,
+                unit_total=total_count,
+                unit_label="音频帧",
+            )
+
         emit_progress(
             task_id,
-            _build_item_progress(index, total, 0.25),
+            _build_transcribe_progress(index, total, 0.0, has_translation),
             f"转录文件 {index}/{total}: 语音识别中",
             file_index=index,
             file_count=total,
@@ -129,6 +167,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
             beam_size=options.get("beam_size", 5),
             best_of=options.get("best_of", 5),
             task_id=task_id,
+            progress_callback=_transcribe_progress,
         )
         source_segments = _extract_segments(result)
         if not source_segments:
@@ -139,7 +178,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
 
         emit_progress(
             task_id,
-            _build_item_progress(index, total, 0.45),
+            _build_transcribe_progress(index, total, 1.0, has_translation),
             f"转录文件 {index}/{total}: 写入原文字幕",
             file_index=index,
             file_count=total,
@@ -162,10 +201,10 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
         translated_segments = None
         translated_subtitle = None
         bilingual_subtitle = None
-        if translator and (options.get("translate_to") or "").strip():
+        if has_translation:
             emit_progress(
                 task_id,
-                _build_item_progress(index, total, 0.58),
+                _build_translate_progress(index, total, 0.0),
                 f"转录文件 {index}/{total}: 翻译中",
                 file_index=index,
                 file_count=total,
@@ -178,7 +217,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                 ratio = max(0.0, min(1.0, float(done) / float(total_count)))
                 emit_progress(
                     task_id,
-                    _build_item_progress(index, total, 0.58 + ratio * 0.18),
+                    _build_translate_progress(index, total, ratio),
                     f"转录文件 {index}/{total}: 翻译中 {done}/{total_count}",
                     file_index=index,
                     file_count=total,
@@ -225,7 +264,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
         if mode in {"subtitled_video", "subtitle_and_video_zip"} and info.get("has_video"):
             emit_progress(
                 task_id,
-                _build_item_progress(index, total, 0.86),
+                _build_item_progress(index, total, 1.0),
                 f"转录文件 {index}/{total}: 合成字幕视频",
                 file_index=index,
                 file_count=total,
@@ -331,6 +370,7 @@ def process_transcription_task(task):
             {
                 "task_id": task_id,
                 "task_category": "transcribe",
+                "status": "COMPLETED",
                 "progress": 100,
                 "message": "转录任务已完成",
                 "stage": "completed",

@@ -1,7 +1,9 @@
 import json
 import logging
+from datetime import datetime, timezone
 
 from app.src.Database import core as db
+from app.src.Notifications.events import send_event
 
 from .conversion import process_conversion_task
 from .download import process_download_task
@@ -13,12 +15,24 @@ logger = logging.getLogger("PROCESSOR")
 
 def process_task(task):
     task_id = task["task_id"]
+    category = (task.get("task_category") or "enhance").lower()
     logger.info("=== Starting Task Processor: %s ===", task_id)
 
     try:
         db.update_task_status(task_id, "PROCESSING", 0, "Initializing...")
         params = json.loads(task["task_params"])
         category = (task.get("task_category") or params.get("task_category") or "enhance").lower()
+        send_event(
+            {
+                "task_id": task_id,
+                "task_category": category,
+                "status": "PROCESSING",
+                "progress": 0,
+                "message": "Initializing...",
+                "stage": "prepare",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         if category == "convert":
             logger.info("Task %s routed to conversion pipeline.", task_id)
             process_conversion_task(task)
@@ -36,3 +50,14 @@ def process_task(task):
     except Exception as exc:
         logger.error("Task failed: %s", exc, exc_info=True)
         db.update_task_status(task_id, "FAILED", message=str(exc))
+        send_event(
+            {
+                "task_id": task_id,
+                "task_category": category,
+                "status": "FAILED",
+                "progress": task.get("progress") or 0,
+                "message": str(exc),
+                "stage": "failed",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )

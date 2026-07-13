@@ -59,7 +59,13 @@ the FFmpeg encoders available inside the container and verified against the
 current GPU:
 
 ```json
-{ "enhance_output_codecs": ["h264", "h265", "av1"] }
+{
+  "gpu_name": "NVIDIA GeForce GTX 960",
+  "vram_gb": 3.94,
+  "tile_size": 256,
+  "upscale": 2,
+  "enhance_output_codecs": ["h264", "h265"]
+}
 ```
 
 ## Conversion APIs

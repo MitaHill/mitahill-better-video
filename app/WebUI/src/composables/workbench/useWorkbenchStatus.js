@@ -2,6 +2,9 @@ import { computed, reactive, ref } from "vue";
 import { io } from "socket.io-client";
 import { buildParamRows, buildProgressDetails, resolveStatusClass } from "./statusViewBuilders";
 
+const SOCKET_RETRY_LIMIT = 3;
+const SOCKET_RETRY_DELAY_MS = 30000;
+
 export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   const taskIds = ref([]);
   const statusQuery = ref("");
@@ -35,11 +38,10 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
 
   const lastPreviewId = ref("");
   const lastPreviewFrame = ref(0);
-  const liveNowMs = ref(Date.now());
 
   let socket = null;
-  let pollTimer = null;
-  let liveClockTimer = null;
+  let socketErrorShown = false;
+  let connectErrorCount = 0;
 
   const toNumber = (value, fallback = 0) => {
     const numeric = Number(value);
@@ -109,12 +111,9 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
 
     live.updatedAtMs = parseUpdatedAtMs(task.updated_at) || live.updatedAtMs;
     live.totalFrames = toNumber(taskProgress.total_frames, live.totalFrames);
-    const polledGpu = toNullableNumber(gpuLive.utilization_gpu);
-    if (polledGpu !== null) {
-      // 任务页现在不再完全依赖 socket 事件里的 gpu_util。
-      // 轮询接口每次都会带一个当前 GPU 快照，因此就算事件流里没有 GPU 字段，
-      // 状态板也能维持一个接近实时的数值。
-      live.gpu = polledGpu;
+    const currentGpu = toNullableNumber(gpuLive.utilization_gpu);
+    if (currentGpu !== null) {
+      live.gpu = currentGpu;
     }
 
     if (!live.itemCount) {
@@ -151,7 +150,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
 
   const paramRows = computed(() => buildParamRows(status.value));
   const statusClass = computed(() => resolveStatusClass(status.value));
-  const progressDetails = computed(() => buildProgressDetails(status.value, live, liveNowMs.value));
+  const progressDetails = computed(() => buildProgressDetails());
 
   const swapPreview = (kind, url) => {
     const img = new Image();
@@ -165,17 +164,6 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
       }
     };
     img.src = url;
-  };
-
-  const startPolling = (fetchStatus) => {
-    if (pollTimer) return;
-    pollTimer = setInterval(fetchStatus, 4000);
-  };
-
-  const stopPolling = () => {
-    if (!pollTimer) return;
-    clearInterval(pollTimer);
-    pollTimer = null;
   };
 
   const joinRoom = () => {
@@ -224,14 +212,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
         swapPreview("original", `/api/tasks/${statusQuery.value}/preview/original?ts=${ts}`);
         swapPreview("upscaled", `/api/tasks/${statusQuery.value}/preview/upscaled?ts=${ts}`);
       }
-
-      if (status.value.status === "PROCESSING" || status.value.status === "PENDING") {
-        startPolling(fetchStatus);
-      } else {
-        stopPolling();
-      }
     } catch (error) {
-      stopPolling();
       status.value = null;
       statusError.value = error.message;
     }
@@ -256,8 +237,6 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     const category = String(payload.task_category || status.value?.task_params?.task_category || "").trim().toLowerCase();
     const nextGpu = toNullableNumber(payload.gpu_util);
     if (nextGpu !== null) {
-      // 事件流仍然保留优先级更高的“瞬时值”。
-      // 轮询值解决兜底问题，事件值解决刷新更快的问题，两者并存最稳。
       live.gpu = nextGpu;
     }
     live.stage = String(payload.stage || "").trim().toLowerCase() || live.stage;
@@ -282,6 +261,9 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
       if (payload.progress !== undefined && payload.progress !== null) {
         status.value.progress = Number(payload.progress) || status.value.progress || 0;
       }
+      if (payload.status) {
+        status.value.status = String(payload.status || "").trim().toUpperCase();
+      }
       if (payload.message) {
         status.value.message = payload.message;
       }
@@ -304,25 +286,40 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     }
   };
 
+  const showSocketError = () => {
+    if (socketErrorShown) return;
+    socketErrorShown = true;
+    const message = "实时连接失败，已重试 3 次。请检查网络或刷新页面后重试。";
+    statusError.value = message;
+    window.alert(message);
+  };
+
   const initRealtime = () => {
-    socket = io();
+    socket = io({
+      reconnectionAttempts: SOCKET_RETRY_LIMIT,
+      reconnectionDelay: SOCKET_RETRY_DELAY_MS,
+      reconnectionDelayMax: SOCKET_RETRY_DELAY_MS,
+      timeout: 10000,
+    });
+    socket.on("connect", () => {
+      connectErrorCount = 0;
+      socketErrorShown = false;
+      joinRoom();
+    });
+    socket.on("connect_error", () => {
+      connectErrorCount += 1;
+      if (connectErrorCount > SOCKET_RETRY_LIMIT) {
+        showSocketError();
+      }
+    });
+    socket.io.on("reconnect_failed", showSocketError);
     socket.on("frame", onFrame);
-    if (!liveClockTimer) {
-      liveClockTimer = setInterval(() => {
-        liveNowMs.value = Date.now();
-      }, 1000);
-    }
   };
 
   const disposeRealtime = () => {
-    stopPolling();
     if (socket) {
       socket.close();
       socket = null;
-    }
-    if (liveClockTimer) {
-      clearInterval(liveClockTimer);
-      liveClockTimer = null;
     }
   };
 
@@ -333,7 +330,6 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     statusError,
     preview,
     live,
-    liveNowMs,
     isPreviewSupported,
     resolution,
     paramRows,
