@@ -50,7 +50,9 @@ export const bindBatchTasksAndRefresh = async ({
   const safeIds = Array.isArray(taskIdList) ? taskIdList.filter(Boolean) : [];
   taskIds.value = safeIds;
   if (Array.isArray(warnings) && warnings.length) {
-    submitWarnings.value = warnings.map((item) => `${item.filename}: ${item.error}`).join("；");
+    submitWarnings.value = warnings
+      .map((item) => `${item.filename || item.url || "任务"}: ${item.error}`)
+      .join("；");
   }
   if (!safeIds.length) return;
   setStatusQuery(safeIds[0]);

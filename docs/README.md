@@ -1,25 +1,17 @@
-# MitaHill Better Video
+# 项目文档
 
-Flask + Vue web UI for video/image processing around Real-ESRGAN. The current
-frontend exposes enhancement, conversion, transcription, watermark/download
-workflows, and an admin console.
+这里放运行、开发和排障需要长期保留的文档。README 只写快速入口，具体规则以本目录文档为准。
 
-## Main capabilities
+## 文档索引
 
-- Image/video upscaling with Real-ESRGAN.
-- Models: `realesrgan-x4plus`, `realesrnet-x4plus`, `realesr-general-x4v3`.
-- Denoise control for `realesr-general-x4v3` through DNI blending.
-- Batch image upload with ZIP download.
-- Video output with original audio copied by default, CRF, dynamic GPU codec
-  options, tiling, and FP16 controls.
-- Conversion tasks focus on video processing; transcode outputs copy the source
-  audio stream when present and do not expose audio processing parameters.
-- Admin console for task overview, cancellation/deletion, maintenance mode,
-  real IP configuration, GPU usage, logs, and password management.
+- [运行 SOP](SOP.md)：日常开发、构建、验证、Git 和版本规则。
+- [架构说明](ARCHITECTURE.md)：进程模型、模块边界、存储路径和关键约束。
+- [API 说明](API.md)：任务、管理、转录、下载等接口。
+- [WSL2 部署提示](WSL2.md)：WSL2 下 NVIDIA / Docker 常见问题。
+- [真实 IP 部署](DEPLOY_REAL_IP.md)：Nginx、FRP、Proxy Protocol 配置。
+- [Compose 工作流](../deploy/compose/README.md)：构建、开发、测试 Compose 文件。
 
-## Standard runtime
-
-Use `pre-run/` as the runtime entry:
+## 标准运行入口
 
 ```bash
 cd pre-run
@@ -28,52 +20,26 @@ docker compose ps
 docker compose logs --tail=200 better_video
 ```
 
-Persistent data lives under `pre-run/storage/`:
+持久化数据在 `pre-run/storage/`：
 
-- `upload/` uploaded source files
-- `output/` generated outputs and per-run scratch
-- `data/tasks.db` SQLite database
-- `logs/` runtime logs
-- `models/` runtime model cache
+- `upload/`：上传源文件
+- `output/`：输出结果和任务临时目录
+- `data/tasks.db`：SQLite 数据库
+- `logs/`：运行日志
+- `models/`：运行期模型缓存
 
-Build from the repository root when needed:
+## 开发基线
 
-```bash
-docker compose -f deploy/compose/docker-compose.build.yml build app_image
-```
+- 新功能、修复和文档改动从 `dev` 开始。
+- `main` 只放已验证、可发布的稳定版本。
+- 每个 `dev` 提交都要先完成必要验证。
+- 版本号带 `alpha` 或 `beta` 后缀时，GitHub Release 必须标记为预览版。
+- 版本号没有后缀时，GitHub Release 才标记为正式发行版。
 
-## Configuration
+## 项目原则
 
-- Runtime env file: `pre-run/.env`, mounted to `/workspace/config/.env`.
-- Template: `config/.env.example`.
-- Settings loader: `app/src/Config/settings.py`.
-- Default port: `8501` with host networking.
+代码和文档都遵循同一条原则：
 
-## Important paths
+> 易实现、稳健、最小改动、简单。
 
-- API service: `app/main.py`, `app/src/Api/`
-- Worker: `app/src/Worker/`
-- Database helpers: `app/src/Database/`
-- Frontend: `app/WebUI/`
-- Model weights: `app/models/`
-- Compose files: `deploy/compose/`
-- Dockerfiles: `deploy/docker/`
-
-## Related docs
-
-- [Architecture](ARCHITECTURE.md)
-- [API contract](API.md)
-- [Operational SOP](SOP.md)
-- [Real IP deployment](DEPLOY_REAL_IP.md)
-- [Compose workflows](../deploy/compose/README.md)
-
-## Git baseline
-
-- `dev`: daily development branch. New features and fixes start here.
-- `main`: stable branch. Merge only tested, release-ready changes from `dev`.
-- Every commit on `dev` must be validated before commit; record the relevant
-  test command or manual verification in the commit/PR notes.
-
-## Acknowledgements
-
-- Real-ESRGAN by Xintao et al.: https://github.com/xinntao/Real-ESRGAN
+不要为假想需求增加复杂抽象。前端只暴露真实生效的配置项。后端失败要清晰报错，不做静默降级。

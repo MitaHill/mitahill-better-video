@@ -98,6 +98,7 @@ export const useWorkbenchFormsState = () => {
     subtitleLanguagesOptions: [],
     subtitleLanguages: [],
     subtitleIncludeAuto: true,
+    cookieFile: null,
     probeLoading: false,
     probeReady: false,
     probeError: "",

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from app.src.Database import core as db
 from app.src.Notifications.events import send_event
+from app.src.Api.services.video_download import yt_dlp_conservative_args, yt_dlp_cookie_args
 from app.src.Utils.http import ffprobe_info
 from app.src.Utils.ffmpeg import get_gpu_utilization
 
@@ -196,8 +197,10 @@ def _run_video_download(task_id: str, source_url: str, params: dict, results_dir
         output_format,
         "-f",
         quality,
-        source_url,
     ]
+    cmd.extend(yt_dlp_cookie_args(params.get("download_cookie_path", "")))
+    cmd.extend(yt_dlp_conservative_args())
+    cmd.append(source_url)
     _run_yt_dlp(task_id, cmd, stage="视频下载中")
     return _pick_output_file(results_dir, {".mp4", ".webm", ".mkv"})
 
@@ -215,8 +218,10 @@ def _run_audio_download(task_id: str, source_url: str, params: dict, results_dir
         "-x",
         "--audio-format",
         output_format,
-        source_url,
     ]
+    cmd.extend(yt_dlp_cookie_args(params.get("download_cookie_path", "")))
+    cmd.extend(yt_dlp_conservative_args())
+    cmd.append(source_url)
     _run_yt_dlp(task_id, cmd, stage="音频下载中")
     return _pick_output_file(results_dir, {".mp3", ".m4a", ".wav", ".flac"})
 
@@ -244,9 +249,11 @@ def _run_subtitle_download(task_id: str, source_url: str, params: dict, results_
             ",".join(languages),
             "--convert-subs",
             subtitle_format,
-            source_url,
         ]
     )
+    cmd.extend(yt_dlp_cookie_args(params.get("download_cookie_path", "")))
+    cmd.extend(yt_dlp_conservative_args())
+    cmd.append(source_url)
     _run_yt_dlp(task_id, cmd, stage="字幕下载中")
     subtitle_files = sorted(
         [p for p in results_dir.glob(f"*.{subtitle_format}") if p.is_file()],

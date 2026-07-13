@@ -25,6 +25,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     UV_NO_CACHE=1 \
     PYTHONPATH=/workspace/app
 
+ARG DENO_VERSION=2.9.2
+
 WORKDIR /workspace
 
 COPY --from=uv /uv /uvx /usr/local/bin/
@@ -35,6 +37,12 @@ RUN echo "Triggering Re-build (Force Update 2026-01-08-1051)"
 RUN apt-get update && \
     apt-get install -y --no-install-recommends fonts-noto-cjk && \
     rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL -o /tmp/deno.zip "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-x86_64-unknown-linux-gnu.zip" && \
+    unzip -q /tmp/deno.zip -d /usr/local/bin && \
+    chmod 0755 /usr/local/bin/deno && \
+    rm -f /tmp/deno.zip && \
+    deno --version
 
 # 1. Copy Source Code (app-only)
 COPY app/ /workspace/app/

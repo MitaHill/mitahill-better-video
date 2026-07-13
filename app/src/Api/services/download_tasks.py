@@ -1,11 +1,12 @@
 from app.src.Database import core as db
 from .uploads import new_task_id
-from .video_download import normalize_download_url
+from .video_download import normalize_download_url, save_download_cookie_file, snapshot_download_cookie
 
 
 def create_download_task(client_ip, params, output_root):
     safe_params = dict(params or {})
-    safe_params["source_url"] = normalize_download_url(safe_params.get("source_url", ""))
+    source_url = normalize_download_url(safe_params.get("source_url"))
+    safe_params["source_url"] = source_url
     mode = str(safe_params.get("download_mode") or "video").strip().lower()
     if mode not in {"video", "audio", "subtitle_only"}:
         mode = "video"
@@ -14,6 +15,9 @@ def create_download_task(client_ip, params, output_root):
     task_id = new_task_id(output_root=output_root)
     run_dir = output_root / f"run_{task_id}"
     run_dir.mkdir(parents=True, exist_ok=True)
+    cookie_path = snapshot_download_cookie(run_dir)
+    if cookie_path:
+        safe_params["download_cookie_path"] = cookie_path
 
     title = str(safe_params.get("source_title") or "").strip()
     video_info = {
@@ -27,3 +31,32 @@ def create_download_task(client_ip, params, output_root):
     }
     db.create_task(task_id, client_ip, safe_params, video_info, task_category="download")
     return task_id, None
+
+
+def create_download_tasks(client_ip, params, output_root, cookie_file=None):
+    task_ids = []
+    errors = []
+    seen = set()
+    cookie_saved = False
+    for raw in str((params or {}).get("source_url", "") or "").splitlines():
+        if not raw.strip() or raw.strip() in seen:
+            continue
+        seen.add(raw.strip())
+        try:
+            url = normalize_download_url(raw)
+        except ValueError as exc:
+            errors.append({"url": raw.strip(), "error": str(exc)})
+            continue
+        if cookie_file and not cookie_saved:
+            save_download_cookie_file(cookie_file)
+            cookie_saved = True
+        task_params = dict(params or {})
+        task_params["source_url"] = url
+        task_id, err = create_download_task(client_ip, task_params, output_root)
+        if err:
+            errors.append({"url": url, "error": err})
+            continue
+        task_ids.append(task_id)
+    if not task_ids and not errors:
+        raise ValueError("url is required")
+    return task_ids, errors

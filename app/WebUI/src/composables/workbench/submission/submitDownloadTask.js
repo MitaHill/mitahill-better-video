@@ -1,5 +1,5 @@
 import { buildDownloadTaskFormData } from "../submitPayloadBuilders";
-import { bindSingleTaskAndRefresh, ensureCategory } from "./common";
+import { bindBatchTasksAndRefresh, ensureCategory } from "./common";
 
 export const submitDownloadTask = async (ctx) => {
   const {
@@ -7,6 +7,7 @@ export const submitDownloadTask = async (ctx) => {
     downloadForm,
     parseJsonSafe,
     taskIds,
+    submitWarnings,
     setStatusQuery,
     joinRoom,
     fetchStatus,
@@ -31,9 +32,11 @@ export const submitDownloadTask = async (ctx) => {
     throw new Error(payload.error || "下载任务失败。");
   }
 
-  await bindSingleTaskAndRefresh({
-    taskId: payload.task_id,
+  await bindBatchTasksAndRefresh({
+    taskIdList: Array.isArray(payload.task_ids) ? payload.task_ids : [payload.task_id],
+    warnings: payload.errors || [],
     taskIds,
+    submitWarnings,
     setStatusQuery,
     joinRoom,
     fetchStatus,

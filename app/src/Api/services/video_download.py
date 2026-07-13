@@ -1,12 +1,15 @@
 import os
 import shutil
 import subprocess
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
 
 DOWNLOAD_ROOT = Path("/workspace/storage/downloads/manual")
+DOWNLOAD_COOKIE_PATH = Path("/workspace/storage/data/download_cookies.txt")
+MAX_COOKIE_SIZE = 5 * 1024 * 1024
 _MB = 1024 * 1024
 
 
@@ -48,6 +51,107 @@ def normalize_download_url(value: str) -> str:
     return raw
 
 
+def split_download_urls(value: str) -> list[str]:
+    rows = []
+    seen = set()
+    for line in str(value or "").splitlines():
+        raw = line.strip()
+        if not raw or raw in seen:
+            continue
+        rows.append(normalize_download_url(raw))
+        seen.add(raw)
+    if not rows:
+        raise ValueError("url is required")
+    return rows
+
+
+def save_download_cookie_file(cookie_file) -> str:
+    if not cookie_file or not getattr(cookie_file, "filename", ""):
+        return ""
+
+    cookie_file.stream.seek(0, 2)
+    size = cookie_file.stream.tell()
+    cookie_file.stream.seek(0)
+    if size <= 0:
+        raise ValueError("Cookie 文件为空")
+    if size > MAX_COOKIE_SIZE:
+        raise ValueError("Cookie 文件过大，最大支持 5MB")
+
+    DOWNLOAD_COOKIE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = tempfile.NamedTemporaryFile(
+        prefix="download_cookies_",
+        suffix=".txt",
+        dir=str(DOWNLOAD_COOKIE_PATH.parent),
+        delete=False,
+    )
+    tmp_path = Path(tmp.name)
+    tmp.close()
+    try:
+        cookie_file.save(tmp_path)
+        tmp_path.replace(DOWNLOAD_COOKIE_PATH)
+    finally:
+        tmp_path.unlink(missing_ok=True)
+    return str(DOWNLOAD_COOKIE_PATH)
+
+
+def get_download_cookie_path() -> str:
+    return str(DOWNLOAD_COOKIE_PATH) if DOWNLOAD_COOKIE_PATH.is_file() else ""
+
+
+def snapshot_download_cookie(run_dir: Path) -> str:
+    if not DOWNLOAD_COOKIE_PATH.is_file():
+        return ""
+    run_dir.mkdir(parents=True, exist_ok=True)
+    target = run_dir / "download_cookies.txt"
+    shutil.copy2(DOWNLOAD_COOKIE_PATH, target)
+    return str(target)
+
+
+def yt_dlp_cookie_args(cookie_path=None) -> list[str]:
+    path = get_download_cookie_path() if cookie_path is None else str(cookie_path or "")
+    return ["--cookies", path] if path else []
+
+
+def yt_dlp_conservative_args() -> list[str]:
+    return [
+        "--no-update",
+        "--concurrent-fragments",
+        "1",
+        "--limit-rate",
+        "9M",
+        "--sleep-requests",
+        "1",
+        "--sleep-interval",
+        "2",
+        "--max-sleep-interval",
+        "5",
+        "--retries",
+        "10",
+        "--fragment-retries",
+        "10",
+    ]
+
+
+def _summarize_yt_dlp_error(text: str) -> str:
+    raw = str(text or "").strip()
+    lower = raw.lower()
+    if "provided YouTube account cookies are no longer valid" in raw:
+        return "YouTube Cookie 已失效，请重新导出 cookies.txt 后再试。"
+    if "No supported JavaScript runtime could be found" in raw:
+        return "yt-dlp 缺少 JavaScript runtime，请重新构建包含 Deno 的应用镜像。"
+    if "Sign in to confirm your age" in raw:
+        return "该 YouTube 视频需要登录或年龄验证，请上传有效 YouTube Cookie。"
+    if "rate-limited" in lower or "rate limited" in lower:
+        return "当前会话被站点限流，请稍后再试，或降低批量下载频率。"
+    if "http error 403" in lower or "403 forbidden" in lower:
+        return "站点拒绝访问该资源，请检查链接、Cookie 或稍后重试。"
+    if "private video" in lower or "this video is private" in lower:
+        return "该视频为私有内容，请使用有访问权限的账号重新导出 Cookie。"
+    if "video unavailable" in lower or "this video is unavailable" in lower:
+        return "视频当前不可用，请检查链接是否有效，或稍后重试。"
+    return "\n".join(raw.splitlines()[-50:])
+
+
 def _collect_files(root: Path):
     rows = []
     if not root.exists():
@@ -74,7 +178,7 @@ def ensure_yt_dlp_ready():
         raise RuntimeError("未找到 ffmpeg，请先在镜像中安装。")
 
 
-def _run_probe_json(url: str) -> Dict:
+def _run_probe_json(url: str, cookie_path: str = "") -> Dict:
     ensure_yt_dlp_ready()
     safe_url = normalize_download_url(url)
     cmd = [
@@ -82,8 +186,11 @@ def _run_probe_json(url: str) -> Dict:
         "--dump-single-json",
         "--skip-download",
         "--no-playlist",
-        safe_url,
     ]
+    if cookie_path:
+        cmd.extend(["--cookies", str(cookie_path)])
+    cmd.extend(yt_dlp_conservative_args())
+    cmd.append(safe_url)
     proc = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
@@ -93,7 +200,7 @@ def _run_probe_json(url: str) -> Dict:
         timeout=120,
     )
     if proc.returncode != 0:
-        detail = "\n".join((proc.stderr or proc.stdout or "").splitlines()[-50:])
+        detail = _summarize_yt_dlp_error(proc.stderr or proc.stdout or "")
         raise RuntimeError(f"解析视频信息失败: {detail or proc.returncode}")
     import json
 
@@ -246,8 +353,8 @@ def _build_subtitle_languages(subtitles: Dict, automatic_captions: Dict) -> list
     return out
 
 
-def probe_download_source(url: str) -> Dict:
-    payload = _run_probe_json(url)
+def probe_download_source(url: str, cookie_path: str = "") -> Dict:
+    payload = _run_probe_json(url, cookie_path=cookie_path)
     quality_options, max_quality = _build_quality_options(payload.get("formats") or [])
     source_metrics = _resolve_source_metrics(payload)
     subtitle_languages = _build_subtitle_languages(
@@ -289,6 +396,7 @@ def run_direct_video_download(url: str, output_format: str = "mp4", audio_only=F
 
     cmd = [
         "yt-dlp",
+        "--no-update",
         "--no-playlist",
         "--restrict-filenames",
         "-P",
@@ -312,8 +420,8 @@ def run_direct_video_download(url: str, output_format: str = "mp4", audio_only=F
     )
 
     if proc.returncode != 0:
-        stderr_tail = "\n".join((proc.stderr or "").splitlines()[-50:])
-        stdout_tail = "\n".join((proc.stdout or "").splitlines()[-50:])
+        stderr_tail = _summarize_yt_dlp_error(proc.stderr or "")
+        stdout_tail = _summarize_yt_dlp_error(proc.stdout or "")
         detail = stderr_tail or stdout_tail or f"yt-dlp exit code {proc.returncode}"
         raise RuntimeError(f"yt-dlp 下载失败: {detail}")
 
