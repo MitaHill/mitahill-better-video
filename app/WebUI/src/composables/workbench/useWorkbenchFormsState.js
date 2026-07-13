@@ -22,6 +22,7 @@ export const useWorkbenchFormsState = () => {
     modelName: "realesrgan-x4plus",
     upscale: 3,
     tile: 256,
+    recommendationText: "",
     denoise: 0.5,
     crf: 18,
     outputCodec: "",

@@ -142,7 +142,7 @@ def get_env_preview_stride(key, default):
 # --- Configuration Mapping ---
 try:
     TASK_TTL_HOURS = get_env_float("TASK_TTL_HOURS", 12.0)
-    DEFAULT_UPSCALE_FACTOR = get_env_int("DEFAULT_UPSCALE_FACTOR", 2)
+    DEFAULT_UPSCALE_FACTOR = get_env_int("DEFAULT_UPSCALE_FACTOR", 0)
     DEFAULT_MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "realesrgan-x4plus")
     DEFAULT_TILE_PADDING = get_env_int("DEFAULT_TILE_PADDING", 10)
     DEFAULT_FP16 = get_env_bool("DEFAULT_FP16", True)
@@ -200,8 +200,9 @@ def get_gpu_memory_gb():
         logger.error("-" * 60)
         sys.exit(1)
 
-def get_smart_tile_size():
-    vram = get_gpu_memory_gb()
+def get_smart_tile_size(vram=None):
+    if vram is None:
+        vram = get_gpu_memory_gb()
     if vram < 4:
         res = 128
     elif vram < 6:
@@ -212,20 +213,30 @@ def get_smart_tile_size():
         res = 512
     return res, vram
 
-def resolve_default_tile_size():
+def get_smart_upscale_factor(vram):
+    if DEFAULT_UPSCALE_FACTOR > 0:
+        return DEFAULT_UPSCALE_FACTOR, "env"
+    if vram < 6:
+        return 2, "auto"
+    if vram < 10:
+        return 3, "auto"
+    return 4, "auto"
+
+def resolve_default_tile_size(vram=None):
     env_tile = get_env_int("DEFAULT_TILE_SIZE", 0)
     if env_tile > 0:
         return env_tile, None
-    smart_tile, vram = get_smart_tile_size()
+    smart_tile, vram = get_smart_tile_size(vram)
     return smart_tile, vram
 
 # --- Execution Lifecycle ---
 _initialized = False
 _init_info = None
 DEFAULT_SMART_TILE_SIZE = 512
+DEFAULT_SMART_UPSCALE_FACTOR = 2
 
 def initialize_context():
-    global _initialized, DEFAULT_SMART_TILE_SIZE, _init_info
+    global _initialized, DEFAULT_SMART_TILE_SIZE, DEFAULT_SMART_UPSCALE_FACTOR, _init_info
     if _initialized: return
     
     log_system_info()
@@ -246,28 +257,33 @@ def initialize_context():
         sys.exit(1)
     logger.info(f"NVIDIA GPU detected: {gpu_name}")
     verify_models()
-    DEFAULT_SMART_TILE_SIZE, vram = resolve_default_tile_size()
-    if vram is None:
-        logger.info("Tile Size: %s (env override)", DEFAULT_SMART_TILE_SIZE)
-        source = "env"
-    else:
-        logger.info("Tile Size: %s (auto by VRAM %.2f GB)", DEFAULT_SMART_TILE_SIZE, vram)
-        source = "auto"
+    vram = get_gpu_memory_gb()
+    DEFAULT_SMART_TILE_SIZE, tile_vram = resolve_default_tile_size(vram)
+    DEFAULT_SMART_UPSCALE_FACTOR, upscale_source = get_smart_upscale_factor(vram)
+    source = "env" if tile_vram is None else "auto"
+    logger.info("Tile Size: %s (%s by VRAM %.2f GB)", DEFAULT_SMART_TILE_SIZE, source, vram)
+    logger.info("Upscale Factor: %sx (%s)", DEFAULT_SMART_UPSCALE_FACTOR, upscale_source)
     logger.info(f"Application context initialized. Smart Tile Size: {DEFAULT_SMART_TILE_SIZE}")
     _initialized = True
     _init_info = {
+        "gpu_name": gpu_name,
         "tile_size": DEFAULT_SMART_TILE_SIZE,
         "vram_gb": vram,
         "source": source,
+        "upscale": DEFAULT_SMART_UPSCALE_FACTOR,
+        "upscale_source": upscale_source,
         "enhance_output_codecs": get_available_output_codecs(),
     }
     return _init_info
 
 def get_init_info():
     return _init_info or {
+        "gpu_name": "",
         "tile_size": DEFAULT_SMART_TILE_SIZE,
         "vram_gb": None,
         "source": "unknown",
+        "upscale": DEFAULT_SMART_UPSCALE_FACTOR,
+        "upscale_source": "unknown",
         "enhance_output_codecs": get_available_output_codecs(),
     }
 

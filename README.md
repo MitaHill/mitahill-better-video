@@ -161,6 +161,7 @@ pre-run/
 - `realesrnet-x4plus`
 - `realesr-general-x4v3`
 - `real-hat-gan-x4`
+- `hat-l-srx4`
 
 ### 转录模型
 

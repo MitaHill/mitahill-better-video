@@ -23,6 +23,16 @@ class Upscaler:
             )
             logger.info("HAT model loaded and ready.")
             return
+        if model_name == 'hat-l-srx4':
+            self.upsampler = HATUpscaler(
+                weights_dir / 'HAT-L_SRx4_ImageNet-pretrain.pth',
+                tile=tile,
+                tile_pad=tile_pad,
+                half=False,
+                variant="hat-l",
+            )
+            logger.info("HAT-L model loaded and ready.")
+            return
         model_scale = 4
         dni_weight = None
         
