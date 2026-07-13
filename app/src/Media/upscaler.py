@@ -19,7 +19,7 @@ class Upscaler:
                 weights_dir / 'Real_HAT_GAN_SRx4.pth',
                 tile=tile,
                 tile_pad=tile_pad,
-                half=fp16,
+                half=False,
             )
             logger.info("HAT model loaded and ready.")
             return
