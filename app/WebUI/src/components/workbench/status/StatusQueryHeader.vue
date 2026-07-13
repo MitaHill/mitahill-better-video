@@ -26,6 +26,7 @@
     <div class="status-row">
       <button class="secondary" @click="onFetchStatus">查询</button>
       <div v-if="status" :class="['status-pill', statusClass]">{{ statusText(status.status) }}</div>
+      <div v-if="status" class="status-progress-percent">{{ progressText }}%</div>
       <button v-if="status && status.status === 'COMPLETED'" @click="onDownloadResult">下载</button>
     </div>
 
@@ -64,6 +65,10 @@ const props = defineProps({
     type: String,
     required: true,
   },
+  progressValue: {
+    type: Number,
+    required: true,
+  },
   taskIds: {
     type: Array,
     required: true,
@@ -84,6 +89,11 @@ const isFocused = ref(false);
 const focusedIndex = ref(-1);
 
 const pinDigits = computed(() => Array.from({ length: PIN_LENGTH }, (_, index) => props.statusQuery[index] || ""));
+const progressText = computed(() => {
+  const numeric = Number(props.progressValue);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+});
 const activeIndex = computed(() => {
   if (!isFocused.value) return -1;
   if (focusedIndex.value >= 0) return focusedIndex.value;

@@ -106,7 +106,7 @@ export const buildParamRows = (status) => {
   ];
 };
 
-export const buildProgressDetails = (status, live, nowMs = Date.now()) => {
+export const buildProgressDetails = () => {
   // 实时状态已经由 StatusProgressSummary 的矩形信息卡展示。
   // 这里保留函数接口，避免改动调用链，但不再生成重复的文字摘要。
   return "";

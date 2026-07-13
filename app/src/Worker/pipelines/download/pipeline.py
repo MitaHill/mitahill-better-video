@@ -29,6 +29,7 @@ def _emit_progress(task_id: str, progress: int, message: str, *, stage: str = "d
         {
             "task_id": task_id,
             "task_category": "download",
+            "status": "PROCESSING",
             "progress": value,
             "message": message,
             "stage": str(stage or "").strip().lower(),

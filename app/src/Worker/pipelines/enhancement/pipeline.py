@@ -30,6 +30,19 @@ def process_enhancement_task(task):
     logger.info(f"=== Starting Task Processor: {task_id} ===")
     model_holder = {}
 
+    def _emit_status(progress, message, stage):
+        send_event(
+            {
+                "task_id": task_id,
+                "task_category": "enhance",
+                "status": "PROCESSING",
+                "progress": progress,
+                "message": message,
+                "stage": stage,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+
     def _release_realesrgan():
         model_holder.pop("upsampler", None)
         if torch.cuda.is_available():
@@ -39,6 +52,7 @@ def process_enhancement_task(task):
     
     try:
         db.update_task_status(task_id, "PROCESSING", 0, "Initializing...")
+        _emit_status(0, "Initializing...", "prepare")
         params = json.loads(task['task_params'])
         video_info = json.loads(task.get('video_info') or "{}")
         output_root = Path("/workspace/storage/output")
@@ -56,6 +70,7 @@ def process_enhancement_task(task):
 
         # 1. Load Model ONCE
         db.update_task_status(task_id, "PROCESSING", 5, "Loading Model...")
+        _emit_status(5, "Loading Model...", "prepare")
         prepare_model_load("realesrgan")
         try:
             upsampler = build_model(
@@ -99,6 +114,7 @@ def process_enhancement_task(task):
             if duration > config.SEGMENT_TIME_SECONDS:
                 # Segmented processing
                 db.update_task_status(task_id, "PROCESSING", 10, "Splitting Video...")
+                _emit_status(10, "Splitting Video...", "prepare")
                 logger.info("Segmenting video: %.2fs per segment", config.SEGMENT_TIME_SECONDS)
                 segments_dir = run_dir / "segments"
                 segments_dir.mkdir(exist_ok=True)

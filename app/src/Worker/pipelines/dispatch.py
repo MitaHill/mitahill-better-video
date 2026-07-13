@@ -22,6 +22,17 @@ def process_task(task):
         db.update_task_status(task_id, "PROCESSING", 0, "Initializing...")
         params = json.loads(task["task_params"])
         category = (task.get("task_category") or params.get("task_category") or "enhance").lower()
+        send_event(
+            {
+                "task_id": task_id,
+                "task_category": category,
+                "status": "PROCESSING",
+                "progress": 0,
+                "message": "Initializing...",
+                "stage": "prepare",
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         if category == "convert":
             logger.info("Task %s routed to conversion pipeline.", task_id)
             process_conversion_task(task)

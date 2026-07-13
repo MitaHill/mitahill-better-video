@@ -80,6 +80,7 @@ class ProgressRecorder:
         payload = {
             "task_id": self.task_id,
             "task_category": "enhance",
+            "status": "PROCESSING",
             "stage": "enhance",
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "segment_key": self.segment_key,

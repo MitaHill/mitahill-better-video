@@ -38,10 +38,8 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
 
   const lastPreviewId = ref("");
   const lastPreviewFrame = ref(0);
-  const liveNowMs = ref(Date.now());
 
   let socket = null;
-  let liveClockTimer = null;
   let socketErrorShown = false;
   let connectErrorCount = 0;
 
@@ -152,7 +150,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
 
   const paramRows = computed(() => buildParamRows(status.value));
   const statusClass = computed(() => resolveStatusClass(status.value));
-  const progressDetails = computed(() => buildProgressDetails(status.value, live, liveNowMs.value));
+  const progressDetails = computed(() => buildProgressDetails());
 
   const swapPreview = (kind, url) => {
     const img = new Image();
@@ -316,21 +314,12 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     });
     socket.io.on("reconnect_failed", showSocketError);
     socket.on("frame", onFrame);
-    if (!liveClockTimer) {
-      liveClockTimer = setInterval(() => {
-        liveNowMs.value = Date.now();
-      }, 1000);
-    }
   };
 
   const disposeRealtime = () => {
     if (socket) {
       socket.close();
       socket = null;
-    }
-    if (liveClockTimer) {
-      clearInterval(liveClockTimer);
-      liveClockTimer = null;
     }
   };
 
@@ -341,7 +330,6 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     statusError,
     preview,
     live,
-    liveNowMs,
     isPreviewSupported,
     resolution,
     paramRows,

@@ -2,7 +2,6 @@
   <div class="status-progress-shell">
     <div class="status-progress-head">
       <div>
-        <div class="status-progress-percent">{{ progressValue }}%</div>
         <p class="notice">{{ status.message }}</p>
         <p v-if="progressDetails" class="notice">{{ progressDetails }}</p>
       </div>
@@ -30,10 +29,6 @@
         <div class="status-live-label">GPU</div>
         <strong>{{ gpuText }}</strong>
       </div>
-      <div class="status-live-card">
-        <div class="status-live-label">最近更新</div>
-        <strong>{{ updateText }}</strong>
-      </div>
     </div>
 
     <div class="panel" style="margin-top: 16px; background: rgba(255,255,255,0.05);">
@@ -57,10 +52,6 @@ const props = defineProps({
   },
   live: {
     type: Object,
-    required: true,
-  },
-  liveNowMs: {
-    type: Number,
     required: true,
   },
   progressDetails: {
@@ -112,17 +103,6 @@ const subProgressPercent = computed(() => {
   if (!total) return null;
   const done = Number(props.live.unitDone || 0);
   return clampPercent((done / total) * 100);
-});
-
-const updateText = computed(() => {
-  const updated = Number(props.live.updatedAtMs || 0);
-  if (!updated) return "等待事件";
-  const diffSec = Math.max(0, Math.floor((props.liveNowMs - updated) / 1000));
-  if (diffSec <= 1) return "刚刚更新";
-  if (diffSec < 60) return `${diffSec}s前`;
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m前`;
-  return `${Math.floor(diffMin / 60)}h前`;
 });
 
 const sizeText = computed(() => {

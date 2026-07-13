@@ -6,6 +6,7 @@
       :status-query="statusQuery"
       :status="status"
       :status-class="statusClass"
+      :progress-value="status?.progress || 0"
       :task-ids="taskIds"
       :on-fetch-status="fetchStatus"
       :on-download-result="downloadResult"
@@ -16,7 +17,6 @@
       <StatusProgressSummary
         :status="status"
         :live="live"
-        :live-now-ms="liveNowMs"
         :progress-details="progressDetails"
         :resolution="resolution"
       />
@@ -67,10 +67,6 @@ defineProps({
   },
   live: {
     type: Object,
-    required: true,
-  },
-  liveNowMs: {
-    type: Number,
     required: true,
   },
   isPreviewSupported: {
