@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -112,6 +113,33 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
     audio_path, info, created_temp_audio = extract_transcribe_audio(media_path, run_dir)
 
     try:
+        last_transcribe_emit = {"time": 0.0, "ratio": -1.0}
+
+        def _transcribe_progress(done, total_count):
+            if total_count <= 0:
+                return
+            ratio = max(0.0, min(1.0, float(done) / float(total_count)))
+            now = time.monotonic()
+            if (
+                ratio < 1.0
+                and now - last_transcribe_emit["time"] < 1.0
+                and ratio - last_transcribe_emit["ratio"] < 0.01
+            ):
+                return
+            last_transcribe_emit["time"] = now
+            last_transcribe_emit["ratio"] = ratio
+            emit_progress(
+                task_id,
+                _build_item_progress(index, total, 0.25 + ratio * 0.20),
+                f"转录文件 {index}/{total}: 语音识别中 {done}/{total_count}",
+                file_index=index,
+                file_count=total,
+                stage="transcribe",
+                unit_done=done,
+                unit_total=total_count,
+                unit_label="音频帧",
+            )
+
         emit_progress(
             task_id,
             _build_item_progress(index, total, 0.25),
@@ -129,6 +157,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
             beam_size=options.get("beam_size", 5),
             best_of=options.get("best_of", 5),
             task_id=task_id,
+            progress_callback=_transcribe_progress,
         )
         source_segments = _extract_segments(result)
         if not source_segments:
