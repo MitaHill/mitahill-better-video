@@ -114,6 +114,7 @@ def yt_dlp_cookie_args(cookie_path=None) -> list[str]:
 
 def yt_dlp_conservative_args() -> list[str]:
     return [
+        "--no-update",
         "--concurrent-fragments",
         "1",
         "--limit-rate",
@@ -129,6 +130,17 @@ def yt_dlp_conservative_args() -> list[str]:
         "--fragment-retries",
         "10",
     ]
+
+
+def _summarize_yt_dlp_error(text: str) -> str:
+    raw = str(text or "").strip()
+    if "provided YouTube account cookies are no longer valid" in raw:
+        return "YouTube Cookie 已失效，请重新导出 cookies.txt 后再试。"
+    if "No supported JavaScript runtime could be found" in raw:
+        return "yt-dlp 缺少 JavaScript runtime，请重新构建包含 Deno 的应用镜像。"
+    if "Sign in to confirm your age" in raw:
+        return "该 YouTube 视频需要登录或年龄验证，请上传有效 YouTube Cookie。"
+    return "\n".join(raw.splitlines()[-50:])
 
 
 def _collect_files(root: Path):
@@ -179,7 +191,7 @@ def _run_probe_json(url: str, cookie_path: str = "") -> Dict:
         timeout=120,
     )
     if proc.returncode != 0:
-        detail = "\n".join((proc.stderr or proc.stdout or "").splitlines()[-50:])
+        detail = _summarize_yt_dlp_error(proc.stderr or proc.stdout or "")
         raise RuntimeError(f"解析视频信息失败: {detail or proc.returncode}")
     import json
 
@@ -375,6 +387,7 @@ def run_direct_video_download(url: str, output_format: str = "mp4", audio_only=F
 
     cmd = [
         "yt-dlp",
+        "--no-update",
         "--no-playlist",
         "--restrict-filenames",
         "-P",
@@ -398,8 +411,8 @@ def run_direct_video_download(url: str, output_format: str = "mp4", audio_only=F
     )
 
     if proc.returncode != 0:
-        stderr_tail = "\n".join((proc.stderr or "").splitlines()[-50:])
-        stdout_tail = "\n".join((proc.stdout or "").splitlines()[-50:])
+        stderr_tail = _summarize_yt_dlp_error(proc.stderr or "")
+        stdout_tail = _summarize_yt_dlp_error(proc.stdout or "")
         detail = stderr_tail or stdout_tail or f"yt-dlp exit code {proc.returncode}"
         raise RuntimeError(f"yt-dlp 下载失败: {detail}")
 
