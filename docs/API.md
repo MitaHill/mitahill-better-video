@@ -155,8 +155,8 @@ directly.
 Created tasks use a per-task Cookie snapshot, so later Cookie uploads do not
 change already queued tasks.
 
-yt-dlp downloads use conservative defaults: one fragment at a time, limited
-download rate, short request sleeps, and retry enabled.
+yt-dlp downloads use conservative defaults: one fragment at a time, 9M/s
+download rate limit, short request sleeps, and retry enabled.
 
 Response:
 ```json

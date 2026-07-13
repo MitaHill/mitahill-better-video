@@ -118,7 +118,7 @@ def yt_dlp_conservative_args() -> list[str]:
         "--concurrent-fragments",
         "1",
         "--limit-rate",
-        "4M",
+        "9M",
         "--sleep-requests",
         "1",
         "--sleep-interval",
