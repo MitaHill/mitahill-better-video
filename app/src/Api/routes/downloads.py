@@ -38,7 +38,7 @@ def create_download_task_route():
     params = parse_download_task_params(request.form if request.form else payload)
     client_ip = resolve_request_client_ip(request)
     try:
-        task_ids, errors = create_download_tasks(
+        task_ids, errors, batch_id = create_download_tasks(
             client_ip,
             params,
             OUTPUT_ROOT,
@@ -50,6 +50,8 @@ def create_download_task_route():
         detail = errors[0]["error"] if errors else "下载任务失败"
         return jsonify({"error": detail, "errors": errors}), 400
     payload = {"task_id": task_ids[0], "task_ids": task_ids}
+    if batch_id:
+        payload["batch_id"] = batch_id
     if errors:
         payload["errors"] = errors
     return jsonify(payload), 201

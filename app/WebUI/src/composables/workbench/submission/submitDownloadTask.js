@@ -33,6 +33,7 @@ export const submitDownloadTask = async (ctx) => {
   }
 
   await bindBatchTasksAndRefresh({
+    batchId: payload.batch_id,
     taskIdList: Array.isArray(payload.task_ids) ? payload.task_ids : [payload.task_id],
     warnings: payload.errors || [],
     taskIds,

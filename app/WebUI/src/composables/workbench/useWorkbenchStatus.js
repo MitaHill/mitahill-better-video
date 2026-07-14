@@ -54,6 +54,10 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   };
 
   const normalizeTaskId = (value) => String(value || "").replace(/\D+/g, "").slice(0, 4);
+  const isBatchId = (value) => {
+    const numeric = Number(value);
+    return Number.isInteger(numeric) && numeric >= 9500 && numeric <= 9999;
+  };
 
   const normalizeServerTimestamp = (value) => {
     const raw = String(value || "").trim();
@@ -136,6 +140,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   };
 
   const isPreviewSupported = computed(() => {
+    if (status.value?.is_batch) return false;
     const category = status.value?.task_params?.task_category || "";
     return category !== "convert" && category !== "transcribe" && category !== "download";
   });
@@ -184,10 +189,11 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     }
 
     try {
-      const res = await fetch(`/api/tasks/${statusQuery.value}`);
+      const endpoint = isBatchId(statusQuery.value) ? `/api/batches/${statusQuery.value}` : `/api/tasks/${statusQuery.value}`;
+      const res = await fetch(endpoint);
       if (!res.ok) {
         const err = await parseJsonSafe(res);
-        if (res.status === 404 || err.error_code === "task_not_found") {
+        if (res.status === 404 || err.error_code === "task_not_found" || err.error_code === "batch_not_found") {
           throw new Error(err.hint || "没有找到这个任务。请确认 4 位任务 ID 是否正确，或该任务已经被系统清理。");
         }
         throw new Error(err.error || "查询任务状态失败，请稍后重试。");
@@ -219,7 +225,8 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   };
 
   const downloadResult = () => {
-    window.location.href = `/api/tasks/${statusQuery.value}/result`;
+    const endpoint = isBatchId(statusQuery.value) ? `/api/batches/${statusQuery.value}/result` : `/api/tasks/${statusQuery.value}/result`;
+    window.location.href = endpoint;
   };
 
   const setStatusQuery = (value) => {

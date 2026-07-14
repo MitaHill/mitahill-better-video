@@ -23,6 +23,13 @@
 
       <StatusPreviewGrid v-if="isPreviewSupported && status.status !== 'PENDING'" :preview="preview" />
 
+      <div v-if="status.is_batch && status.children?.length" class="notice" style="margin-top: 14px;">
+        <div v-for="item in status.children" :key="item.task_id" style="display: flex; justify-content: space-between; gap: 12px; padding: 4px 0;">
+          <span>{{ item.task_id }} · {{ item.item_label || item.task_category }}</span>
+          <span>{{ item.status }} · {{ Math.round(item.progress || 0) }}%</span>
+        </div>
+      </div>
+
       <StatusParamTable v-if="status.task_params" :param-rows="paramRows" />
     </div>
 

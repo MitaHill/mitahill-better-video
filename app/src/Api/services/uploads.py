@@ -26,9 +26,9 @@ def new_task_id(output_root=None, upload_root=None, reserved_task_id=None):
             return task_id
         raise RuntimeError(f"task id {task_id} is already in use")
 
-    # 0000 留给启动自检。普通任务按顺序使用 0001-9999。
+    # 0000 留给启动自检。9500-9999 留给批次总任务。
     # 这里同时避开遗留 run 目录，防止撞到半清理状态的旧任务。
-    for index in range(1, 10_000):
+    for index in range(1, 9_500):
         task_id = f"{index:04d}"
         if _task_id_available(task_id, output_base, upload_base):
             return task_id

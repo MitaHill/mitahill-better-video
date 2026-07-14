@@ -15,6 +15,7 @@ from ..constants import OUTPUT_ROOT, UPLOAD_ROOT
 from ..parsers import parse_enhance_task_params
 from ..services.real_ip import resolve_request_client_ip
 from ..services import create_enhance_task, find_result_file
+from ..services.batch_tasks import add_batch_item, create_batch
 
 bp = Blueprint("api_tasks", __name__)
 _TASK_PARAM_SENSITIVE_KEYS = {"translator_api_key"}
@@ -86,6 +87,7 @@ def create_tasks_batch():
     task_ids = []
     errors = []
     logger = current_app.logger
+    batch_id = None
     for upload in uploads:
         task_id, err = create_enhance_task(
             upload,
@@ -98,10 +100,15 @@ def create_tasks_batch():
             logger,
         )
         if task_id:
+            if not batch_id:
+                batch_id = create_batch("enhance")
             task_ids.append(task_id)
+            add_batch_item(batch_id, task_id, "enhance", upload.filename or task_id)
         if err:
             errors.append({"filename": upload.filename, "error": err, "task_id": task_id})
-    return jsonify({"task_ids": task_ids, "errors": errors}), 201
+    if not task_ids:
+        return jsonify({"error": "批量任务创建失败", "errors": errors}), 400
+    return jsonify({"batch_id": batch_id, "task_ids": task_ids, "errors": errors}), 201
 
 
 @bp.get("/api/tasks/<task_id>")

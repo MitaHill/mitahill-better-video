@@ -126,6 +126,24 @@ def init_db():
         )
         c.execute("CREATE INDEX IF NOT EXISTS idx_gpu_usage_samples_collected ON gpu_usage_samples(collected_at)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_gpu_usage_samples_gpu ON gpu_usage_samples(gpu_index)")
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS task_batches
+               (batch_id TEXT PRIMARY KEY,
+                batch_category TEXT,
+                created_at DATETIME,
+                updated_at DATETIME)"""
+        )
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS task_batch_items
+               (batch_id TEXT,
+                task_id TEXT,
+                task_category TEXT,
+                item_label TEXT,
+                created_at DATETIME,
+                PRIMARY KEY (batch_id, task_id))"""
+        )
+        c.execute("CREATE INDEX IF NOT EXISTS idx_task_batch_items_batch ON task_batch_items(batch_id)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_task_batch_items_task ON task_batch_items(task_id)")
         conn.commit()
         conn.close()
         logger.debug("Database initialized successfully.")
@@ -157,6 +175,80 @@ def get_task(task_id):
     row = c.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def get_batch(batch_id):
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM task_batches WHERE batch_id = ?", (batch_id,))
+    row = c.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def _batch_id_available(batch_id):
+    if get_task(batch_id):
+        return False
+    if get_batch(batch_id):
+        return False
+    return True
+
+
+def new_batch_id():
+    for index in range(9_500, 10_000):
+        batch_id = f"{index:04d}"
+        if _batch_id_available(batch_id):
+            return batch_id
+    raise RuntimeError("failed to allocate a unique 4-digit batch id")
+
+
+def create_batch(batch_category):
+    batch_id = new_batch_id()
+    now = datetime.datetime.now()
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        """INSERT INTO task_batches (batch_id, batch_category, created_at, updated_at)
+           VALUES (?, ?, ?, ?)""",
+        (batch_id, batch_category, now, now),
+    )
+    conn.commit()
+    conn.close()
+    return batch_id
+
+
+def add_batch_item(batch_id, task_id, task_category, item_label=""):
+    conn = get_connection()
+    c = conn.cursor()
+    now = datetime.datetime.now()
+    c.execute(
+        """INSERT OR REPLACE INTO task_batch_items
+           (batch_id, task_id, task_category, item_label, created_at)
+           VALUES (?, ?, ?, ?, ?)""",
+        (batch_id, task_id, task_category, item_label, now),
+    )
+    c.execute("UPDATE task_batches SET updated_at = ? WHERE batch_id = ?", (now, batch_id))
+    conn.commit()
+    conn.close()
+
+
+def list_batch_items(batch_id):
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute(
+        """SELECT bi.batch_id, bi.task_id, bi.task_category, bi.item_label, bi.created_at,
+                  tq.status, tq.progress, tq.message, tq.result_path, tq.updated_at
+           FROM task_batch_items bi
+           LEFT JOIN task_queue tq ON tq.task_id = bi.task_id
+           WHERE bi.batch_id = ?
+           ORDER BY bi.created_at ASC, bi.task_id ASC""",
+        (batch_id,),
+    )
+    rows = c.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
 
 def update_task_status(task_id, status, progress=None, message=None):
     logger.debug(f"Updating Task {task_id}: {status} ({progress}%) - {message}")

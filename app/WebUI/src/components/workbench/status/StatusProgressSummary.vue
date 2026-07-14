@@ -31,7 +31,7 @@
       </div>
     </div>
 
-    <div class="panel" style="margin-top: 16px; background: rgba(255,255,255,0.05);">
+    <div v-if="!status.is_batch" class="panel" style="margin-top: 16px; background: rgba(255,255,255,0.05);">
       <p class="notice">文件：{{ status.video_info?.filename || "未知" }}</p>
       <p v-if="showResolutionRow" class="notice">分辨率：{{ resolution }}</p>
       <p v-if="showSizeRow" class="notice">大小：{{ sizeText }}</p>
