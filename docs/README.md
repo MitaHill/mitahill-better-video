@@ -34,6 +34,7 @@ docker compose logs --tail=200 better_video
 - 新功能、修复和文档改动从 `dev` 开始。
 - `main` 只放已验证、可发布的稳定版本。
 - 每个 `dev` 提交都要先完成必要验证。
+- 每次代码行为变化后，同步更新相关项目文档。
 - 版本号带 `alpha` 或 `beta` 后缀时，GitHub Release 必须标记为预览版。
 - 版本号没有后缀时，GitHub Release 才标记为正式发行版。
 
