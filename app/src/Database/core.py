@@ -196,6 +196,7 @@ def _batch_id_available(batch_id):
 
 
 def new_batch_id():
+    # 9500-9999 留给批次任务，普通任务只使用前面的号码段
     for index in range(9_500, 10_000):
         batch_id = f"{index:04d}"
         if _batch_id_available(batch_id):
@@ -263,6 +264,7 @@ def get_task_batch_id(task_id):
 def delete_batch(batch_id):
     conn = get_connection()
     c = conn.cursor()
+    # 只删除批次关系，子任务和文件由上层批量删除流程处理
     c.execute("DELETE FROM task_batch_items WHERE batch_id = ?", (batch_id,))
     c.execute("DELETE FROM task_batches WHERE batch_id = ?", (batch_id,))
     conn.commit()

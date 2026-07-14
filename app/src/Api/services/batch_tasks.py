@@ -47,6 +47,7 @@ def get_batch_status(batch_id):
     if not batch:
         return None
 
+    # 批次状态不入队，由子任务实时聚合出来
     children = db.list_batch_items(batch_id)
     progress_values = []
     child_payload = []
@@ -124,6 +125,7 @@ def make_batch_result_zip(batch_id, output_root):
             task_id = child["task_id"]
             label = Path(child.get("item_label") or path.name).stem or task_id
             arcname = f"{task_id}_{label}{path.suffix}"
+            # 文件名来自用户上传内容，重复时保留任务 ID 兜底
             if arcname in used_names:
                 arcname = f"{task_id}_{path.name}"
             used_names.add(arcname)

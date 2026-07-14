@@ -56,6 +56,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   const normalizeTaskId = (value) => String(value || "").replace(/\D+/g, "").slice(0, 4);
   const isBatchId = (value) => {
     const numeric = Number(value);
+    // 95xx-99xx 是批次号，查询时走批次接口
     return Number.isInteger(numeric) && numeric >= 9500 && numeric <= 9999;
   };
 
@@ -242,6 +243,10 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     if (!payload || payload.task_id !== statusQuery.value) return;
 
     if (payload.is_batch) {
+      /*
+       * 批次没有自己的 Worker
+       * 这里直接接收服务端聚合后的子任务进度
+       */
       status.value = payload;
       live.stage = String(payload.status || "").trim().toLowerCase();
       live.updatedAtMs = parseUpdatedAtMs(payload.updated_at) || Date.now();

@@ -31,6 +31,7 @@ def ingest_events():
         socketio.emit("frame", payload, to=task_id)
         batch_id = db.get_task_batch_id(task_id)
         if batch_id:
+            # 子任务有进度时，同步推送一份批次聚合状态
             batch = get_batch_status(batch_id)
             if batch:
                 socketio.emit("frame", batch, to=batch_id)

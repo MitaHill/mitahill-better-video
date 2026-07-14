@@ -166,6 +166,10 @@ const tableRows = computed(() => {
   const batchedTaskIds = new Set();
 
   for (const batch of props.batches) {
+    /*
+     * 批次作为第一层展示
+     * 子任务只在展开后插入，避免和单任务混在一起
+     */
     rows.push({
       ...batch,
       row_key: `batch-${batch.batch_id}`,
@@ -245,6 +249,7 @@ const copyTaskId = async (taskId) => {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text);
     } else {
+      // 部分旧浏览器或非 HTTPS 环境没有 Clipboard API
       const input = document.createElement("textarea");
       input.value = text;
       input.setAttribute("readonly", "");
