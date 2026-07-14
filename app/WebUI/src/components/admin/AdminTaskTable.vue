@@ -38,7 +38,7 @@
                 :disabled="loading || taskActionLoading(task.batch_id)"
                 @click="confirmDeleteBatch(task.batch_id)"
               >
-                {{ taskActionLoading(task.batch_id) ? "删除中..." : "删除批次" }}
+                {{ taskActionLoading(task.batch_id) ? "删除中..." : "删除" }}
               </button>
               <button
                 v-else-if="!task.is_batch && canCancel(task.status)"
