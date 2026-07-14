@@ -250,6 +250,15 @@ def list_batch_items(batch_id):
     conn.close()
     return [dict(row) for row in rows]
 
+
+def delete_batch(batch_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM task_batch_items WHERE batch_id = ?", (batch_id,))
+    c.execute("DELETE FROM task_batches WHERE batch_id = ?", (batch_id,))
+    conn.commit()
+    conn.close()
+
 def update_task_status(task_id, status, progress=None, message=None):
     logger.debug(f"Updating Task {task_id}: {status} ({progress}%) - {message}")
     conn = get_connection()
@@ -331,6 +340,7 @@ def delete_task(task_id):
     c.execute("DELETE FROM task_progress WHERE task_id = ?", (task_id,))
     c.execute("DELETE FROM segment_progress WHERE task_id = ?", (task_id,))
     c.execute("DELETE FROM task_control WHERE task_id = ?", (task_id,))
+    c.execute("DELETE FROM task_batch_items WHERE task_id = ?", (task_id,))
     conn.commit()
     conn.close()
     
@@ -351,6 +361,54 @@ def delete_task(task_id):
             logger.debug(f"Removing result file: {path}")
             try: path.unlink()
             except: pass
+
+
+def delete_tasks(task_ids):
+    safe_ids = [str(task_id).strip() for task_id in task_ids if str(task_id).strip()]
+    if not safe_ids:
+        return
+
+    logger.warning(f"Deleting {len(safe_ids)} tasks and associated files")
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    tasks = []
+    for start in range(0, len(safe_ids), 500):
+        chunk = safe_ids[start:start + 500]
+        placeholders = ",".join("?" for _ in chunk)
+        c.execute(f"SELECT * FROM task_queue WHERE task_id IN ({placeholders})", chunk)
+        tasks.extend(dict(row) for row in c.fetchall())
+        for table in ("task_queue", "task_progress", "segment_progress", "task_control", "task_batch_items"):
+            c.execute(f"DELETE FROM {table} WHERE task_id IN ({placeholders})", chunk)
+    conn.commit()
+    conn.close()
+
+    output_root = Path("/workspace/storage/output")
+    upload_root = Path("/workspace/storage/upload")
+    import shutil
+    result_paths = []
+    for task in tasks:
+        task_id = task.get("task_id")
+        if task.get("result_path"):
+            result_paths.append(Path(task["result_path"]))
+        if task.get("task_params"):
+            try:
+                params = json.loads(task["task_params"])
+                filename = params.get("filename")
+                if filename:
+                    result_paths.extend(output_root.glob(f"sr_{Path(filename).stem}.*"))
+            except Exception:
+                pass
+        for root in (output_root, upload_root):
+            run_dir = root / f"run_{task_id}"
+            if run_dir.exists():
+                shutil.rmtree(run_dir, ignore_errors=True)
+    for path in set(result_paths):
+        if path.is_file():
+            try:
+                path.unlink()
+            except Exception:
+                pass
 
 def get_next_task_atomic():
     logger.debug("Checking for next pending task...")

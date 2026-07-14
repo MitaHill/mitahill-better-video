@@ -19,7 +19,7 @@
         <thead>
           <tr>
             <th>操作</th>
-            <th>任务ID</th>
+            <th>批次/任务ID</th>
             <th>类别</th>
             <th>状态</th>
             <th>进度</th>
@@ -30,10 +30,18 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="task in tasks" :key="task.task_id">
+          <tr v-for="task in tableRows" :key="task.row_key">
             <td>
               <button
-                v-if="canCancel(task.status)"
+                v-if="task.is_batch && canDelete(task.status)"
+                type="button"
+                :disabled="loading || taskActionLoading(task.batch_id)"
+                @click="confirmDeleteBatch(task.batch_id)"
+              >
+                {{ taskActionLoading(task.batch_id) ? "删除中..." : "删除批次" }}
+              </button>
+              <button
+                v-else-if="!task.is_batch && canCancel(task.status)"
                 type="button"
                 :disabled="loading || taskActionLoading(task.task_id)"
                 @click="onCancelTask(task.task_id)"
@@ -41,7 +49,7 @@
                 {{ taskActionLoading(task.task_id) ? "取消中..." : "取消" }}
               </button>
               <button
-                v-else-if="canDelete(task.status)"
+                v-else-if="!task.batch_id && canDelete(task.status)"
                 type="button"
                 :disabled="loading || taskActionLoading(task.task_id)"
                 @click="confirmDelete(task.task_id)"
@@ -50,7 +58,18 @@
               </button>
               <span v-else>-</span>
             </td>
-            <td class="mono">{{ task.task_id }}</td>
+            <td class="mono">
+              <button
+                v-if="task.is_batch"
+                type="button"
+                class="secondary"
+                style="padding: 2px 8px; margin-right: 8px;"
+                @click="toggleBatch(task.batch_id)"
+              >
+                {{ isBatchExpanded(task.batch_id) ? "▾" : "▸" }}
+              </button>
+              <span :style="{ paddingLeft: task.is_child ? '28px' : '0' }">{{ task.task_id }}</span>
+            </td>
             <td>{{ task.task_category || "-" }}</td>
             <td>{{ statusText(task.status) }}</td>
             <td>{{ task.progress ?? 0 }}%</td>
@@ -59,7 +78,7 @@
             <td>{{ formatDateTimeToSecond(task.updated_at) }}</td>
             <td>{{ task.message || "-" }}</td>
           </tr>
-          <tr v-if="!tasks.length">
+          <tr v-if="!tableRows.length">
             <td colspan="9" class="notice">暂无任务记录</td>
           </tr>
         </tbody>
@@ -71,12 +90,17 @@
 </template>
 
 <script setup>
+import { computed, reactive } from "vue";
 import { formatDateTimeToSecond } from "./formatDateTime";
 
 const props = defineProps({
   tasks: {
     type: Array,
     required: true,
+  },
+  batches: {
+    type: Array,
+    default: () => [],
   },
   statusFilter: {
     type: String,
@@ -102,6 +126,10 @@ const props = defineProps({
     type: Function,
     required: true,
   },
+  onDeleteBatch: {
+    type: Function,
+    required: true,
+  },
   taskActionLoading: {
     type: Function,
     default: () => false,
@@ -109,6 +137,54 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["update:statusFilter"]);
+const expandedBatches = reactive({});
+
+const taskMap = computed(() => {
+  const map = {};
+  for (const task of props.tasks) {
+    map[task.task_id] = task;
+  }
+  return map;
+});
+
+const tableRows = computed(() => {
+  const rows = [];
+  const batchedTaskIds = new Set();
+
+  for (const batch of props.batches) {
+    rows.push({
+      ...batch,
+      row_key: `batch-${batch.batch_id}`,
+      is_batch: true,
+      task_id: batch.batch_id,
+    });
+    for (const child of batch.children || []) {
+      batchedTaskIds.add(child.task_id);
+    }
+    if (!expandedBatches[batch.batch_id]) continue;
+    for (const child of batch.children || []) {
+      const fullTask = taskMap.value[child.task_id] || {};
+      rows.push({
+        ...child,
+        ...fullTask,
+        row_key: `batch-${batch.batch_id}-task-${child.task_id}`,
+        is_child: true,
+        batch_id: batch.batch_id,
+        task_id: child.task_id,
+        task_category: fullTask.task_category || child.task_category || batch.task_category,
+        status: fullTask.status || child.status,
+        progress: fullTask.progress ?? child.progress ?? 0,
+        message: fullTask.message || child.message || child.item_label || "-",
+      });
+    }
+  }
+
+  for (const task of props.tasks) {
+    if (task.batch_id || batchedTaskIds.has(task.task_id)) continue;
+    rows.push({ ...task, row_key: `task-${task.task_id}` });
+  }
+  return rows;
+});
 
 const onFilterChange = (event) => {
   emit("update:statusFilter", event.target.value);
@@ -134,8 +210,19 @@ const canDelete = (status) => {
   return raw === "COMPLETED" || raw === "FAILED";
 };
 
+const isBatchExpanded = (batchId) => Boolean(expandedBatches[batchId]);
+
+const toggleBatch = (batchId) => {
+  expandedBatches[batchId] = !expandedBatches[batchId];
+};
+
 const confirmDelete = (taskId) => {
   if (!window.confirm(`确认删除任务 ${taskId}？相关文件和数据库记录将被永久删除。`)) return;
   props.onDeleteTask(taskId);
+};
+
+const confirmDeleteBatch = (batchId) => {
+  if (!window.confirm(`确认删除批次 ${batchId}？该批次下所有任务文件和数据库记录将被永久删除。`)) return;
+  props.onDeleteBatch(batchId);
 };
 </script>
