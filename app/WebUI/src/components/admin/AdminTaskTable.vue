@@ -30,7 +30,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="task in tableRows" :key="task.row_key">
+          <tr v-for="task in tableRows" :key="task.row_key" :class="rowClass(task)">
             <td>
               <button
                 v-if="task.is_batch && canDelete(task.status)"
@@ -59,16 +59,21 @@
               <span v-else>-</span>
             </td>
             <td class="mono">
-              <button
-                v-if="task.is_batch"
-                type="button"
-                class="secondary"
-                style="padding: 2px 8px; margin-right: 8px;"
-                @click="toggleBatch(task.batch_id)"
-              >
-                {{ isBatchExpanded(task.batch_id) ? "▾" : "▸" }}
-              </button>
-              <span :style="{ paddingLeft: task.is_child ? '28px' : '0' }">{{ task.task_id }}</span>
+              <span class="admin-task-id-cell">
+                <button
+                  v-if="task.is_batch"
+                  type="button"
+                  class="secondary admin-batch-toggle"
+                  @click="toggleBatch(task.batch_id)"
+                >
+                  {{ isBatchExpanded(task.batch_id) ? "▾" : "▸" }}
+                </button>
+                <span v-if="task.is_child" class="admin-child-branch"></span>
+                <span class="admin-task-id-main">{{ task.task_id }}</span>
+                <span v-if="task.is_batch" class="admin-row-badge">批次</span>
+                <span v-else-if="task.is_child" class="admin-row-badge admin-row-badge--child">属于 {{ task.batch_id }}</span>
+                <span v-else class="admin-row-badge admin-row-badge--single">单任务</span>
+              </span>
             </td>
             <td>{{ task.task_category || "-" }}</td>
             <td>{{ statusText(task.status) }}</td>
@@ -184,6 +189,12 @@ const tableRows = computed(() => {
     rows.push({ ...task, row_key: `task-${task.task_id}` });
   }
   return rows;
+});
+
+const rowClass = (task) => ({
+  "admin-task-row--batch": task.is_batch,
+  "admin-task-row--child": task.is_child,
+  "admin-task-row--single": !task.is_batch && !task.is_child,
 });
 
 const onFilterChange = (event) => {
