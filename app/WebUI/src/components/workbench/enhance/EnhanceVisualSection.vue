@@ -1,9 +1,6 @@
 <template>
   <div class="param-section">
     <div class="param-title">画面参数</div>
-    <div v-if="enhanceForm.recommendationText" class="auto-tile-note">
-      {{ enhanceForm.recommendationText }}，可手动调整。
-    </div>
     <div class="field">
       <label>模型</label>
       <select v-model="enhanceForm.modelName" :disabled="isDisabled('modelName')">

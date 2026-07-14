@@ -1,6 +1,7 @@
 from app.src.Database import core as db
 from .uploads import new_task_id
 from .video_download import normalize_download_url, save_download_cookie_file, snapshot_download_cookie
+from .batch_tasks import add_batch_item, create_batch
 
 
 def create_download_task(client_ip, params, output_root):
@@ -38,10 +39,16 @@ def create_download_tasks(client_ip, params, output_root, cookie_file=None):
     errors = []
     seen = set()
     cookie_saved = False
+    batch_id = None
+    urls = []
     for raw in str((params or {}).get("source_url", "") or "").splitlines():
         if not raw.strip() or raw.strip() in seen:
             continue
         seen.add(raw.strip())
+        urls.append(raw.strip())
+    if not urls:
+        raise ValueError("url is required")
+    for raw in urls:
         try:
             url = normalize_download_url(raw)
         except ValueError as exc:
@@ -57,6 +64,8 @@ def create_download_tasks(client_ip, params, output_root, cookie_file=None):
             errors.append({"url": url, "error": err})
             continue
         task_ids.append(task_id)
-    if not task_ids and not errors:
-        raise ValueError("url is required")
-    return task_ids, errors
+        if len(urls) > 1:
+            if not batch_id:
+                batch_id = create_batch("download")
+            add_batch_item(batch_id, task_id, "download", url)
+    return task_ids, errors, batch_id

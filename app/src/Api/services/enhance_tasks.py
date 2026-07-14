@@ -72,7 +72,7 @@ def create_enhance_task(
         video_codec = (video_info.get("video_codec") or "").lower()
         allowed_video = {"h264", "hevc", "h265", "mpeg2video"}
         if not video_codec or video_codec not in allowed_video:
-            reject_reason = "仅支持 H.264/H.265/MPEG2 视频编码（拒绝 AV1/VP9 等非主流编码）。"
+            reject_reason = "仅支持 H.264/H.265/MPEG2 视频编码。"
             db.update_task_status(task_id, "FAILED", progress=0, message=reject_reason)
             return task_id, reject_reason
 

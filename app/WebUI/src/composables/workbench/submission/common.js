@@ -39,6 +39,7 @@ export const bindSingleTaskAndRefresh = async ({
 };
 
 export const bindBatchTasksAndRefresh = async ({
+  batchId,
   taskIdList,
   warnings,
   taskIds,
@@ -55,7 +56,7 @@ export const bindBatchTasksAndRefresh = async ({
       .join("；");
   }
   if (!safeIds.length) return;
-  setStatusQuery(safeIds[0]);
+  setStatusQuery(batchId || safeIds[0]);
   joinRoom();
   await fetchStatus();
 };

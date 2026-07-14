@@ -23,6 +23,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       failed: 0,
     },
     tasks: [],
+    batches: [],
     ipStats: [],
     statusFilter: "",
     realIpConfig: null,
@@ -123,6 +124,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       }
       overview.counts = payload.counts || overview.counts;
       overview.tasks = payload.tasks || [];
+      overview.batches = payload.batches || [];
       overview.ipStats = payload.ip_stats || [];
       overview.realIpConfig = payload.real_ip_config || null;
       overview.maintenanceMode = Boolean(payload.maintenance_mode);
@@ -211,6 +213,29 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       overview.error = error.message;
     } finally {
       overview.taskActionLoading[safeTaskId] = false;
+    }
+  };
+
+  const deleteBatchById = async (batchId) => {
+    const safeBatchId = String(batchId || "").trim();
+    if (!auth.token || !safeBatchId) return;
+    overview.error = "";
+    overview.taskActionLoading[safeBatchId] = true;
+    try {
+      const res = await fetch(`/api/admin/batches/${encodeURIComponent(safeBatchId)}`, {
+        method: "DELETE",
+        headers: _authHeaders(),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "删除批次失败");
+      }
+      await fetchOverview();
+    } catch (error) {
+      overview.error = error.message;
+    } finally {
+      overview.taskActionLoading[safeBatchId] = false;
     }
   };
 
@@ -703,6 +728,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     setMaintenanceMode,
     cancelTaskById,
     deleteTaskById,
+    deleteBatchById,
     fetchGpuUsage,
     fetchRealIpConfig,
     updateRealIpConfig,

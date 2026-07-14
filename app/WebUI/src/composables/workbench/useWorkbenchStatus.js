@@ -54,6 +54,11 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   };
 
   const normalizeTaskId = (value) => String(value || "").replace(/\D+/g, "").slice(0, 4);
+  const isBatchId = (value) => {
+    const numeric = Number(value);
+    // 95xx-99xx 是批次号，查询时走批次接口
+    return Number.isInteger(numeric) && numeric >= 9500 && numeric <= 9999;
+  };
 
   const normalizeServerTimestamp = (value) => {
     const raw = String(value || "").trim();
@@ -136,6 +141,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   };
 
   const isPreviewSupported = computed(() => {
+    if (status.value?.is_batch) return false;
     const category = status.value?.task_params?.task_category || "";
     return category !== "convert" && category !== "transcribe" && category !== "download";
   });
@@ -184,10 +190,11 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     }
 
     try {
-      const res = await fetch(`/api/tasks/${statusQuery.value}`);
+      const endpoint = isBatchId(statusQuery.value) ? `/api/batches/${statusQuery.value}` : `/api/tasks/${statusQuery.value}`;
+      const res = await fetch(endpoint);
       if (!res.ok) {
         const err = await parseJsonSafe(res);
-        if (res.status === 404 || err.error_code === "task_not_found") {
+        if (res.status === 404 || err.error_code === "task_not_found" || err.error_code === "batch_not_found") {
           throw new Error(err.hint || "没有找到这个任务。请确认 4 位任务 ID 是否正确，或该任务已经被系统清理。");
         }
         throw new Error(err.error || "查询任务状态失败，请稍后重试。");
@@ -219,7 +226,8 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   };
 
   const downloadResult = () => {
-    window.location.href = `/api/tasks/${statusQuery.value}/result`;
+    const endpoint = isBatchId(statusQuery.value) ? `/api/batches/${statusQuery.value}/result` : `/api/tasks/${statusQuery.value}/result`;
+    window.location.href = endpoint;
   };
 
   const setStatusQuery = (value) => {
@@ -233,6 +241,20 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
 
   const onFrame = (payload) => {
     if (!payload || payload.task_id !== statusQuery.value) return;
+
+    if (payload.is_batch) {
+      /*
+       * 批次没有自己的 Worker
+       * 这里直接接收服务端聚合后的子任务进度
+       */
+      status.value = payload;
+      live.stage = String(payload.status || "").trim().toLowerCase();
+      live.updatedAtMs = parseUpdatedAtMs(payload.updated_at) || Date.now();
+      live.itemCount = Array.isArray(payload.children) ? payload.children.length : 0;
+      live.itemIndex = Array.isArray(payload.children) ? payload.children.filter((item) => item.status === "COMPLETED").length : 0;
+      live.itemLabel = "子任务";
+      return;
+    }
 
     const category = String(payload.task_category || status.value?.task_params?.task_category || "").trim().toLowerCase();
     const nextGpu = toNullableNumber(payload.gpu_util);

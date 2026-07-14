@@ -1,5 +1,5 @@
 import { buildTranscriptionTaskFormData } from "../submitPayloadBuilders";
-import { bindSingleTaskAndRefresh, ensureCategory, throwSubmitError } from "./common";
+import { bindBatchTasksAndRefresh, bindSingleTaskAndRefresh, ensureCategory, throwSubmitError } from "./common";
 
 export const submitTranscribeTask = async (ctx) => {
   const {
@@ -7,6 +7,7 @@ export const submitTranscribeTask = async (ctx) => {
     transcribeForm,
     parseJsonSafe,
     taskIds,
+    submitWarnings,
     setStatusQuery,
     joinRoom,
     fetchStatus,
@@ -30,6 +31,20 @@ export const submitTranscribeTask = async (ctx) => {
   }
 
   const payload = await parseJsonSafe(res);
+  if (payload.batch_id) {
+    await bindBatchTasksAndRefresh({
+      batchId: payload.batch_id,
+      taskIdList: payload.task_ids || [],
+      warnings: payload.errors || [],
+      taskIds,
+      submitWarnings,
+      setStatusQuery,
+      joinRoom,
+      fetchStatus,
+    });
+    return;
+  }
+
   await bindSingleTaskAndRefresh({
     taskId: payload.task_id,
     taskIds,

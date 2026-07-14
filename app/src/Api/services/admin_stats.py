@@ -4,6 +4,7 @@ from app.src.Database import admin as db_admin
 def build_overview(limit=200, offset=0, status=""):
     counts = db_admin.get_task_counts()
     tasks = db_admin.list_tasks(limit=limit, offset=offset, status=status)
+    batches = db_admin.list_batches(limit=limit, status=status)
     ip_stats = db_admin.get_ip_access_stats(limit=200)
     maintenance_mode = db_admin.get_worker_maintenance_mode(default=False)
     return {
@@ -15,6 +16,7 @@ def build_overview(limit=200, offset=0, status=""):
             "failed": counts.get("FAILED", 0),
         },
         "tasks": tasks,
+        "batches": batches,
         "ip_stats": ip_stats,
         "maintenance_mode": maintenance_mode,
     }

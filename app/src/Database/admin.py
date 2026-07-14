@@ -190,18 +190,22 @@ def list_tasks(limit: int = 200, offset: int = 0, status: str = "") -> List[Dict
     cur = conn.cursor()
     if status:
         cur.execute(
-            """SELECT task_id, created_at, updated_at, client_ip, task_category, status, progress, message
-               FROM task_queue
-               WHERE status = ?
-               ORDER BY created_at DESC
+            """SELECT tq.task_id, tq.created_at, tq.updated_at, tq.client_ip, tq.task_category,
+                      tq.status, tq.progress, tq.message, bi.batch_id
+               FROM task_queue tq
+               LEFT JOIN task_batch_items bi ON bi.task_id = tq.task_id
+               WHERE tq.status = ?
+               ORDER BY tq.created_at DESC
                LIMIT ? OFFSET ?""",
             (status, safe_limit, safe_offset),
         )
     else:
         cur.execute(
-            """SELECT task_id, created_at, updated_at, client_ip, task_category, status, progress, message
-               FROM task_queue
-               ORDER BY created_at DESC
+            """SELECT tq.task_id, tq.created_at, tq.updated_at, tq.client_ip, tq.task_category,
+                      tq.status, tq.progress, tq.message, bi.batch_id
+               FROM task_queue tq
+               LEFT JOIN task_batch_items bi ON bi.task_id = tq.task_id
+               ORDER BY tq.created_at DESC
                LIMIT ? OFFSET ?""",
             (safe_limit, safe_offset),
         )
@@ -211,6 +215,81 @@ def list_tasks(limit: int = 200, offset: int = 0, status: str = "") -> List[Dict
     for row in rows:
         row["ip_info"] = describe_ip(row.get("client_ip") or "")
     return rows
+
+
+def _batch_status(children: List[Dict]) -> str:
+    statuses = [str(item.get("status") or "").upper() for item in children]
+    if not statuses:
+        return "PENDING"
+    if all(status == "COMPLETED" for status in statuses):
+        return "COMPLETED"
+    if any(status in {"PENDING", "PROCESSING"} for status in statuses):
+        return "PROCESSING"
+    if any(status == "FAILED" for status in statuses):
+        return "FAILED"
+    return "PROCESSING"
+
+
+def list_batches(limit: int = 200, status: str = "") -> List[Dict]:
+    safe_limit = min(max(int(limit or 200), 1), 1000)
+    status = (status or "").strip().upper()
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT b.batch_id, b.batch_category, b.created_at, b.updated_at,
+                  bi.task_id, bi.item_label, tq.status, tq.progress, tq.message
+           FROM task_batches b
+           LEFT JOIN task_batch_items bi ON bi.batch_id = b.batch_id
+           LEFT JOIN task_queue tq ON tq.task_id = bi.task_id
+           ORDER BY b.created_at DESC, bi.created_at ASC
+           LIMIT ?""",
+        (safe_limit * 100,),
+    )
+    rows = [dict(row) for row in cur.fetchall()]
+    conn.close()
+
+    batches = {}
+    for row in rows:
+        batch_id = row["batch_id"]
+        batch = batches.setdefault(
+            batch_id,
+            {
+                "row_type": "batch",
+                "batch_id": batch_id,
+                "task_id": batch_id,
+                "task_category": row.get("batch_category") or "batch",
+                "created_at": row.get("created_at"),
+                "updated_at": row.get("updated_at"),
+                "client_ip": "-",
+                "children": [],
+            },
+        )
+        if row.get("task_id"):
+            batch["children"].append(
+                {
+                    "task_id": row.get("task_id"),
+                    "status": row.get("status") or "PENDING",
+                    "progress": int(row.get("progress") or 0),
+                    "message": row.get("message") or "",
+                    "item_label": row.get("item_label") or "",
+                }
+            )
+
+    result = []
+    for batch in batches.values():
+        children = batch["children"]
+        progress_values = [max(0, min(100, int(item.get("progress") or 0))) for item in children]
+        batch["status"] = _batch_status(children)
+        batch["progress"] = round(sum(progress_values) / len(progress_values)) if progress_values else 0
+        done = len([item for item in children if item.get("status") == "COMPLETED"])
+        batch["message"] = f"{done}/{len(children)} 个子任务已完成"
+        if status and batch["status"] != status:
+            continue
+        result.append(batch)
+        if len(result) >= safe_limit:
+            break
+    return result
 
 
 def get_ip_access_stats(limit: int = 200) -> List[Dict]:
@@ -272,3 +351,25 @@ def delete_task(task_id: str) -> None:
         raise ValueError("only completed or failed tasks can be deleted")
 
     db_core.delete_task(safe_task_id)
+
+
+def delete_batch(batch_id: str) -> None:
+    safe_batch_id = str(batch_id or "").strip()
+    if not safe_batch_id:
+        raise ValueError("batch_id is required")
+
+    batch = db_core.get_batch(safe_batch_id)
+    if not batch:
+        raise ValueError("batch not found")
+
+    items = db_core.list_batch_items(safe_batch_id)
+    active = [
+        item.get("task_id")
+        for item in items
+        if str(item.get("status") or "").upper() in {"PENDING", "PROCESSING"}
+    ]
+    if active:
+        raise ValueError("批次中存在排队中或处理中的任务")
+
+    db_core.delete_tasks([item.get("task_id") for item in items])
+    db_core.delete_batch(safe_batch_id)

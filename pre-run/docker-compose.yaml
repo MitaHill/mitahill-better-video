@@ -10,6 +10,7 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
       - PYTHONUNBUFFERED=1
+      - TZ=Asia/Shanghai
     command: python3 app/main.py
     network_mode: host
     volumes:

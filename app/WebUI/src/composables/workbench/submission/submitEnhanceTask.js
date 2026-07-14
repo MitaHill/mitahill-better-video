@@ -39,6 +39,7 @@ export const submitEnhanceTask = async (ctx) => {
   const payload = await parseJsonSafe(res);
   if (endpoint.endsWith("/batch")) {
     await bindBatchTasksAndRefresh({
+      batchId: payload.batch_id,
       taskIdList: payload.task_ids || [],
       warnings: payload.errors || [],
       taskIds,

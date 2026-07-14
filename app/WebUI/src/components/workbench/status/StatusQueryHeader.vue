@@ -20,7 +20,7 @@
           @paste="onPinPaste(index, $event)"
         />
       </div>
-      <p class="notice" style="margin-top: 10px;">输入 4 位数字任务 ID</p>
+      <p class="notice" style="margin-top: 10px;">输入4位数字</p>
     </div>
 
     <div class="status-row">
@@ -30,11 +30,11 @@
       <button v-if="status && status.status === 'COMPLETED'" @click="onDownloadResult">下载</button>
     </div>
 
-    <div v-if="taskIds.length" class="notice task-id-panel" style="margin-top: 12px;">
-      <div class="task-id-header"><span>任务 ID：</span></div>
+    <div v-if="displayTaskIds.length" class="notice task-id-panel" style="margin-top: 12px;">
+      <div class="task-id-header"><span>{{ status?.is_batch ? "子任务 ID：" : "任务 ID：" }}</span></div>
       <div class="task-id-list">
         <button
-          v-for="id in taskIds"
+          v-for="id in displayTaskIds"
           :key="id"
           type="button"
           class="task-id-item"
@@ -93,6 +93,12 @@ const progressText = computed(() => {
   const numeric = Number(props.progressValue);
   if (!Number.isFinite(numeric)) return 0;
   return Math.max(0, Math.min(100, Math.round(numeric)));
+});
+const displayTaskIds = computed(() => {
+  if (props.status?.is_batch && Array.isArray(props.status.children)) {
+    return props.status.children.map((item) => item.task_id).filter(Boolean);
+  }
+  return props.taskIds;
 });
 const activeIndex = computed(() => {
   if (!isFocused.value) return -1;

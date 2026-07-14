@@ -126,6 +126,24 @@ def init_db():
         )
         c.execute("CREATE INDEX IF NOT EXISTS idx_gpu_usage_samples_collected ON gpu_usage_samples(collected_at)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_gpu_usage_samples_gpu ON gpu_usage_samples(gpu_index)")
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS task_batches
+               (batch_id TEXT PRIMARY KEY,
+                batch_category TEXT,
+                created_at DATETIME,
+                updated_at DATETIME)"""
+        )
+        c.execute(
+            """CREATE TABLE IF NOT EXISTS task_batch_items
+               (batch_id TEXT,
+                task_id TEXT,
+                task_category TEXT,
+                item_label TEXT,
+                created_at DATETIME,
+                PRIMARY KEY (batch_id, task_id))"""
+        )
+        c.execute("CREATE INDEX IF NOT EXISTS idx_task_batch_items_batch ON task_batch_items(batch_id)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_task_batch_items_task ON task_batch_items(task_id)")
         conn.commit()
         conn.close()
         logger.debug("Database initialized successfully.")
@@ -157,6 +175,100 @@ def get_task(task_id):
     row = c.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def get_batch(batch_id):
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM task_batches WHERE batch_id = ?", (batch_id,))
+    row = c.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def _batch_id_available(batch_id):
+    if get_task(batch_id):
+        return False
+    if get_batch(batch_id):
+        return False
+    return True
+
+
+def new_batch_id():
+    # 9500-9999 留给批次任务，普通任务只使用前面的号码段
+    for index in range(9_500, 10_000):
+        batch_id = f"{index:04d}"
+        if _batch_id_available(batch_id):
+            return batch_id
+    raise RuntimeError("failed to allocate a unique 4-digit batch id")
+
+
+def create_batch(batch_category):
+    batch_id = new_batch_id()
+    now = datetime.datetime.now()
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        """INSERT INTO task_batches (batch_id, batch_category, created_at, updated_at)
+           VALUES (?, ?, ?, ?)""",
+        (batch_id, batch_category, now, now),
+    )
+    conn.commit()
+    conn.close()
+    return batch_id
+
+
+def add_batch_item(batch_id, task_id, task_category, item_label=""):
+    conn = get_connection()
+    c = conn.cursor()
+    now = datetime.datetime.now()
+    c.execute(
+        """INSERT OR REPLACE INTO task_batch_items
+           (batch_id, task_id, task_category, item_label, created_at)
+           VALUES (?, ?, ?, ?, ?)""",
+        (batch_id, task_id, task_category, item_label, now),
+    )
+    c.execute("UPDATE task_batches SET updated_at = ? WHERE batch_id = ?", (now, batch_id))
+    conn.commit()
+    conn.close()
+
+
+def list_batch_items(batch_id):
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute(
+        """SELECT bi.batch_id, bi.task_id, bi.task_category, bi.item_label, bi.created_at,
+                  tq.status, tq.progress, tq.message, tq.result_path, tq.updated_at
+           FROM task_batch_items bi
+           LEFT JOIN task_queue tq ON tq.task_id = bi.task_id
+           WHERE bi.batch_id = ?
+           ORDER BY bi.created_at ASC, bi.task_id ASC""",
+        (batch_id,),
+    )
+    rows = c.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def get_task_batch_id(task_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT batch_id FROM task_batch_items WHERE task_id = ? LIMIT 1", (task_id,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
+def delete_batch(batch_id):
+    conn = get_connection()
+    c = conn.cursor()
+    # 只删除批次关系，子任务和文件由上层批量删除流程处理
+    c.execute("DELETE FROM task_batch_items WHERE batch_id = ?", (batch_id,))
+    c.execute("DELETE FROM task_batches WHERE batch_id = ?", (batch_id,))
+    conn.commit()
+    conn.close()
 
 def update_task_status(task_id, status, progress=None, message=None):
     logger.debug(f"Updating Task {task_id}: {status} ({progress}%) - {message}")
@@ -239,6 +351,7 @@ def delete_task(task_id):
     c.execute("DELETE FROM task_progress WHERE task_id = ?", (task_id,))
     c.execute("DELETE FROM segment_progress WHERE task_id = ?", (task_id,))
     c.execute("DELETE FROM task_control WHERE task_id = ?", (task_id,))
+    c.execute("DELETE FROM task_batch_items WHERE task_id = ?", (task_id,))
     conn.commit()
     conn.close()
     
@@ -259,6 +372,54 @@ def delete_task(task_id):
             logger.debug(f"Removing result file: {path}")
             try: path.unlink()
             except: pass
+
+
+def delete_tasks(task_ids):
+    safe_ids = [str(task_id).strip() for task_id in task_ids if str(task_id).strip()]
+    if not safe_ids:
+        return
+
+    logger.warning(f"Deleting {len(safe_ids)} tasks and associated files")
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    tasks = []
+    for start in range(0, len(safe_ids), 500):
+        chunk = safe_ids[start:start + 500]
+        placeholders = ",".join("?" for _ in chunk)
+        c.execute(f"SELECT * FROM task_queue WHERE task_id IN ({placeholders})", chunk)
+        tasks.extend(dict(row) for row in c.fetchall())
+        for table in ("task_queue", "task_progress", "segment_progress", "task_control", "task_batch_items"):
+            c.execute(f"DELETE FROM {table} WHERE task_id IN ({placeholders})", chunk)
+    conn.commit()
+    conn.close()
+
+    output_root = Path("/workspace/storage/output")
+    upload_root = Path("/workspace/storage/upload")
+    import shutil
+    result_paths = []
+    for task in tasks:
+        task_id = task.get("task_id")
+        if task.get("result_path"):
+            result_paths.append(Path(task["result_path"]))
+        if task.get("task_params"):
+            try:
+                params = json.loads(task["task_params"])
+                filename = params.get("filename")
+                if filename:
+                    result_paths.extend(output_root.glob(f"sr_{Path(filename).stem}.*"))
+            except Exception:
+                pass
+        for root in (output_root, upload_root):
+            run_dir = root / f"run_{task_id}"
+            if run_dir.exists():
+                shutil.rmtree(run_dir, ignore_errors=True)
+    for path in set(result_paths):
+        if path.is_file():
+            try:
+                path.unlink()
+            except Exception:
+                pass
 
 def get_next_task_atomic():
     logger.debug("Checking for next pending task...")

@@ -77,12 +77,14 @@
           <AdminTaskTable
             v-if="activeMenuKey === 'tasks'"
             :tasks="overview.tasks"
+            :batches="overview.batches"
             :status-filter="overview.statusFilter"
             :loading="overview.loading"
             :error="overview.error"
             :on-refresh="fetchOverview"
             :on-cancel-task="onTaskCancel"
             :on-delete-task="onTaskDelete"
+            :on-delete-batch="onBatchDelete"
             :task-action-loading="taskActionLoading"
             @update:status-filter="onStatusFilterChange"
           />
@@ -213,6 +215,7 @@ const {
   setMaintenanceMode,
   cancelTaskById,
   deleteTaskById,
+  deleteBatchById,
   fetchGpuUsage,
   fetchRealIpConfig,
   updateRealIpConfig,
@@ -295,6 +298,10 @@ const onTaskCancel = async (taskId) => {
 
 const onTaskDelete = async (taskId) => {
   await deleteTaskById(taskId);
+};
+
+const onBatchDelete = async (batchId) => {
+  await deleteBatchById(batchId);
 };
 
 const taskActionLoading = (taskId) => Boolean(overview.taskActionLoading[String(taskId || "")]);

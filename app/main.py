@@ -16,6 +16,7 @@ from app.src.Services.startup_self_check_service import run_startup_self_check_s
 from app.src.Services.worker_service import WorkerService
 from flask_socketio import SocketIO, join_room
 from app.src.Api.services.admin import get_transcription_config
+from app.src.Api.services.batch_tasks import get_batch_status
 
 logger = logging.getLogger("MAIN")
 
@@ -82,6 +83,10 @@ def main():
                     },
                     room=task_id,
                 )
+            else:
+                batch = get_batch_status(task_id)
+                if batch:
+                    socketio.emit("frame", batch, room=task_id)
 
     socketio.run(app, host="0.0.0.0", port=8501)
 

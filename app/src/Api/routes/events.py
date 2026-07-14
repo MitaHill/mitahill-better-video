@@ -1,9 +1,11 @@
 from flask import Blueprint, current_app, jsonify, request
 
 from app.src.Config import settings as config
+from app.src.Database import core as db
 from app.src.Utils.client_ip import describe_ip
 
 from ..services.real_ip import resolve_request_client_ip
+from ..services.batch_tasks import get_batch_status
 
 bp = Blueprint("api_events", __name__)
 
@@ -27,4 +29,10 @@ def ingest_events():
     socketio = current_app.extensions.get("socketio")
     if socketio is not None:
         socketio.emit("frame", payload, to=task_id)
+        batch_id = db.get_task_batch_id(task_id)
+        if batch_id:
+            # 子任务有进度时，同步推送一份批次聚合状态
+            batch = get_batch_status(batch_id)
+            if batch:
+                socketio.emit("frame", batch, to=batch_id)
     return jsonify({"ok": True})
