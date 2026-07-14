@@ -20,7 +20,7 @@
           @paste="onPinPaste(index, $event)"
         />
       </div>
-      <p class="notice" style="margin-top: 10px;">输入 4 位数字任务 ID 或批次 ID</p>
+      <p class="notice" style="margin-top: 10px;">输入4位数字</p>
     </div>
 
     <div class="status-row">

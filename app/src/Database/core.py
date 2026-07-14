@@ -251,6 +251,15 @@ def list_batch_items(batch_id):
     return [dict(row) for row in rows]
 
 
+def get_task_batch_id(task_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT batch_id FROM task_batch_items WHERE task_id = ? LIMIT 1", (task_id,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+
 def delete_batch(batch_id):
     conn = get_connection()
     c = conn.cursor()

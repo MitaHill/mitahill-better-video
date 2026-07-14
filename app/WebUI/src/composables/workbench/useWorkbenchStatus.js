@@ -241,6 +241,16 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   const onFrame = (payload) => {
     if (!payload || payload.task_id !== statusQuery.value) return;
 
+    if (payload.is_batch) {
+      status.value = payload;
+      live.stage = String(payload.status || "").trim().toLowerCase();
+      live.updatedAtMs = parseUpdatedAtMs(payload.updated_at) || Date.now();
+      live.itemCount = Array.isArray(payload.children) ? payload.children.length : 0;
+      live.itemIndex = Array.isArray(payload.children) ? payload.children.filter((item) => item.status === "COMPLETED").length : 0;
+      live.itemLabel = "子任务";
+      return;
+    }
+
     const category = String(payload.task_category || status.value?.task_params?.task_category || "").trim().toLowerCase();
     const nextGpu = toNullableNumber(payload.gpu_util);
     if (nextGpu !== null) {
