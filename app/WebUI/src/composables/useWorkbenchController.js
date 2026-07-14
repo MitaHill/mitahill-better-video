@@ -6,6 +6,7 @@ import { useWorkbenchFormConstraints } from "./workbench/useWorkbenchFormConstra
 import { useWorkbenchStatus } from "./workbench/useWorkbenchStatus";
 import { useWorkbenchSubmission } from "./workbench/useWorkbenchSubmission";
 import { useWorkbenchTheme } from "./workbench/useWorkbenchTheme";
+import { useTranscribeLowDataMode } from "./workbench/useTranscribeLowDataMode";
 import { useWorkbenchUploads } from "./workbench/useWorkbenchUploads";
 import { parseJsonSafe } from "./workbench/utils";
 
@@ -74,6 +75,11 @@ export const useWorkbenchController = () => {
     enforceCategory,
   });
 
+  const { enableLowData, prepareUploadFiles } = useTranscribeLowDataMode({
+    transcribeForm,
+    submitError,
+  });
+
   const { submitTask } = useWorkbenchSubmission({
     activeCategory,
     loading,
@@ -89,6 +95,7 @@ export const useWorkbenchController = () => {
     joinRoom,
     parseJsonSafe,
     enforceCategory,
+    prepareTranscribeUploadFiles: prepareUploadFiles,
   });
 
   const { fetchRecommendations } = useWorkbenchRecommendations({ enhanceForm });
@@ -252,6 +259,7 @@ export const useWorkbenchController = () => {
     onEnhanceFileChange,
     onConvertMediaChange,
     onTranscribeMediaChange,
+    onTranscribeLowDataToggle: enableLowData,
     onWatermarkImagesChange,
     probeDownloadSource,
     addWatermarkSegment,

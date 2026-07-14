@@ -62,6 +62,7 @@
 - `app/WebUI/src/composables/workbench/*`: atomic workbench logic units (theme/routing/forms/uploads/status/submission/builders).
 - `app/WebUI/src/composables/workbench/submitPayloadBuilders/*`: 按任务类别拆分的提交载荷构建器（index 聚合导出）。
 - `app/WebUI/src/composables/workbench/submission/*`: 提交流程原子模块（通用动作 + enhance/convert/transcribe/download 各自 submitter）。
+- `app/WebUI/src/composables/workbench/useTranscribeLowDataMode.js`: 字幕与文本转录的低数据传输逻辑，前端用 ffmpeg.wasm 提取音频后复用原提交接口。
 - `app/WebUI/src/composables/workbench/useWorkbenchAdmin.js`: 管理鉴权与总览数据获取。
 - `app/WebUI/src/constants/workbench.js`: category path and menu constants.
 - `app/WebUI/src/styles/navigation.css`: top menu animation/style module.

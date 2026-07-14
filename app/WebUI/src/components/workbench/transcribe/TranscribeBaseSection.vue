@@ -25,7 +25,7 @@
     <div class="inline-grid two">
       <div class="field compact">
         <label>转录类型</label>
-        <select v-model="transcribeForm.transcribeMode" :disabled="isDisabled('transcribeMode')">
+        <select v-model="transcribeForm.transcribeMode" :disabled="isDisabled('transcribeMode') || transcribeForm.lowDataTransfer">
           <option v-for="item in transcribeModeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
         </select>
       </div>
@@ -60,6 +60,19 @@
         <option v-for="item in translateTargetOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
       </select>
     </div>
+
+    <div class="field low-data-field">
+      <label class="check-inline">
+        <input
+          type="checkbox"
+          v-model="transcribeForm.lowDataTransfer"
+          @change="onLowDataTransferChange"
+        />
+        <span>低数据传输</span>
+      </label>
+      <p class="notice">开启后在浏览器中先提取音频，只提交音频到后端。仅适用于字幕与文本。</p>
+      <p v-if="transcribeForm.lowDataMessage" class="notice">{{ transcribeForm.lowDataMessage }}</p>
+    </div>
   </div>
 </template>
 
@@ -86,6 +99,10 @@ const props = defineProps({
     type: Function,
     required: true,
   },
+  onTranscribeLowDataToggle: {
+    type: Function,
+    required: true,
+  },
   getFieldPolicy: {
     type: Function,
     required: true,
@@ -103,6 +120,10 @@ const openMediaPicker = () => {
   mediaInput.value?.click();
 };
 
+const onLowDataTransferChange = () => {
+  props.onTranscribeLowDataToggle();
+};
+
 const selectedFileCount = computed(() => {
   const files = props.transcribeForm?.mediaFiles;
   return Array.isArray(files) ? files.length : 0;
@@ -113,7 +134,7 @@ const transcribeModeOptions = computed(() =>
     value,
     label:
       value === "subtitle_zip"
-        ? "字幕与文本（单文件直出 / 批量 ZIP）"
+        ? "字幕与文本"
         : value === "subtitled_video"
           ? "生成带字幕视频（单视频直出 / 批量 ZIP）"
           : value === "subtitle_and_video_zip"

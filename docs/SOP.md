@@ -55,6 +55,7 @@ GPU 探测、模型 HASH 校验、`nvidia-smi`、模型加载等操作必须放�
 - 字幕封装使用 `/workspace/storage/tmp/subtitles/` 下的安全临时文件，ffmpeg 结束后立即删除。
 - 转录固定使用原版 OpenAI Whisper。CUDA 必需，不增加 CPU fallback。
 - GTX 960 4G 等旧卡使用 `fp16=False`。如果 `medium` 放不下显存，清晰失败，让用户选择更小的已下载模型。
+- 字幕与文本转录可以启用低数据传输：前端用同源托管的 ffmpeg.wasm 提取 m4a 音频后再提交，后端仍走普通转录任务路径。
 - 自动过期删除任务当前禁用。任务文件和数据库记录由管理员在任务总览里显式删除；批量任务按批次 ID 折叠显示，展开后可查看子任务归属；批次状态页通过 WebSocket 接收聚合状态。
 
 ## 构建与部署

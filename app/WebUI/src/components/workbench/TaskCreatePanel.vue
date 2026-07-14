@@ -24,6 +24,7 @@
       :transcribe-form="transcribeForm"
       :transcribe-media-info="transcribeMediaInfo"
       :on-transcribe-media-change="onTranscribeMediaChange"
+      :on-transcribe-low-data-toggle="onTranscribeLowDataToggle"
       :get-field-policy="getFieldPolicy"
       :runtime-config="transcriptionRuntimeConfig"
     />
@@ -97,6 +98,10 @@ const props = defineProps({
     required: true,
   },
   onTranscribeMediaChange: {
+    type: Function,
+    required: true,
+  },
+  onTranscribeLowDataToggle: {
     type: Function,
     required: true,
   },

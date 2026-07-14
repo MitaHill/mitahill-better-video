@@ -374,6 +374,11 @@ button.secondary {
   height: 16px;
 }
 
+.low-data-field {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
 .wm-timeline {
   margin-top: 14px;
   padding: 14px;
