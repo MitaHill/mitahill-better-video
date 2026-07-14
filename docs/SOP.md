@@ -7,6 +7,7 @@
 - 不用项目根目录下的临时 `docker run` 验证正式部署，避免挂载或生成错误的存储路径。
 - 服务端口是 `8501`。重启前先确认端口没有冲突。
 - Compose 项目名固定为 `mitahill-better-video`，容器名保留 `better_video`。
+- 标准运行容器时区使用 GMT+8（`TZ=Asia/Shanghai`）。
 
 ## 工程原则
 

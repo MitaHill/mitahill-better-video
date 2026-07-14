@@ -69,10 +69,18 @@
                   {{ isBatchExpanded(task.batch_id) ? "▾" : "▸" }}
                 </button>
                 <span v-if="task.is_child" class="admin-child-branch"></span>
-                <span class="admin-task-id-main">{{ task.task_id }}</span>
+                <button
+                  type="button"
+                  class="admin-task-id-main"
+                  title="点击复制"
+                  @click="copyTaskId(task.task_id)"
+                >
+                  {{ task.task_id }}
+                </button>
                 <span v-if="task.is_batch" class="admin-row-badge">批次</span>
                 <span v-else-if="task.is_child" class="admin-row-badge admin-row-badge--child">属于 {{ task.batch_id }}</span>
                 <span v-else class="admin-row-badge admin-row-badge--single">单任务</span>
+                <span v-if="copiedTaskId === task.task_id" class="admin-row-badge admin-row-badge--copied">已复制</span>
               </span>
             </td>
             <td>{{ task.task_category || "-" }}</td>
@@ -143,6 +151,7 @@ const props = defineProps({
 
 const emit = defineEmits(["update:statusFilter"]);
 const expandedBatches = reactive({});
+const copiedState = reactive({ taskId: "", timer: null });
 
 const taskMap = computed(() => {
   const map = {};
@@ -225,6 +234,38 @@ const isBatchExpanded = (batchId) => Boolean(expandedBatches[batchId]);
 
 const toggleBatch = (batchId) => {
   expandedBatches[batchId] = !expandedBatches[batchId];
+};
+
+const copiedTaskId = computed(() => copiedState.taskId);
+
+const copyTaskId = async (taskId) => {
+  const text = String(taskId || "").trim();
+  if (!text) return;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const input = document.createElement("textarea");
+      input.value = text;
+      input.setAttribute("readonly", "");
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+    }
+    copiedState.taskId = text;
+    if (copiedState.timer) {
+      window.clearTimeout(copiedState.timer);
+    }
+    copiedState.timer = window.setTimeout(() => {
+      copiedState.taskId = "";
+      copiedState.timer = null;
+    }, 1200);
+  } catch (_err) {
+    window.prompt("复制失败，请手动复制任务 ID", text);
+  }
 };
 
 const confirmDelete = (taskId) => {
