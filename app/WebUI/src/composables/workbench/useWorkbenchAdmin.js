@@ -493,6 +493,33 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     }
   };
 
+  const cancelBatchById = async (batchId) => {
+    const safeBatchId = String(batchId || "").trim();
+    if (!auth.token || !safeBatchId) return;
+    overview.error = "";
+    overview.taskActionLoading[safeBatchId] = true;
+    try {
+      const res = await fetch(`/api/admin/batches/${encodeURIComponent(safeBatchId)}/cancel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ..._authHeaders(),
+        },
+        body: JSON.stringify({ reason: "已取消（管理员操作）" }),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        _handleAuthedError(res);
+        throw new Error(payload.error || "取消批次失败");
+      }
+      await fetchOverview();
+    } catch (error) {
+      overview.error = error.message;
+    } finally {
+      overview.taskActionLoading[safeBatchId] = false;
+    }
+  };
+
   const cancelModelDownloadJob = async (jobId) => {
     if (!auth.token || !jobId) return;
     transcriptionModels.error = "";
@@ -727,6 +754,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     fetchOverview,
     setMaintenanceMode,
     cancelTaskById,
+    cancelBatchById,
     deleteTaskById,
     deleteBatchById,
     fetchGpuUsage,

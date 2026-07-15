@@ -233,6 +233,14 @@ Header:
 - `PENDING`/`PROCESSING`：置为 `FAILED`，消息为“已取消（管理员操作）”
 - `COMPLETED`/`FAILED`：返回当前任务状态（幂等）
 
+### POST /api/admin/batches/<batch_id>/cancel
+Header:
+- `Authorization: Bearer <token>`
+
+取消批次下仍在排队或处理中的子任务。
+- `PENDING`/`PROCESSING` 子任务：置为 `FAILED`，消息为“已取消（管理员操作）”
+- 已结束子任务保持原状态
+
 ### DELETE /api/admin/tasks/<task_id>
 Header:
 - `Authorization: Bearer <token>`

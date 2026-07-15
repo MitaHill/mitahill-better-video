@@ -83,6 +83,7 @@
             :error="overview.error"
             :on-refresh="fetchOverview"
             :on-cancel-task="onTaskCancel"
+            :on-cancel-batch="onBatchCancel"
             :on-delete-task="onTaskDelete"
             :on-delete-batch="onBatchDelete"
             :task-action-loading="taskActionLoading"
@@ -214,6 +215,7 @@ const {
   fetchOverview,
   setMaintenanceMode,
   cancelTaskById,
+  cancelBatchById,
   deleteTaskById,
   deleteBatchById,
   fetchGpuUsage,
@@ -294,6 +296,10 @@ const onStatusFilterChange = (value) => {
 
 const onTaskCancel = async (taskId) => {
   await cancelTaskById(taskId);
+};
+
+const onBatchCancel = async (batchId) => {
+  await cancelBatchById(batchId);
 };
 
 const onTaskDelete = async (taskId) => {
