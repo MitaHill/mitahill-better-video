@@ -60,6 +60,37 @@ GPU 探测、模型 HASH 校验、`nvidia-smi`、模型加载等操作必须放�
 
 ## 构建与部署
 
+快速启动脚本是 `scripts/quick-start.sh`，用于检测环境并拉取项目。检测通过后，会自动运行 `quick-deploy`。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MitaHill/mitahill-better-video/main/scripts/quick-start.sh | bash
+```
+
+部署脚本是 `scripts/quick-deploy.sh`，必须在项目仓库内运行，只负责构建镜像和启动容器。
+
+```bash
+bash scripts/quick-deploy.sh
+```
+
+`quick-deploy` 会检查 Debian 系统、NVIDIA GPU、Docker、DockerHub、GitHub、Docker GPU 调用能力，再执行标准构建和 `pre-run` 启动流程。
+脚本会根据系统时区显示中文或英文，并自动区分 WSL2 与标准 Linux。
+
+只检查环境：
+
+```bash
+bash scripts/quick-deploy.sh --check-only
+```
+
+允许脚本安装缺失依赖：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MitaHill/mitahill-better-video/main/scripts/quick-start.sh | bash -s -- --install-deps
+```
+
+如果 NVIDIA GPU 和互联网正常，但 Docker 或 NVIDIA Container Toolkit 缺失，脚本会询问是否允许自动安装。
+
+脚本模块放在 `scripts/quick-deploy-src/`。WSL2 会自动附加 `docker-compose.wsl2.yaml`，不直接修改 `pre-run/docker-compose.yaml`。
+
 从仓库根目录构建应用镜像：
 
 ```bash

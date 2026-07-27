@@ -12,6 +12,19 @@ nvidia-smi
 docker run --rm --gpus all nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04 nvidia-smi
 ```
 
+仓库根目录提供快速部署脚本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MitaHill/mitahill-better-video/main/scripts/quick-start.sh | bash
+```
+
+`quick-start` 会检测环境并拉取项目，随后运行 `quick-deploy`。脚本检测到 WSL2 后，会自动附加 `scripts/quick-deploy-src/docker-compose.wsl2.yaml`，用于挂载 WSL2 NVIDIA 动态库。
+如果 Docker 或 NVIDIA Container Toolkit 缺失，可以使用：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MitaHill/mitahill-better-video/main/scripts/quick-start.sh | bash -s -- --install-deps
+```
+
 ## 常见问题
 
 ### unknown or invalid runtime name: nvidia
@@ -43,7 +56,7 @@ sudo ln -sf /usr/lib/wsl/lib/nvidia-smi /usr/bin/nvidia-smi
 
 ### 容器缺少 NVIDIA 动态库
 
-如果日志出现 `libcuda.so`、`libnvidia-encode.so.1` 相关错误，在 `pre-run/docker-compose.yaml` 中加入：
+如果日志出现 `libcuda.so`、`libnvidia-encode.so.1` 相关错误，快速部署脚本会通过 WSL2 覆盖文件加入：
 
 ```yaml
 environment:
