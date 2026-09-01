@@ -15,9 +15,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 
-ARG INSTALL_PREBUILT_FFMPEG=0
-ARG FFMPEG_BUILD_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
-ARG FFMPEG_BUILD_SHA256=c5156dd8059afc7b42b4ea19ae0b7df67b8361036ccef110aa0078196ac00028
+ARG INSTALL_PREBUILT_FFMPEG=1
+ARG FFMPEG_BUILD_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-n8.1.2-50-g1a748fe2cd-linux64-gpl-8.1.tar.xz
+ARG FFMPEG_BUILD_SHA256=ea0aa14aa7a45bba0825616c5b2a1c331d8ca19dff4fa51f941587fc16affb27
 
 # Core system dependencies and tooling
 RUN apt-get update && apt-get install -y --no-install-recommends \
