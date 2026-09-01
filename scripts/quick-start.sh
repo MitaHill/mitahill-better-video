@@ -125,9 +125,23 @@ check_debian() {
   esac
 }
 
+is_wsl() {
+  grep -qi microsoft /proc/version 2>/dev/null || grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null
+}
+
 check_gpu() {
-  have nvidia-smi || fail "$(msg nvidia_missing)"
-  nvidia-smi >/tmp/mitahill-better-video-start-nvidia-smi.log 2>&1 || {
+  local nvidia_smi="nvidia-smi"
+
+  if ! have nvidia-smi && is_wsl && [ -x /usr/lib/wsl/lib/nvidia-smi ]; then
+    nvidia_smi="/usr/lib/wsl/lib/nvidia-smi"
+    if [ "$(id -u)" -eq 0 ]; then
+      ln -sf "$nvidia_smi" /usr/bin/nvidia-smi
+      nvidia_smi="nvidia-smi"
+    fi
+  fi
+
+  command -v "$nvidia_smi" >/dev/null 2>&1 || fail "$(msg nvidia_missing)"
+  "$nvidia_smi" >/tmp/mitahill-better-video-start-nvidia-smi.log 2>&1 || {
     cat /tmp/mitahill-better-video-start-nvidia-smi.log >&2
     fail "$(msg nvidia_failed)"
   }

@@ -54,6 +54,8 @@ WSL2 的 `nvidia-smi` 通常在 `/usr/lib/wsl/lib/`：
 sudo ln -sf /usr/lib/wsl/lib/nvidia-smi /usr/bin/nvidia-smi
 ```
 
+使用 `quick-start` 或 `quick-deploy` 时，root 用户会自动创建该软链接。
+
 ### 容器缺少 NVIDIA 动态库
 
 如果日志出现 `libcuda.so`、`libnvidia-encode.so.1` 相关错误，快速部署脚本会通过 WSL2 覆盖文件加入：

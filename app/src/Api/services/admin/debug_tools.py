@@ -4,7 +4,7 @@ from typing import Dict, Optional
 from .model_checks import (
     resolve_model_entry,
     test_translation_provider,
-    verify_model_hashes,
+    verify_model_files,
     warmup_transcription_model,
 )
 from .transcription_catalog import (
@@ -17,15 +17,15 @@ from .transcription_config import get_transcription_config
 logger = logging.getLogger("ADMIN_DEBUG")
 
 
-def _pick_hash_error_message(hash_res: Dict) -> str:
-    checks = hash_res.get("checks") or []
+def _pick_file_check_error_message(file_result: Dict) -> str:
+    checks = file_result.get("checks") or []
     for item in checks:
         if str(item.get("status") or "").strip().lower() != "failed":
             continue
         message = str(item.get("message") or "").strip()
         if message:
             return message
-    return "HASH 校验失败"
+    return "必要文件检查失败"
 
 
 def _build_backend_mismatch_error(backend: str, model_id: str) -> str:
@@ -56,7 +56,7 @@ def run_transcription_model_test(
     model_id: Optional[str] = None,
 ) -> Dict:
     safe_mode = str(mode or "full").strip().lower()
-    if safe_mode not in {"full", "hash", "warmup"}:
+    if safe_mode not in {"full", "files", "warmup"}:
         safe_mode = "full"
 
     current = get_transcription_config()
@@ -104,11 +104,11 @@ def run_transcription_model_test(
     if not model_is_supported_by_backend(chosen_backend, chosen_model_id):
         result["steps"].append(
             {
-                "name": "hash",
+                "name": "files",
                 "ok": False,
                 "checks": [
                     {
-                        "name": "hash",
+                        "name": "files",
                         "status": "failed",
                         "message": _build_backend_mismatch_error(chosen_backend, chosen_model_id),
                     }
@@ -126,20 +126,20 @@ def run_transcription_model_test(
         result["error"] = str(exc)
         return result
 
-    hash_res = verify_model_hashes(model_entry)
-    result["steps"].append({"name": "hash", **hash_res})
-    if not hash_res.get("ok"):
+    file_result = verify_model_files(model_entry)
+    result["steps"].append({"name": "files", **file_result})
+    if not file_result.get("ok"):
         result["error"] = _append_cross_backend_hint(
-            _pick_hash_error_message(hash_res),
+            _pick_file_check_error_message(file_result),
             chosen_backend,
             chosen_model_id,
         )
-        logger.error("Model hash validation failed: %s/%s (%s)", chosen_backend, chosen_model_id, result["error"])
+        logger.error("Model file check failed: %s/%s (%s)", chosen_backend, chosen_model_id, result["error"])
         return result
 
-    if safe_mode == "hash":
+    if safe_mode == "files":
         result["ok"] = True
-        result["message"] = "HASH 校验通过"
+        result["message"] = "必要文件检查通过"
         return result
 
     warmup_res = warmup_transcription_model(model_entry)

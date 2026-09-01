@@ -43,12 +43,18 @@ detect_wsl() {
 }
 
 check_gpu() {
+  local nvidia_smi="nvidia-smi"
+
   if ! have nvidia-smi && [ "$IS_WSL" -eq 1 ] && [ -x /usr/lib/wsl/lib/nvidia-smi ]; then
-    warn "$(msg nvidia_missing): /usr/lib/wsl/lib/nvidia-smi"
+    nvidia_smi="/usr/lib/wsl/lib/nvidia-smi"
+    if [ "$(id -u)" -eq 0 ]; then
+      fix_wsl_nvidia_smi
+      nvidia_smi="nvidia-smi"
+    fi
   fi
 
-  have nvidia-smi || fail "$(msg nvidia_missing)"
-  nvidia-smi >/tmp/mitahill-better-video-nvidia-smi.log 2>&1 || {
+  command -v "$nvidia_smi" >/dev/null 2>&1 || fail "$(msg nvidia_missing)"
+  "$nvidia_smi" >/tmp/mitahill-better-video-nvidia-smi.log 2>&1 || {
     cat /tmp/mitahill-better-video-nvidia-smi.log >&2
     fail "$(msg nvidia_failed)"
   }

@@ -366,12 +366,12 @@ Header:
 Request (optional):
 ```json
 {
-  "mode": "hash",
+  "mode": "files",
   "backend": "whisper",
   "model_id": "large-v3"
 }
 ```
-- `mode=hash`：执行到必要文件检查即返回
+- `mode=files`：执行到必要文件检查即返回
 - `mode=warmup` / `mode=full`：执行完整链路
 - 不传 `backend/model_id` 时，使用管理页当前配置中的目标模型
 

@@ -8,7 +8,7 @@ from typing import Callable, Dict, Optional
 
 from app.src.Database import transcription_admin as db_transcription
 
-from .model_checks import verify_model_hashes, warmup_transcription_model
+from .model_checks import verify_model_files, warmup_transcription_model
 from .transcription_catalog import get_model_entry
 from .transcription_config import get_transcription_config
 
@@ -147,23 +147,17 @@ def _request_cancel(job_id: str):
             pass
 
 
-def _build_hash_failure_message(hash_result: Dict) -> str:
-    checks = hash_result.get("checks") or []
+def _build_file_check_failure_message(file_result: Dict) -> str:
+    checks = file_result.get("checks") or []
     failed = next((item for item in checks if str(item.get("status") or "").lower() == "failed"), None)
     if not failed:
-        return "HASH 校验失败"
+        return "必要文件检查失败"
 
     file_name = str(failed.get("file") or "").strip()
-    msg = str(failed.get("message") or "HASH 校验失败").strip()
-    expected = str(failed.get("expected") or "").strip()
-    actual = str(failed.get("actual") or "").strip()
+    msg = str(failed.get("message") or "必要文件检查失败").strip()
     parts = [msg]
     if file_name:
         parts.append(f"文件: {file_name}")
-    if expected:
-        parts.append(f"期望: {expected}")
-    if actual:
-        parts.append(f"实际: {actual}")
     return " | ".join(parts)
 
 
@@ -201,10 +195,10 @@ def _run_download_job(job_id: str, model_entry: Dict):
             message="下载完成，开始文件检查",
         )
 
-        hash_result = verify_model_hashes(model_entry)
-        partial_result["hash"] = hash_result
-        if not hash_result.get("ok"):
-            raise RuntimeError(_build_hash_failure_message(hash_result))
+        file_result = verify_model_files(model_entry)
+        partial_result["files"] = file_result
+        if not file_result.get("ok"):
+            raise RuntimeError(_build_file_check_failure_message(file_result))
 
         db_transcription.update_model_download_job(
             job_id,
@@ -226,7 +220,7 @@ def _run_download_job(job_id: str, model_entry: Dict):
             status="COMPLETED",
             progress=100.0,
             message="下载、检查、热身全部完成",
-            result={"hash": hash_result, "warmup": warmup_result, "model": model_entry},
+            result={"files": file_result, "warmup": warmup_result, "model": model_entry},
             error="",
         )
     except Exception as exc:

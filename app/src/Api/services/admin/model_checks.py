@@ -39,7 +39,7 @@ def _extract_error_detail(resp) -> str:
     return str(error or "").strip() or (resp.text or "").strip()[:180]
 
 
-def verify_model_hashes(model_entry: Dict) -> Dict:
+def verify_model_files(model_entry: Dict) -> Dict:
     backend = str(model_entry.get("backend") or "").strip().lower()
 
     if backend == "whisper":
@@ -69,7 +69,7 @@ def verify_model_hashes(model_entry: Dict) -> Dict:
         "ok": False,
         "checks": [
             {
-                "name": "hash",
+                "name": "files",
                 "status": "failed",
                 "message": f"不支持的后端: {backend}",
             }

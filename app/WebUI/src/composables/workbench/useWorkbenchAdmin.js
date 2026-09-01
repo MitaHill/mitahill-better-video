@@ -571,8 +571,8 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       details: null,
     },
     {
-      key: "hash",
-      label: "HASH 校验",
+      key: "files",
+      label: "必要文件检查",
       status: "pending",
       message: "等待执行",
       details: null,
@@ -604,11 +604,11 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
       const first = checks[0] || {};
       return String(first.message || (payload.ok ? "目标解析完成" : "目标解析失败"));
     }
-    if (stepName === "hash") {
+    if (stepName === "files") {
       const checks = payload.checks || [];
       const failed = checks.find((item) => String(item.status || "").toLowerCase() === "failed");
       if (failed && failed.message) return String(failed.message);
-      return payload.ok ? "HASH 校验通过" : "HASH 校验失败";
+      return payload.ok ? "必要文件检查通过" : "必要文件检查失败";
     }
     if (stepName === "warmup") {
       return payload.ok ? "GPU 热身成功" : "GPU 热身失败";
@@ -666,13 +666,13 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
           ? `${String(target.backend).toLowerCase()}/${String(target.modelId).toLowerCase()}`
           : "管理配置中的当前目标";
       _updateModelTestStep("resolve", { status: "running", message: `正在解析测试目标：${targetLabel}` });
-      _updateModelTestStep("hash", { status: "running", message: "正在校验模型 HASH..." });
-      const hashRes = await _requestTranscriptionModelTest("hash", target);
-      _applyModelTestPayload(hashRes.payload);
-      debugTools.modelTestResult = hashRes.payload;
-      if (!hashRes.ok || !hashRes.payload.ok) {
+      _updateModelTestStep("files", { status: "running", message: "正在检查模型必要文件..." });
+      const fileRes = await _requestTranscriptionModelTest("files", target);
+      _applyModelTestPayload(fileRes.payload);
+      debugTools.modelTestResult = fileRes.payload;
+      if (!fileRes.ok || !fileRes.payload.ok) {
         _updateModelTestStep("warmup", { status: "pending", message: "未执行（前置校验失败）" });
-        throw new Error(hashRes.payload.error || "HASH 校验失败");
+        throw new Error(fileRes.payload.error || "必要文件检查失败");
       }
 
       _updateModelTestStep("warmup", { status: "running", message: "正在进行 GPU 热身识别..." });
