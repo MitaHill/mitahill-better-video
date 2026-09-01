@@ -386,10 +386,10 @@ Header:
 Header:
 - `Authorization: Bearer <token>`
 
-读取数据库中的系统日志（默认 WARN+）。
+读取数据库中的系统日志（默认 INFO+）。
 
 Query:
-- `min_level` (`WARNING` | `ERROR` | `CRITICAL` | `INFO`)
+- `min_level` (`INFO` | `WARNING` | `ERROR` | `CRITICAL`)
 - `logger` (optional)
 - `q` (optional keyword)
 - `limit` (optional)

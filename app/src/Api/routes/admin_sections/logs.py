@@ -13,7 +13,7 @@ def admin_get_logs():
     if err:
         return jsonify({"error": err}), 401
 
-    min_level = request.args.get("min_level", type=str) or "WARNING"
+    min_level = request.args.get("min_level", type=str) or "INFO"
     limit = request.args.get("limit", type=int) or 200
     offset = request.args.get("offset", type=int) or 0
     logger_name = request.args.get("logger", type=str) or ""

@@ -146,6 +146,8 @@ def init_db():
         c.execute("CREATE INDEX IF NOT EXISTS idx_task_batch_items_task ON task_batch_items(task_id)")
         conn.commit()
         conn.close()
+        from . import app_logs
+        app_logs.purge_expired_logs()
         logger.debug("Database initialized successfully.")
     except Exception as e:
         logger.critical(f"[FAILED] Failed to initialize database: {e}")
@@ -331,7 +333,7 @@ def update_task_video_info(task_id, video_info):
     conn.close()
 
 def delete_task(task_id):
-    logger.warning(f"Deleting task and all associated files: {task_id}")
+    logger.info(f"Deleting task and all associated files: {task_id}")
     task = get_task(task_id)
     result_paths = []
     if task and task.get("result_path"):

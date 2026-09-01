@@ -86,7 +86,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     loading: false,
     error: "",
     logs: [],
-    minLevel: "WARNING",
+    minLevel: "INFO",
     keyword: "",
     loggerName: "",
   });
@@ -719,7 +719,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     try {
       const query = new URLSearchParams();
       query.set("limit", "200");
-      query.set("min_level", logsView.minLevel || "WARNING");
+      query.set("min_level", logsView.minLevel || "INFO");
       if (logsView.keyword) query.set("q", logsView.keyword);
       if (logsView.loggerName) query.set("logger", logsView.loggerName);
 

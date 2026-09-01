@@ -8,6 +8,7 @@ from app.src.Database import app_logs as db_logs
 
 LOG_FORMAT = "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
 LOG_LEVELS = set(logging._nameToLevel.keys())
+LOGS_DIR = Path("/workspace/storage/logs/server")
 
 
 def _resolve_log_level():
@@ -22,16 +23,27 @@ def _resolve_log_file():
     if existing:
         return Path(existing)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    logs_dir = Path("/workspace/storage/logs/server")
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    log_path = logs_dir / f"{stamp}.log"
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = LOGS_DIR / f"{stamp}.log"
     os.environ["LOG_FILE"] = str(log_path)
     return log_path
 
 
-class DatabaseWarnHandler(logging.Handler):
+def _purge_expired_log_files():
+    if not LOGS_DIR.exists():
+        return
+    cutoff = datetime.now().timestamp() - app_logs.LOG_RETENTION_DAYS * 24 * 60 * 60
+    for log_path in LOGS_DIR.glob("*.log"):
+        try:
+            if log_path.stat().st_mtime < cutoff:
+                log_path.unlink()
+        except OSError:
+            pass
+
+
+class DatabaseLogHandler(logging.Handler):
     def __init__(self):
-        super().__init__(level=logging.WARNING)
+        super().__init__(level=logging.INFO)
 
     def emit(self, record: logging.LogRecord):
         # Prevent recursive failures from bubbling back into logging.
@@ -53,11 +65,12 @@ class DatabaseWarnHandler(logging.Handler):
 
 def configure_logging(component="app"):
     level = _resolve_log_level()
+    _purge_expired_log_files()
     log_path = _resolve_log_file()
     handlers = [
         logging.StreamHandler(sys.stdout),
         logging.FileHandler(log_path, encoding="utf-8"),
-        DatabaseWarnHandler(),
+        DatabaseLogHandler(),
     ]
     logging.basicConfig(
         level=level,
@@ -65,6 +78,7 @@ def configure_logging(component="app"):
         handlers=handlers,
         force=True,
     )
+    logging.captureWarnings(True)
     logging.getLogger("LOGGING").info(
         "Logging initialized (level=%s, file=%s, component=%s)",
         logging.getLevelName(level),
