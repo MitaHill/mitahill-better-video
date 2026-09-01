@@ -48,7 +48,9 @@ class DatabaseLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord):
         # Prevent recursive failures from bubbling back into logging.
         try:
-            message = self.format(record)
+            message = record.getMessage()
+            if record.exc_info:
+                message = f"{message}\n{logging.Formatter().formatException(record.exc_info)}"
             db_logs.insert_log(
                 level=record.levelname,
                 logger_name=record.name,
