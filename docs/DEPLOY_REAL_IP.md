@@ -20,7 +20,7 @@ EVENTS_SHARED_TOKEN=replace_with_random_token
 
 说明：
 - `REAL_IP_TRUSTED_PROXIES` 是默认值，启动后会写入数据库。
-- 你可以在“后端管理 -> 受信代理配置”中在线修改，修改后立即生效。
+- 管理页面不提供受信代理配置入口。
 
 ## 2. Nginx standard reverse proxy
 
@@ -69,12 +69,11 @@ server {
 
 - FRP 服务端与 Nginx 之间若传递 Proxy Protocol，必须保证版本匹配。
 - 若链路包含多级代理，请把每一级代理出口网段加入 `REAL_IP_TRUSTED_PROXIES`。
-- 程序会自动识别 IPv4/IPv6、局域网地址、回环地址，并用于后端管理页统计。
+- 程序会自动识别 IPv4/IPv6、局域网地址、回环地址，并记录任务来源。
 
 ## 5. Validation checklist
 
-1. 访问前端后创建任务，进入“后端管理”。
-2. 在任务表中确认 `client_ip` 与公网访问地址一致。
-3. 在 IP 统计中确认 IPv4/IPv6、局域网/公网分类正确。
-4. 使用错误管理密码应被拒绝（401）。
-5. 修改密码后，旧 Token 应失效并需重新登录。
+1. 访问前端后创建任务。
+2. 检查任务记录中的 `client_ip` 是否为公网访问地址。
+3. 使用错误管理密码应被拒绝（401）。
+4. 修改密码后，旧 Token 应失效并需重新登录。

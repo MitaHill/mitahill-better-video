@@ -8,7 +8,7 @@
       <textarea :value="trustedProxies" rows="4" @input="onInput"></textarea>
     </div>
 
-    <p class="notice">当前请求识别IP：{{ resolvedClientIp || "-" }}</p>
+    <p class="notice">Client IP：{{ resolvedClientIp || "-" }}</p>
     <p class="notice" v-if="fromEnvDefault">环境默认：{{ fromEnvDefault }}</p>
 
     <div class="action-row" style="margin-top: 10px;">
