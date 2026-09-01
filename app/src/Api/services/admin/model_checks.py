@@ -1,4 +1,3 @@
-import hashlib
 import gc
 import logging
 import os
@@ -15,18 +14,6 @@ from app.src.Worker.gpu_model_coordinator import release_all_models
 from .transcription_catalog import get_model_entry, get_storage_roots
 
 logger = logging.getLogger("ADMIN_MODEL_CHECKS")
-
-
-def _digest_of_file(path: Path, algo: str) -> str:
-    safe_algo = str(algo or "").strip().lower()
-    if safe_algo == "sha1":
-        digest = hashlib.sha1()
-    else:
-        digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _speed_grade(latency_sec: float) -> str:
@@ -58,46 +45,21 @@ def verify_model_hashes(model_entry: Dict) -> Dict:
     if backend == "whisper":
         model_id = str(model_entry.get("model_id") or "").strip()
         local_path = Path(model_entry.get("local_path") or "")
-        expected = str(model_entry.get("expected_sha256") or "").strip().lower()
-        if not local_path.exists():
-            return {
-                "ok": False,
-                "checks": [
-                    {
-                        "name": "hash",
-                        "status": "failed",
-                        "file": str(local_path),
-                        "message": f"模型文件不存在: {local_path}",
-                    }
-                ],
-            }
-
-        if not expected:
-            return {
-                "ok": False,
-                "checks": [
-                    {
-                        "name": "hash",
-                        "status": "failed",
-                        "file": str(local_path),
-                        "message": "模型 URL 未提供 SHA256",
-                    }
-                ],
-            }
-
-        actual = _digest_of_file(local_path, "sha256")
-        passed = actual == expected
+        required_files = [str(name or "").strip() for name in model_entry.get("required_files") or []]
+        missing_files = [name for name in required_files if not (local_path / name).is_file()]
+        passed = bool(required_files) and not missing_files
         return {
             "ok": passed,
             "checks": [
                 {
-                    "name": "hash",
+                    "name": "files",
                     "status": "passed" if passed else "failed",
-                    "algorithm": "sha256",
                     "file": str(local_path),
-                    "expected": expected,
-                    "actual": actual,
-                    "message": "SHA256 校验通过" if passed else "SHA256 校验失败",
+                    "message": (
+                        "模型必要文件齐全"
+                        if passed
+                        else f"模型文件缺失: {', '.join(missing_files) or '未提供必要文件'}"
+                    ),
                 }
             ],
             "model_id": model_id,
@@ -148,12 +110,13 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
         if not device:
             raise RuntimeError("CUDA not available. NVIDIA GPU required for transcription.")
 
-        import whisper
+        from app.src.Worker.pipelines.transcription.whisper_engine import load_whisper_model
 
         release_all_models()
         fp16 = True
-        model = whisper.load_model(model_id, device=device, download_root=str(local_path.parent))
-        model.transcribe(str(wav_path), beam_size=1, language="en", fp16=fp16)
+        model = load_whisper_model(local_path)
+        segments, _info = model.transcribe(str(wav_path), beam_size=1, language="en")
+        list(segments)
 
         elapsed = time.time() - started
         return {

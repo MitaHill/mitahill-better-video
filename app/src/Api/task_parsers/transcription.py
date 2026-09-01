@@ -38,9 +38,9 @@ def parse_transcription_task_params(form):
         "transcribe_mode": (form.get("transcribe_mode", "subtitle_zip") or "subtitle_zip").lower(),
         "subtitle_format": (form.get("subtitle_format", "srt") or "srt").lower(),
         "whisper_model": (
-            form.get("whisper_model", defaults.get("whisper_model", "medium"))
-            or defaults.get("whisper_model", "medium")
-            or "medium"
+            form.get("whisper_model", defaults.get("whisper_model", "large-v3"))
+            or defaults.get("whisper_model", "large-v3")
+            or "large-v3"
         ).lower(),
         "language": (form.get("language", "auto") or "auto").strip().lower(),
         "translate_to": translate_to,

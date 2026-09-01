@@ -141,13 +141,13 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
             emit_progress(
                 task_id,
                 _build_transcribe_progress(index, total, ratio, has_translation),
-                f"转录文件 {index}/{total}: 语音识别中 {done}/{total_count}",
+                f"转录文件 {index}/{total}: 语音识别中 {done:.1f}/{total_count:.1f} 秒",
                 file_index=index,
                 file_count=total,
                 stage="transcribe",
                 unit_done=done,
                 unit_total=total_count,
-                unit_label="音频帧",
+                unit_label="音频秒",
             )
 
         emit_progress(
@@ -161,7 +161,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
         result = ENGINE.transcribe(
             audio_path,
             backend=options.get("transcription_backend", "whisper"),
-            model_name=options.get("whisper_model", "medium"),
+            model_name=options.get("whisper_model", "large-v3"),
             language=options.get("language", "auto"),
             temperature=options.get("temperature", 0.0),
             beam_size=options.get("beam_size", 5),
@@ -291,7 +291,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                     "source_file": media_item,
                     "runtime_mode": "scheduler",
                     "transcription_backend": options.get("transcription_backend", "whisper"),
-                    "whisper_model": options.get("whisper_model", "medium"),
+                    "whisper_model": options.get("whisper_model", "large-v3"),
                     "translate_to": options.get("translate_to", ""),
                     "subtitle_format": options.get("subtitle_format", "srt"),
                     "transcribe_mode": options.get("transcribe_mode", "subtitle_zip"),

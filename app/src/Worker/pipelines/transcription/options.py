@@ -45,7 +45,7 @@ def normalize_transcription_options(raw):
     if subtitle_format not in VALID_SUBTITLE_FORMATS:
         subtitle_format = "srt"
 
-    whisper_model = (options.get("whisper_model") or "medium").strip().lower() or "medium"
+    whisper_model = (options.get("whisper_model") or "large-v3").strip().lower() or "large-v3"
     language = (options.get("language") or "auto").strip().lower() or "auto"
 
     translate_to = (options.get("translate_to") or "").strip()

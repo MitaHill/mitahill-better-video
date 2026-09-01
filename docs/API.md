@@ -314,8 +314,8 @@ Request (example):
 {
   "transcription": {
     "backend": "whisper",
-    "active_model": "medium",
-    "allowed_models": ["small", "medium", "large-v3", "large"]
+    "active_model": "large-v3",
+    "allowed_models": ["large-v3"]
   },
   "translation": {
     "provider": "openai_compatible",
@@ -329,7 +329,7 @@ Request (example):
 Header:
 - `Authorization: Bearer <token>`
 
-返回 OpenAI Whisper 模型目录，以及本地安装状态。
+返回 Faster-Whisper `large-v3` 模型目录，以及本地安装状态。
 
 ### POST /api/admin/transcription/models/download
 Header:
@@ -339,7 +339,7 @@ Header:
 
 Request:
 ```json
-{ "backend": "whisper", "model_id": "medium" }
+{ "backend": "whisper", "model_id": "large-v3" }
 ```
 
 ### GET /api/admin/transcription/models/downloads
@@ -360,7 +360,7 @@ Header:
 
 执行转录模型测试：
 1. 目标解析（读取当前管理配置中的 backend + active_model）
-2. HASH 校验
+2. 必要文件检查
 3. GPU 热身（5秒静音音频识别）
 
 Request (optional):
@@ -368,10 +368,10 @@ Request (optional):
 {
   "mode": "hash",
   "backend": "whisper",
-  "model_id": "medium"
+  "model_id": "large-v3"
 }
 ```
-- `mode=hash`：执行到 HASH 校验即返回
+- `mode=hash`：执行到必要文件检查即返回
 - `mode=warmup` / `mode=full`：执行完整链路
 - 不传 `backend/model_id` 时，使用管理页当前配置中的目标模型
 

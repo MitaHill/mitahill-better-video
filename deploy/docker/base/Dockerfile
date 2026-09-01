@@ -42,18 +42,27 @@ WORKDIR /workspace
 
 # Python dependencies (heavy, rarely changes)
 COPY pyproject.toml uv.lock /workspace/
-RUN uv export --locked --no-emit-project --no-default-groups --group base \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev \
+        libswresample-dev libswscale-dev && \
+    uv export --locked --no-emit-project --no-default-groups --group base \
         --format requirements.txt --no-hashes --output-file /tmp/base-requirements.txt && \
     uv pip install --system setuptools==69.5.1 wheel==0.45.1 numpy==1.24.4 cython==0.29.36 && \
     uv pip install --system \
         --index https://download.pytorch.org/whl/cu116 \
         --index-strategy unsafe-best-match \
-        --no-build-isolation-package openai-whisper \
+        --no-build-isolation-package faster-whisper \
+        --no-build-isolation-package av \
         --no-build-isolation-package basicsr \
         --no-build-isolation-package facexlib \
         --no-build-isolation-package gfpgan \
         --requirements /tmp/base-requirements.txt && \
-    rm -f /tmp/base-requirements.txt
+    rm -f /tmp/base-requirements.txt && \
+    apt-get purge -y \
+        libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev \
+        libswresample-dev libswscale-dev && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
 # Pre-download Real-ESRGAN weights (huge layer, fixed)
 RUN mkdir -p /workspace/app/models/video && \
