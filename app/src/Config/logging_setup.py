@@ -32,7 +32,7 @@ def _resolve_log_file():
 def _purge_expired_log_files():
     if not LOGS_DIR.exists():
         return
-    cutoff = datetime.now().timestamp() - app_logs.LOG_RETENTION_DAYS * 24 * 60 * 60
+    cutoff = datetime.now().timestamp() - db_logs.LOG_RETENTION_DAYS * 24 * 60 * 60
     for log_path in LOGS_DIR.glob("*.log"):
         try:
             if log_path.stat().st_mtime < cutoff:
