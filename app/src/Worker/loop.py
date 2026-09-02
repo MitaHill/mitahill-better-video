@@ -1,19 +1,21 @@
 import time
 import shutil
 import json
-import gc
 import logging
 from pathlib import Path
 import sqlite3
-import torch
 
 from app.src.Database import core as db
 from app.src.Database import admin as db_admin
 from app.src.Config import settings as config
 from app.src.Worker.pipelines.dispatch import process_task
-from app.src.Worker.gpu_model_coordinator import release_all_models
+from app.src.Worker.gpu_model_coordinator import (
+    release_all_models,
+    restart_worker_if_cuda_memory_leaked,
+)
 
 logger = logging.getLogger("WORKER")
+IDLE_MEMORY_CHECK_INTERVAL_SECONDS = 30
 
 def recover_tasks():
     """Check for interrupted tasks on startup and reset or delete them."""
@@ -55,6 +57,7 @@ def worker_loop():
         config.initialize_context()
         db.init_db()
         recover_tasks()
+        last_idle_memory_check = 0.0
         
         logger.info(f"Daemon Loop Started (TTL: {config.TASK_TTL_HOURS}h, Segments: {config.SEGMENT_TIME_SECONDS}s)")
         
@@ -80,10 +83,13 @@ def worker_loop():
                     db.update_task_status(task['task_id'], "FAILED", message=str(e))
                 finally:
                     release_all_models()
-                    gc.collect()
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
+                    restart_worker_if_cuda_memory_leaked()
             else:
+                now = time.monotonic()
+                if now - last_idle_memory_check >= IDLE_MEMORY_CHECK_INTERVAL_SECONDS:
+                    release_all_models()
+                    restart_worker_if_cuda_memory_leaked()
+                    last_idle_memory_check = now
                 time.sleep(2)
     except Exception as fatal_e:
         logger.critical(f"WORKER CRASHED: {fatal_e}", exc_info=True)

@@ -1,5 +1,7 @@
 import gc
 import logging
+import os
+import sys
 import threading
 from typing import Callable, Dict
 
@@ -9,6 +11,7 @@ logger = logging.getLogger("GPU_MODEL_COORDINATOR")
 
 _lock = threading.Lock()
 _release_hooks: Dict[str, Callable[[], None]] = {}
+_RESIDUAL_MEMORY_LIMIT_BYTES = 128 * 1024 * 1024
 
 
 def register_release_hook(name: str, callback: Callable[[], None]):
@@ -79,6 +82,38 @@ def cleanup_cuda_cache():
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+
+
+def restart_worker_if_cuda_memory_leaked(restart: Callable[[], None] = None) -> bool:
+    """Restart this worker when its own PyTorch cache remains unexpectedly large."""
+    if not torch.cuda.is_available():
+        return False
+
+    try:
+        allocated_bytes = torch.cuda.memory_allocated()
+        reserved_bytes = torch.cuda.memory_reserved()
+        free_bytes, total_bytes = torch.cuda.mem_get_info()
+    except Exception:
+        logger.warning("Failed to inspect Worker CUDA memory", exc_info=True)
+        return False
+
+    if max(allocated_bytes, reserved_bytes) <= _RESIDUAL_MEMORY_LIMIT_BYTES:
+        return False
+
+    logger.warning(
+        "Restarting idle Worker after CUDA cleanup left allocated=%sMiB reserved=%sMiB "
+        "free=%sMiB total=%sMiB",
+        allocated_bytes // (1024 * 1024),
+        reserved_bytes // (1024 * 1024),
+        free_bytes // (1024 * 1024),
+        total_bytes // (1024 * 1024),
+    )
+    if restart is not None:
+        restart()
+    else:
+        # execv keeps the Worker PID, so the main process keeps supervising it
+        os.execv(sys.executable, [sys.executable, "-u", *sys.argv])
+    return True
 
 
 def is_cuda_oom(exc: BaseException) -> bool:

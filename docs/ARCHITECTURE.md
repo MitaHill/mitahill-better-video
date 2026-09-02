@@ -36,6 +36,9 @@
   loading a model-heavy pipeline, the loader may release other idle in-process
   models and retry once after CUDA OOM. Keep this mechanism simple; do not add a
   second task scheduler unless the worker model changes to real concurrency.
+- After task cleanup and during idle periods, the Worker checks only its own
+  PyTorch CUDA allocation. If more than 128 MiB remains, it re-executes itself
+  in the container to release the stale CUDA context without restarting Flask.
 
 ## WebUI Module Layout
 - `app/WebUI/src/pages/WorkbenchPage.vue`: page shell only (layout + component assembly).
