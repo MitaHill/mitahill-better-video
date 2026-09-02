@@ -82,6 +82,23 @@ class GpuModelCoordinatorTests(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(restarted, [True])
 
+    def test_detects_failed_cuda_oom_task(self):
+        task = {"status": "FAILED", "message": "CUDA out of memory"}
+
+        self.assertTrue(self.coordinator.task_failed_from_cuda_oom(task))
+
+    def test_ignores_completed_or_non_cuda_failures(self):
+        self.assertFalse(
+            self.coordinator.task_failed_from_cuda_oom(
+                {"status": "COMPLETED", "message": "CUDA out of memory"}
+            )
+        )
+        self.assertFalse(
+            self.coordinator.task_failed_from_cuda_oom(
+                {"status": "FAILED", "message": "Input missing"}
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

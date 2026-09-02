@@ -11,7 +11,9 @@ from app.src.Config import settings as config
 from app.src.Worker.pipelines.dispatch import process_task
 from app.src.Worker.gpu_model_coordinator import (
     release_all_models,
+    restart_worker,
     restart_worker_if_cuda_memory_leaked,
+    task_failed_from_cuda_oom,
 )
 
 logger = logging.getLogger("WORKER")
@@ -83,6 +85,9 @@ def worker_loop():
                     db.update_task_status(task['task_id'], "FAILED", message=str(e))
                 finally:
                     release_all_models()
+                    completed_task = db.get_task(task["task_id"])
+                    if task_failed_from_cuda_oom(completed_task):
+                        restart_worker("Task %s failed with CUDA OOM" % task["task_id"])
                     restart_worker_if_cuda_memory_leaked()
             else:
                 now = time.monotonic()

@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 import threading
-from typing import Callable, Dict
+from typing import Callable, Dict, Mapping
 
 import torch
 
@@ -100,20 +100,32 @@ def restart_worker_if_cuda_memory_leaked(restart: Callable[[], None] = None) -> 
     if max(allocated_bytes, reserved_bytes) <= _RESIDUAL_MEMORY_LIMIT_BYTES:
         return False
 
-    logger.warning(
-        "Restarting idle Worker after CUDA cleanup left allocated=%sMiB reserved=%sMiB "
-        "free=%sMiB total=%sMiB",
-        allocated_bytes // (1024 * 1024),
-        reserved_bytes // (1024 * 1024),
-        free_bytes // (1024 * 1024),
-        total_bytes // (1024 * 1024),
+    return restart_worker(
+        "Idle CUDA cleanup left allocated=%sMiB reserved=%sMiB free=%sMiB total=%sMiB"
+        % (
+            allocated_bytes // (1024 * 1024),
+            reserved_bytes // (1024 * 1024),
+            free_bytes // (1024 * 1024),
+            total_bytes // (1024 * 1024),
+        ),
+        restart=restart,
     )
+
+
+def restart_worker(reason: str, restart: Callable[[], None] = None) -> bool:
+    logger.warning("Restarting Worker: %s", reason)
     if restart is not None:
         restart()
     else:
         # execv keeps the Worker PID, so the main process keeps supervising it
         os.execv(sys.executable, [sys.executable, "-u", *sys.argv])
     return True
+
+
+def task_failed_from_cuda_oom(task: Mapping[str, object] | None) -> bool:
+    if not task or str(task.get("status") or "").upper() != "FAILED":
+        return False
+    return is_cuda_oom(RuntimeError(str(task.get("message") or "")))
 
 
 def is_cuda_oom(exc: BaseException) -> bool:
