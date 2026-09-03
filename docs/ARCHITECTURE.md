@@ -14,7 +14,7 @@
 ## Service Flow
 1. Frontend uploads file to `POST /api/tasks`.
 2. Backend writes file into `/workspace/storage/upload/run_<task_id>/` and inserts task row.
-3. Worker picks pending task, processes with Real-ESRGAN, updates progress.
+3. Worker starts one isolated task process, which updates task progress.
 4. Frontend polls `GET /api/tasks/<task_id>` and shows previews.
 5. Finished output is downloaded from `/api/tasks/<task_id>/result`.
 
@@ -24,7 +24,9 @@
 
 ## Process Model
 - **Main process**: Flask API server
-- **Worker process**: long-running task processing loop
+- **Worker process**: long-running task scheduling loop
+- **Task process**: one child process per task, including download, conversion,
+  enhancement, and transcription
 
 ## Processing Model
 - Long videos are processed in segments to keep disk, memory, and VRAM usage
@@ -32,15 +34,12 @@
 - Each segment follows the same lifecycle: extract frames, upscale, encode the
   segment, then release intermediate frames before moving on.
 - This avoids full-video frame extraction for multi-hour inputs.
-- GPU model loading is coordinated through a small release-hook registry. Before
-  loading a model-heavy pipeline, the loader may release other idle in-process
-  models and retry once after CUDA OOM. Keep this mechanism simple; do not add a
-  second task scheduler unless the worker model changes to real concurrency.
-- After task cleanup and during idle periods, the Worker checks only its own
-  PyTorch CUDA allocation. If more than 128 MiB remains, it re-executes itself
-  in the container to release the stale CUDA context without restarting Flask.
-- A task that fails with CUDA OOM always re-executes the Worker after its failure
-  state is stored. This covers driver-level CUDA memory outside PyTorch allocator metrics.
+- A task process starts its own CUDA context and owns every loaded model. It exits
+  after the task reaches a terminal state, so the container releases its GPU
+  context regardless of success, failure, cancellation, or OOM.
+- The Worker does not cache models, inspect idle CUDA memory, or retry an OOM.
+  It waits for the task process and starts the next task only after that process
+  has exited.
 
 ## WebUI Module Layout
 - `app/WebUI/src/pages/WorkbenchPage.vue`: page shell only (layout + component assembly).
@@ -54,7 +53,7 @@
 - `app/WebUI/src/components/workbench/convert/*`: conversion section modules.
 - `app/src/Worker/pipelines/transcription/translation/*`: 转录翻译提供器与分段翻译子模块（仅 OpenAI 兼容 Chat Completions 格式）。
 - `app/src/Worker/pipelines/transcription/whisper_engine.py`: 转录执行器（固定 Faster-Whisper `large-v3` FP16；CUDA 运行）。
-- `app/src/Media/hat_runtime.py`: HAT 增强模型推理运行时。只保留 `real-hat-gan-x4`、`hat-l-srx4` 推理路径，不加入训练、数据集或完整 HAT 工程；HAT 当前固定 fp32。
+- `app/src/Media/hat_adapter.py`: 官方 HAT 架构的薄推理适配层，负责 BGR/RGB、分片、倍率输出；HAT 当前固定 fp32。
 - `app/src/Api/task_parsers/*`: 后端任务参数解析按类别原子化拆分（enhance/convert/transcribe/download）；`app/src/Api/parsers.py` 仅保留兼容导出层。
 - `app/src/Api/routes/transcriptions_handlers/*`: 转录路由子处理器（参数应用、提交处理、运行时配置载荷）原子化拆分。
 - `app/WebUI/src/components/workbench/TaskStatusPanel.vue`: status panel shell.

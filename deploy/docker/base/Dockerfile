@@ -74,3 +74,10 @@ RUN mkdir -p /workspace/app/models/video && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth && \
     wget -q -O /workspace/app/models/video/Real_HAT_GAN_SRx4.pth https://huggingface.co/jaideepsingh/upscale_models/resolve/867e7c0ad519aba5d36b5bb4ef4a4a91781914c4/HAT/Real_HAT_GAN_SRx4.pth && \
     wget -q -O /workspace/app/models/video/HAT-L_SRx4_ImageNet-pretrain.pth https://huggingface.co/jaideepsingh/upscale_models/resolve/867e7c0ad519aba5d36b5bb4ef4a4a91781914c4/HAT/HAT-L_SRx4_ImageNet-pretrain.pth
+
+# Official inference packages. Their dependency sets conflict on BasicSR, while
+# this project only imports their model and inference modules already covered above.
+RUN uv pip install --system einops==0.8.1 && \
+    uv pip install --system --no-deps \
+        "git+https://github.com/xinntao/Real-ESRGAN.git@a4abfb2979a7bbff3f69f58f58ae324608821e27" \
+        "git+https://github.com/XPixelGroup/HAT.git@1638a9a822581657811867bf670717f8371fc3e5"

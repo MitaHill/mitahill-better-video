@@ -1,6 +1,8 @@
-import gc
+import json
 import logging
 import os
+import subprocess
+import sys
 import tempfile
 import time
 import wave
@@ -8,8 +10,6 @@ from pathlib import Path
 from typing import Dict
 
 import requests
-
-from app.src.Worker.gpu_model_coordinator import release_all_models
 
 from .transcription_catalog import get_model_entry, get_storage_roots
 
@@ -92,7 +92,7 @@ def _build_silent_wav() -> Path:
     return path
 
 
-def warmup_transcription_model(model_entry: Dict) -> Dict:
+def _warmup_transcription_model(model_entry: Dict) -> Dict:
     backend = str(model_entry.get("backend") or "").strip().lower()
     model_id = str(model_entry.get("model_id") or "").strip()
     local_path = Path(model_entry.get("local_path") or "")
@@ -112,7 +112,6 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
 
         from app.src.Worker.pipelines.transcription.whisper_engine import load_whisper_model
 
-        release_all_models()
         fp16 = True
         model = load_whisper_model(local_path)
         segments, _info = model.transcribe(str(wav_path), beam_size=1, language="en")
@@ -145,13 +144,34 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
             del model
         except Exception:
             pass
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
         try:
             wav_path.unlink(missing_ok=True)
         except Exception:
             pass
+
+
+def warmup_transcription_model(model_entry: Dict) -> Dict:
+    """Run a CUDA warmup outside the Flask process."""
+    command = [
+        sys.executable,
+        "-m",
+        "app.src.Api.services.admin.model_check_entrypoint",
+        json.dumps(model_entry, ensure_ascii=False),
+    ]
+    try:
+        result = subprocess.run(command, text=True, capture_output=True, timeout=180, check=False)
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "message": "模型热身超时"}
+
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    if result.returncode == 0 and lines:
+        try:
+            return json.loads(lines[-1])
+        except json.JSONDecodeError:
+            pass
+    detail = (result.stderr or result.stdout or "").strip()
+    logger.error("Warmup subprocess failed: %s", detail)
+    return {"ok": False, "message": detail or f"模型热身子进程失败，退出码: {result.returncode}"}
 
 
 def test_translation_provider(translation_config: Dict) -> Dict:

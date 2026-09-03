@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from PIL import Image
 import numpy as np
-import torch
 
 from app.src.Database import core as db
 from app.src.Config import settings as config
@@ -20,7 +19,6 @@ from app.src.Utils.ffmpeg import (
 from app.src.Utils.preview_cache import set_preview_from_path, clear_task as clear_preview_cache
 from app.src.Media.upscaler import build_model
 from app.src.Notifications.events import send_event
-from app.src.Worker.gpu_model_coordinator import is_cuda_oom, prepare_model_load, register_release_hook
 from .preview import generate_previews
 
 logger = logging.getLogger("PROCESSOR")
@@ -28,7 +26,6 @@ logger = logging.getLogger("PROCESSOR")
 def process_enhancement_task(task):
     task_id = task['task_id']
     logger.info(f"=== Starting Task Processor: {task_id} ===")
-    model_holder = {}
 
     def _emit_status(progress, message, stage):
         send_event(
@@ -43,13 +40,6 @@ def process_enhancement_task(task):
             }
         )
 
-    def _release_realesrgan():
-        model_holder.pop("upsampler", None)
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
-    register_release_hook("realesrgan", _release_realesrgan)
-    
     try:
         db.update_task_status(task_id, "PROCESSING", 0, "Initializing...")
         _emit_status(0, "Initializing...", "prepare")
@@ -71,25 +61,11 @@ def process_enhancement_task(task):
         # 1. Load Model ONCE
         db.update_task_status(task_id, "PROCESSING", 5, "Loading Model...")
         _emit_status(5, "Loading Model...", "prepare")
-        prepare_model_load("realesrgan")
-        try:
-            upsampler = build_model(
-                params['model_name'], params['upscale'], params['tile'],
-                params.get('tile_pad', 10), params.get('fp16', True),
-                weights_dir, params.get('denoise_strength', 0.5)
-            )
-            model_holder["upsampler"] = upsampler
-        except RuntimeError as exc:
-            if not is_cuda_oom(exc):
-                raise
-            logger.warning("CUDA OOM while loading Real-ESRGAN; releasing peer models and retrying once.")
-            prepare_model_load("realesrgan")
-            upsampler = build_model(
-                params['model_name'], params['upscale'], params['tile'],
-                params.get('tile_pad', 10), params.get('fp16', True),
-                weights_dir, params.get('denoise_strength', 0.5)
-            )
-            model_holder["upsampler"] = upsampler
+        upsampler = build_model(
+            params['model_name'], params['upscale'], params['tile'],
+            params.get('tile_pad', 10), params.get('fp16', True),
+            weights_dir, params.get('denoise_strength', 0.5)
+        )
         logger.info("Model loaded: %s", params.get("model_name"))
 
         if params['input_type'] == 'Video':
@@ -282,8 +258,3 @@ def process_enhancement_task(task):
         )
     finally:
         clear_preview_cache(task_id)
-        model_holder.pop("upsampler", None)
-        if 'upsampler' in locals():
-            del upsampler
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()

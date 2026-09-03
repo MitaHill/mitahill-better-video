@@ -5,8 +5,10 @@ import numpy as np
 import torch
 from basicsr.archs.rrdbnet_arch import RRDBNet
 
-from .hat_runtime import HATUpscaler
-from .realesrgan_runtime import RealESRGANer, SRVGGNetCompact
+from realesrgan import RealESRGANer
+from realesrgan.archs.srvgg_arch import SRVGGNetCompact
+
+from .hat_adapter import HATUpscaler
 
 logger = logging.getLogger("UPSCALER")
 
@@ -19,7 +21,6 @@ class Upscaler:
                 weights_dir / 'Real_HAT_GAN_SRx4.pth',
                 tile=tile,
                 tile_pad=tile_pad,
-                half=False,
             )
             logger.info("HAT model loaded and ready.")
             return
@@ -28,7 +29,6 @@ class Upscaler:
                 weights_dir / 'HAT-L_SRx4_ImageNet-pretrain.pth',
                 tile=tile,
                 tile_pad=tile_pad,
-                half=False,
                 variant="hat-l",
             )
             logger.info("HAT-L model loaded and ready.")
