@@ -58,7 +58,6 @@ def process_enhancement_task(task):
         if not input_path.exists():
             raise FileNotFoundError(f"Input missing: {params['filename']}")
 
-        # 1. Load Model ONCE
         db.update_task_status(task_id, "PROCESSING", 5, "Loading Model...")
         _emit_status(5, "Loading Model...", "prepare")
         upsampler = build_model(
@@ -73,7 +72,6 @@ def process_enhancement_task(task):
 
             out_name = f"sr_{input_path.stem}.mp4"
 
-            # 2. Previews
             generate_previews(input_path, run_dir, upsampler, params['upscale'])
             if run_dir.joinpath("preview_original.jpg").exists():
                 set_preview_from_path(task_id, "original", run_dir / "preview_original.jpg", 1)
@@ -99,9 +97,7 @@ def process_enhancement_task(task):
             if total_frames <= 0:
                 total_frames = max(1, int(round(get_video_duration(input_path) * get_video_fps(input_path))))
             db.upsert_task_progress(task_id, total_frames, 0)
-            # 3. Process Video (reuse upsampler logic)
             if duration > config.SEGMENT_TIME_SECONDS:
-                # Segmented processing
                 db.update_task_status(task_id, "PROCESSING", 10, "Splitting Video...")
                 _emit_status(10, "Splitting Video...", "prepare")
                 logger.info("Segmenting video: %.2fs per segment", config.SEGMENT_TIME_SECONDS)
@@ -110,7 +106,6 @@ def process_enhancement_task(task):
                 
                 segs = sorted([p for p in segments_dir.glob("seg_*.mp4") if not p.stem.endswith("_sr")])
                 if not segs:
-                    # Split
                     run_ffmpeg([
                         "ffmpeg", "-y", "-i", str(input_path), "-c", "copy", "-map", "0",
                         "-segment_time", str(config.SEGMENT_TIME_SECONDS), "-f", "segment",
@@ -198,7 +193,6 @@ def process_enhancement_task(task):
                     run_ffmpeg(fallback_cmd)
                 shutil.rmtree(segments_dir, ignore_errors=True)
             else:
-                # Single pass video
                 db.update_task_status(task_id, "PROCESSING", 20, "Upscaling Video...")
                 logger.info("Processing video in a single pass.")
                 from app.src.Media.segmenter import process_video_with_model
@@ -229,14 +223,12 @@ def process_enhancement_task(task):
                     )
 
         else:
-            # 4. Process Image
             db.update_task_status(task_id, "PROCESSING", 50, "Upscaling Image...")
             img = Image.open(input_path).convert("RGB")
             output, _ = upsampler.enhance(np.array(img)[:,:,::-1], outscale=params['upscale'])
             out_img = Image.fromarray(output[:,:,::-1])
             out_name = f"sr_{input_path.stem}.png"
             out_img.save(output_root / out_name)
-            # Previews for image are just the files themselves
             img.save(run_dir / "preview_original.jpg")
             out_img.save(run_dir / "preview_upscaled.jpg")
             set_preview_from_path(task_id, "original", run_dir / "preview_original.jpg", 1)

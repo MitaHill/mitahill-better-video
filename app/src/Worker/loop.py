@@ -87,6 +87,7 @@ def _mark_task_failed(task_id: str, message: str):
 
 
 def _mark_process_exit(task_id: str, returncode: int):
+    logger.error("Task process for %s exited unexpectedly with code %s", task_id, returncode)
     _mark_task_failed(task_id, f"Task process exited unexpectedly (code {returncode}).")
 
 
@@ -125,13 +126,23 @@ def _run_task_process(task_id: str):
                 _terminate_process(_active_process, task_id, "task status is FAILED")
                 return
             if status == "COMPLETED":
-                # Let the task process publish its completion event and run its final cleanup
+                # Let the task process publish its completion event and finish cleanup
                 try:
-                    _active_process.wait(timeout=TASK_PROCESS_COMPLETION_GRACE_SECONDS)
+                    returncode = _active_process.wait(timeout=TASK_PROCESS_COMPLETION_GRACE_SECONDS)
+                    if returncode:
+                        logger.warning(
+                            "Task %s was marked completed but process %s exited with code %s",
+                            task_id,
+                            _active_process.pid,
+                            returncode,
+                        )
+                    else:
+                        logger.info("Task %s completed and process %s exited", task_id, _active_process.pid)
                 except subprocess.TimeoutExpired:
                     _terminate_process(_active_process, task_id, "completion cleanup timed out")
                 return
             if time.monotonic() - started_at >= config.TASK_TIMEOUT_SECONDS:
+                logger.error("Task %s timed out after %s seconds", task_id, config.TASK_TIMEOUT_SECONDS)
                 _mark_task_timeout(task_id)
                 _terminate_process(_active_process, task_id, "task timed out")
                 return

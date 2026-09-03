@@ -15,7 +15,7 @@
 1. Frontend uploads file to `POST /api/tasks`.
 2. Backend writes file into `/workspace/storage/upload/run_<task_id>/` and inserts task row.
 3. Worker starts one isolated task process, which updates task progress.
-4. Frontend polls `GET /api/tasks/<task_id>` and shows previews.
+4. Frontend reads the initial task state through `GET /api/tasks/<task_id>`, then receives progress and previews through WebSocket.
 5. Finished output is downloaded from `/api/tasks/<task_id>/result`.
 
 ## Runtime Baseline

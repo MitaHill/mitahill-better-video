@@ -81,6 +81,7 @@ class HATUpscaler:
                 end_x, end_y = min(start_x + self.tile_size, width), min(start_y + self.tile_size, height)
                 pad_start_x, pad_start_y = max(start_x - self.tile_pad, 0), max(start_y - self.tile_pad, 0)
                 pad_end_x, pad_end_y = min(end_x + self.tile_pad, width), min(end_y + self.tile_pad, height)
+                # Run with overlap, then copy only the tile's center back into the output
                 tile = tensor[:, :, pad_start_y:pad_end_y, pad_start_x:pad_end_x]
                 result = self.model(tile)
                 output[:, :, start_y * self.scale:end_y * self.scale, start_x * self.scale:end_x * self.scale] = result[

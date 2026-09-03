@@ -161,6 +161,7 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
     try:
         result = subprocess.run(command, text=True, capture_output=True, timeout=180, check=False)
     except subprocess.TimeoutExpired:
+        logger.error("Warmup subprocess timed out after 180 seconds")
         return {"ok": False, "message": "模型热身超时"}
 
     lines = [line for line in result.stdout.splitlines() if line.strip()]
