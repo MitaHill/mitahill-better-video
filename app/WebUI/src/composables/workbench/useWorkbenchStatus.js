@@ -292,8 +292,15 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
       if (payload.updated_at) {
         status.value.updated_at = payload.updated_at;
       }
-      if (status.value.task_progress && payload.total_total) {
+      if (payload.total_total) {
+        status.value.task_progress ||= {};
         status.value.task_progress.total_frames = toNumber(payload.total_total, status.value.task_progress.total_frames || 0);
+      }
+      if (payload.segment_index || payload.segment_count || payload.segment_frame || payload.segment_total) {
+        status.value.segment_progress ||= {};
+        status.value.segment_progress.segment_index = live.segmentIndex;
+        status.value.segment_progress.last_done_frame = live.segmentFrame;
+        status.value.segment_progress.total_frames = live.segmentTotal;
       }
     }
 

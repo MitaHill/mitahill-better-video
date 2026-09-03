@@ -80,6 +80,19 @@ def process_enhancement_task(task):
             if run_dir.joinpath("preview_upscaled.jpg").exists():
                 set_preview_from_path(task_id, "upscaled", run_dir / "preview_upscaled.jpg", 1)
             logger.info("Preview generation completed.")
+            send_event(
+                {
+                    "task_id": task_id,
+                    "task_category": "enhance",
+                    "status": "PROCESSING",
+                    "progress": 5,
+                    "message": "Preview generation completed.",
+                    "stage": "prepare",
+                    "preview_frame": 1,
+                    "preview_reset": True,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
             
             duration = get_video_duration(input_path)
             total_frames = get_video_total_frames(input_path)
