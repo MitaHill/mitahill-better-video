@@ -65,21 +65,5 @@ class TaskProcessSupervisorTests(unittest.TestCase):
         self.assertEqual(update_status.call_args.args[:2], ("0001", "FAILED"))
         self.assertIn("Failed to start task process", update_status.call_args.kwargs["message"])
 
-    def test_timeout_stops_task_process_group(self):
-        process = FakeProcess()
-        task = {"status": "PROCESSING", "progress": 42, "task_category": "enhance"}
-        with patch.object(loop.subprocess, "Popen", return_value=process), patch.object(
-            loop.db, "get_task", return_value=task
-        ), patch.object(loop.db, "update_task_status") as update_status, patch.object(
-            loop, "send_event"
-        ), patch.object(loop.os, "killpg") as killpg, patch.object(
-            loop.time, "monotonic", side_effect=[0, 11]
-        ), patch.object(loop.config, "TASK_TIMEOUT_SECONDS", 10):
-            loop._run_task_process("0001")
-
-        update_status.assert_called_once_with("0001", "FAILED", progress=42, message="Task timed out")
-        killpg.assert_called_once_with(process.pid, loop.signal.SIGKILL)
-
-
 if __name__ == "__main__":
     unittest.main()

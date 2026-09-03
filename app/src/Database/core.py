@@ -469,21 +469,6 @@ def cleanup_old_tasks(hours_ttl):
         for row in rows:
             delete_task(row[0])
 
-def mark_stuck_tasks(timeout_seconds):
-    cutoff = datetime.datetime.now() - datetime.timedelta(seconds=timeout_seconds)
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute(
-        "SELECT task_id FROM task_queue WHERE status = 'PROCESSING' AND COALESCE(updated_at, created_at) < ?",
-        (cutoff,),
-    )
-    rows = c.fetchall()
-    conn.close()
-    if rows:
-        logger.warning(f"Marking {len(rows)} stuck tasks as FAILED...")
-        for row in rows:
-            update_task_status(row[0], "FAILED", message="Task timed out")
-
 def upsert_task_progress(task_id, total_frames, total_segments):
     conn = get_connection()
     c = conn.cursor()

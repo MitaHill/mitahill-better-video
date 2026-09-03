@@ -91,10 +91,6 @@ def _mark_process_exit(task_id: str, returncode: int):
     _mark_task_failed(task_id, f"Task process exited unexpectedly (code {returncode}).")
 
 
-def _mark_task_timeout(task_id: str):
-    _mark_task_failed(task_id, "Task timed out")
-
-
 def _run_task_process(task_id: str):
     global _active_process
 
@@ -111,8 +107,6 @@ def _run_task_process(task_id: str):
         _mark_task_failed(task_id, f"Failed to start task process: {exc}")
         return
     logger.info("Task %s started in process %s.", task_id, _active_process.pid)
-    started_at = time.monotonic()
-
     try:
         while True:
             returncode = _active_process.poll()
@@ -141,11 +135,6 @@ def _run_task_process(task_id: str):
                 except subprocess.TimeoutExpired:
                     _terminate_process(_active_process, task_id, "completion cleanup timed out")
                 return
-            if time.monotonic() - started_at >= config.TASK_TIMEOUT_SECONDS:
-                logger.error("Task %s timed out after %s seconds", task_id, config.TASK_TIMEOUT_SECONDS)
-                _mark_task_timeout(task_id)
-                _terminate_process(_active_process, task_id, "task timed out")
-                return
             time.sleep(TASK_PROCESS_POLL_SECONDS)
     finally:
         _terminate_process(_active_process, task_id, "Worker cleanup")
@@ -172,12 +161,6 @@ def worker_loop():
     )
 
     while True:
-        try:
-            # Automatic TTL deletion is temporarily disabled.
-            db.mark_stuck_tasks(config.TASK_TIMEOUT_SECONDS)
-        except Exception as exc:
-            logger.error("Background cleanup failed: %s", exc)
-
         if db_admin.get_worker_maintenance_mode(default=False):
             time.sleep(1)
             continue
