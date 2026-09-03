@@ -15,6 +15,7 @@ from app.src.Notifications.events import send_event
 
 logger = logging.getLogger("WORKER")
 TASK_PROCESS_POLL_SECONDS = 1
+TASK_PROCESS_COMPLETION_GRACE_SECONDS = 5
 _active_process = None
 
 
@@ -61,15 +62,16 @@ def _terminate_process(process, task_id: str, reason: str):
         os.killpg(process.pid, signal.SIGKILL)
     except ProcessLookupError:
         return
-    process.wait(timeout=5)
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        logger.warning("Task process %s did not stop after SIGKILL", process.pid)
 
 
-def _mark_process_exit(task_id: str, returncode: int):
+def _mark_task_failed(task_id: str, message: str):
     task = db.get_task(task_id) or {}
     if str(task.get("status") or "").upper() in {"COMPLETED", "FAILED"}:
         return
-
-    message = f"Task process exited unexpectedly (code {returncode})."
     db.update_task_status(task_id, "FAILED", progress=task.get("progress") or 0, message=message)
     send_event(
         {
@@ -84,17 +86,31 @@ def _mark_process_exit(task_id: str, returncode: int):
     )
 
 
+def _mark_process_exit(task_id: str, returncode: int):
+    _mark_task_failed(task_id, f"Task process exited unexpectedly (code {returncode}).")
+
+
+def _mark_task_timeout(task_id: str):
+    _mark_task_failed(task_id, "Task timed out")
+
+
 def _run_task_process(task_id: str):
     global _active_process
 
     task_script = Path(__file__).with_name("task_entrypoint.py")
-    _active_process = subprocess.Popen(
-        [sys.executable, "-u", str(task_script), task_id],
-        cwd=str(task_script.parents[2]),
-        env=os.environ.copy(),
-        start_new_session=True,
-    )
+    try:
+        _active_process = subprocess.Popen(
+            [sys.executable, "-u", str(task_script), task_id],
+            cwd=str(task_script.parents[2]),
+            env=os.environ.copy(),
+            start_new_session=True,
+        )
+    except OSError as exc:
+        logger.error("Failed to start task process for %s: %s", task_id, exc)
+        _mark_task_failed(task_id, f"Failed to start task process: {exc}")
+        return
     logger.info("Task %s started in process %s.", task_id, _active_process.pid)
+    started_at = time.monotonic()
 
     try:
         while True:
@@ -102,11 +118,22 @@ def _run_task_process(task_id: str):
             current = db.get_task(task_id) or {}
             status = str(current.get("status") or "").upper()
 
-            if status in {"COMPLETED", "FAILED"}:
-                _terminate_process(_active_process, task_id, f"task status is {status}")
-                return
             if returncode is not None:
                 _mark_process_exit(task_id, returncode)
+                return
+            if status == "FAILED":
+                _terminate_process(_active_process, task_id, "task status is FAILED")
+                return
+            if status == "COMPLETED":
+                # Let the task process publish its completion event and run its final cleanup
+                try:
+                    _active_process.wait(timeout=TASK_PROCESS_COMPLETION_GRACE_SECONDS)
+                except subprocess.TimeoutExpired:
+                    _terminate_process(_active_process, task_id, "completion cleanup timed out")
+                return
+            if time.monotonic() - started_at >= config.TASK_TIMEOUT_SECONDS:
+                _mark_task_timeout(task_id)
+                _terminate_process(_active_process, task_id, "task timed out")
                 return
             time.sleep(TASK_PROCESS_POLL_SECONDS)
     finally:
