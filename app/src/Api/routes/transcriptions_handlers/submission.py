@@ -1,4 +1,3 @@
-from app.src.Config import settings as config
 from app.src.Database import core as db
 
 from ...constants import OUTPUT_ROOT, UPLOAD_ROOT
@@ -21,7 +20,6 @@ def submit_transcription_request(req, client_ip):
         params,
         OUTPUT_ROOT,
         UPLOAD_ROOT,
-        config.MAX_VIDEO_SIZE_MB,
     )
     if errors:
         for item in errors:

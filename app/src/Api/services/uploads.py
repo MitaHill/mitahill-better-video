@@ -44,7 +44,7 @@ def new_task_dirs(output_root, upload_root, reserved_task_id=None):
     return task_id, run_dir, upload_dir
 
 
-def save_uploaded_files(files, root_dir, max_mb):
+def save_uploaded_files(files, root_dir):
     saved = []
     for upload in files:
         if not upload or not upload.filename:
@@ -55,9 +55,6 @@ def save_uploaded_files(files, root_dir, max_mb):
         path = root_dir / filename
         upload.save(path)
         size_mb = path.stat().st_size / (1024 * 1024)
-        if size_mb > max_mb:
-            path.unlink(missing_ok=True)
-            return None, f"file exceeds limit ({max_mb} MB): {filename}"
         info = ffprobe_info(path)
         saved.append(
             {

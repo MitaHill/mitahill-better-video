@@ -22,7 +22,7 @@ def _collect_transcription_uploads(req):
     return [*videos, *audios]
 
 
-def _create_transcription_task_from_files(media_files, client_ip, params, output_root, upload_root, max_upload_mb):
+def _create_transcription_task_from_files(media_files, client_ip, params, output_root, upload_root):
     if not media_files:
         return None, "at least one audio/video media file is required"
 
@@ -30,7 +30,7 @@ def _create_transcription_task_from_files(media_files, client_ip, params, output
     media_dir = upload_dir / "media"
     media_dir.mkdir(parents=True, exist_ok=True)
 
-    saved, err = save_uploaded_files(media_files, media_dir, max_upload_mb)
+    saved, err = save_uploaded_files(media_files, media_dir)
     if err:
         return None, err
     if not saved:
@@ -51,7 +51,7 @@ def _create_transcription_task_from_files(media_files, client_ip, params, output
     return task_id, None
 
 
-def create_transcription_task(req, client_ip, params, output_root, upload_root, max_upload_mb):
+def create_transcription_task(req, client_ip, params, output_root, upload_root):
     media_files = _collect_transcription_uploads(req)
     return _create_transcription_task_from_files(
         media_files,
@@ -59,11 +59,10 @@ def create_transcription_task(req, client_ip, params, output_root, upload_root, 
         params,
         output_root,
         upload_root,
-        max_upload_mb,
     )
 
 
-def create_transcription_tasks(req, client_ip, params, output_root, upload_root, max_upload_mb):
+def create_transcription_tasks(req, client_ip, params, output_root, upload_root):
     media_files = _collect_transcription_uploads(req)
     if not media_files:
         return None, [], [{"error": "at least one audio/video media file is required"}]
@@ -74,7 +73,6 @@ def create_transcription_tasks(req, client_ip, params, output_root, upload_root,
             params,
             output_root,
             upload_root,
-            max_upload_mb,
         )
         errors = [{"filename": media_files[0].filename, "error": err, "task_id": task_id}] if err else []
         return None, [task_id] if task_id else [], errors
@@ -89,7 +87,6 @@ def create_transcription_tasks(req, client_ip, params, output_root, upload_root,
             params,
             output_root,
             upload_root,
-            max_upload_mb,
         )
         if task_id:
             if not batch_id:

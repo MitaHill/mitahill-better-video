@@ -94,8 +94,6 @@ class StartupSelfCheckService:
                 client_ip="startup-self-check",
                 output_root=Path("/workspace/storage/output"),
                 upload_root=Path("/workspace/storage/upload"),
-                max_video_mb=config.MAX_VIDEO_SIZE_MB,
-                max_image_mb=config.MAX_IMAGE_SIZE_MB,
                 logger=logger,
                 reserved_task_id=SELF_CHECK_TASK_ID,
             )

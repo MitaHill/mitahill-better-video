@@ -4,9 +4,6 @@ import shutil
 from pathlib import Path
 
 from flask import Blueprint, after_this_request, current_app, jsonify, request, send_file
-from werkzeug.exceptions import RequestEntityTooLarge
-
-from app.src.Config import settings as config
 from app.src.Database import core as db
 from app.src.Database import gpu_metrics as db_gpu
 from app.src.Utils.preview_cache import get_preview as get_cached_preview
@@ -43,12 +40,6 @@ def _normalize_utc_timestamp(value):
     return f"{normalized}+00:00"
 
 
-@bp.errorhandler(RequestEntityTooLarge)
-def handle_request_too_large(_err):
-    limit_mb = max(config.MAX_VIDEO_SIZE_MB, config.MAX_IMAGE_SIZE_MB)
-    return jsonify({"error": f"file exceeds limit ({limit_mb} MB)"}), 413
-
-
 @bp.post("/api/tasks")
 def create_task():
     if "file" not in request.files:
@@ -64,8 +55,6 @@ def create_task():
         client_ip,
         OUTPUT_ROOT,
         UPLOAD_ROOT,
-        config.MAX_VIDEO_SIZE_MB,
-        config.MAX_IMAGE_SIZE_MB,
         current_app.logger,
     )
     if err:
@@ -95,8 +84,6 @@ def create_tasks_batch():
             client_ip,
             OUTPUT_ROOT,
             UPLOAD_ROOT,
-            config.MAX_VIDEO_SIZE_MB,
-            config.MAX_IMAGE_SIZE_MB,
             logger,
         )
         if task_id:
