@@ -318,6 +318,9 @@ def process_transcription_task(task):
     task_id = task["task_id"]
     raw_params = json.loads(task.get("task_params") or "{}")
     options = normalize_transcription_options(raw_params)
+
+    # 不把字幕和译文当作检查点使用
+    # 重启后从语音识别开始，避免混用两次 AI 推理结果
     run_dir = Path("/workspace/storage/output") / f"run_{task_id}"
     run_dir.mkdir(parents=True, exist_ok=True)
 

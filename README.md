@@ -338,9 +338,9 @@ h265
 
 AV1 编码需要较新的显卡和驱动，不是所有 NVIDIA GPU 都支持。
 
-### 3. Whisper large-v3 OOM
+### 3. Whisper 模型 OOM
 
-转录固定使用 Faster-Whisper `large-v3` FP16。显存不足时任务会直接失败，不会切换到 CPU。
+转录支持 Faster-Whisper 标准模型。显存不足时任务会直接失败，不会切换到 CPU；可在创建任务时选择已下载的小型模型。
 
 ### 4. 任务文件需要清理
 

@@ -6,17 +6,20 @@ import torch
 from faster_whisper import WhisperModel
 from faster_whisper.feature_extractor import FeatureExtractor
 
+from app.src.Data.transcription_models import get_whisper_model
+
 _WHISPER_ROOT = Path("/workspace/storage/models/transcription/whisper")
 _MODEL_ID = "large-v3"
 
 logger = logging.getLogger("TRANSCRIBE_ENGINE")
 
 
-def load_whisper_model(model_path: Path):
+def load_whisper_model(model_path: Path, model_name: str = _MODEL_ID):
     model = WhisperModel(str(model_path), device="cuda", compute_type="float16")
 
-    # Faster-Whisper 0.9 predates large-v3 and defaults to 80 mel bins
-    model.feature_extractor = FeatureExtractor(feature_size=128)
+    model_info = get_whisper_model(model_name) or {}
+    # Faster-Whisper 0.9 does not read the model feature size from config
+    model.feature_extractor = FeatureExtractor(feature_size=int(model_info.get("feature_size") or 80))
     return model
 
 
@@ -27,10 +30,11 @@ class WhisperEngine:
         _WHISPER_ROOT.mkdir(parents=True, exist_ok=True)
 
     def _model_path(self, model_name: str) -> Path:
-        if model_name != _MODEL_ID:
+        model_info = get_whisper_model(model_name)
+        if not model_info:
             raise RuntimeError(f"Unsupported Whisper model: {model_name}")
         model_path = _WHISPER_ROOT / model_name
-        required_files = ("model.bin", "config.json", "tokenizer.json", "vocabulary.json")
+        required_files = ("model.bin", "config.json", "tokenizer.json", model_info["vocabulary"])
         missing_files = [name for name in required_files if not (model_path / name).is_file()]
         if missing_files:
             raise RuntimeError(
@@ -48,7 +52,7 @@ class WhisperEngine:
 
         model_path = self._model_path(safe_model)
         logger.info("Loading Faster-Whisper model %s on CUDA with float16", safe_model)
-        self._model = load_whisper_model(model_path)
+        self._model = load_whisper_model(model_path, safe_model)
         self._model_name = safe_model
 
     def release(self):

@@ -315,7 +315,7 @@ Request (example):
   "transcription": {
     "backend": "whisper",
     "active_model": "large-v3",
-    "allowed_models": ["large-v3"]
+    "allowed_models": ["tiny.en", "tiny", "base.en", "base", "small.en", "small", "medium.en", "medium", "large-v1", "large-v2", "large-v3"]
   },
   "translation": {
     "provider": "openai_compatible",
@@ -329,7 +329,7 @@ Request (example):
 Header:
 - `Authorization: Bearer <token>`
 
-返回 Faster-Whisper `large-v3` 模型目录，以及本地安装状态。
+返回所有标准 Faster-Whisper 模型目录，以及本地安装状态。
 
 ### POST /api/admin/transcription/models/download
 Header:

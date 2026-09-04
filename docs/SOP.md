@@ -58,8 +58,9 @@ GPU 探测、模型必要文件检查、`nvidia-smi`、模型加载等操作必�
 - 翻译任务输出原文、译文、双语三种字幕；不翻译时只输出原文字幕。
 - 字幕封装使用 `/workspace/storage/tmp/subtitles/` 下的安全临时文件，ffmpeg 结束后立即删除。
 - 基础镜像固定使用 FFmpeg 8.1 GPL 静态构建，不使用持续变化的 master 构建，并校验下载文件 SHA256。
-- 转录固定使用 Faster-Whisper 的 `large-v3` FP16 成品模型。CUDA 必需，不增加 CPU fallback。
-- 模型从 Hugging Face 下载 CTranslate2 文件，不在本地转换；检查 `model.bin`、`config.json`、`tokenizer.json`、`vocabulary.json`，随后用短音频热身。`preprocessor_config.json` 不参与检查。
+- 转录支持 Faster-Whisper 标准模型：`tiny`、`base`、`small`、`medium` 的多语言与 `.en` 版本，以及 `large-v1`、`large-v2`、`large-v3`。CUDA 必需，不增加 CPU fallback。
+- 转录任务中断后从语音识别开始重新执行，不复用旧字幕或译文。
+- 模型从 Hugging Face 下载 CTranslate2 文件，不在本地转换；检查 `model.bin`、`config.json`、`tokenizer.json` 和模型对应的词表文件，随后用短音频热身。`preprocessor_config.json` 不参与检查。
 - 显存不足时清晰失败，不尝试降级到 CPU 或其它精度。
 - 字幕与文本转录可以启用低数据传输：前端用同源托管的 ffmpeg.wasm 提取 m4a 音频后再提交，后端仍走普通转录任务路径。
 - 自动过期删除任务当前禁用。任务文件和数据库记录由管理员在任务总览里显式删除；批量任务按批次 ID 折叠显示，展开后可查看子任务归属；批次状态页通过 WebSocket 接收聚合状态。

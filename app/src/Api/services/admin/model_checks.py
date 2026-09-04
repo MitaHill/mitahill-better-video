@@ -113,7 +113,7 @@ def _warmup_transcription_model(model_entry: Dict) -> Dict:
         from app.src.Worker.pipelines.transcription.whisper_engine import load_whisper_model
 
         fp16 = True
-        model = load_whisper_model(local_path)
+        model = load_whisper_model(local_path, model_id)
         segments, _info = model.transcribe(str(wav_path), beam_size=1, language="en")
         list(segments)
 
