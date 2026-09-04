@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from PIL import Image
 import numpy as np
-import torch
 
 from app.src.Database import core as db
 from app.src.Config import settings as config
@@ -20,7 +19,6 @@ from app.src.Utils.ffmpeg import (
 from app.src.Utils.preview_cache import set_preview_from_path, clear_task as clear_preview_cache
 from app.src.Media.upscaler import build_model
 from app.src.Notifications.events import send_event
-from app.src.Worker.gpu_model_coordinator import is_cuda_oom, prepare_model_load, register_release_hook
 from .preview import generate_previews
 
 logger = logging.getLogger("PROCESSOR")
@@ -28,7 +26,6 @@ logger = logging.getLogger("PROCESSOR")
 def process_enhancement_task(task):
     task_id = task['task_id']
     logger.info(f"=== Starting Task Processor: {task_id} ===")
-    model_holder = {}
 
     def _emit_status(progress, message, stage):
         send_event(
@@ -43,13 +40,6 @@ def process_enhancement_task(task):
             }
         )
 
-    def _release_realesrgan():
-        model_holder.pop("upsampler", None)
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
-    register_release_hook("realesrgan", _release_realesrgan)
-    
     try:
         db.update_task_status(task_id, "PROCESSING", 0, "Initializing...")
         _emit_status(0, "Initializing...", "prepare")
@@ -68,28 +58,13 @@ def process_enhancement_task(task):
         if not input_path.exists():
             raise FileNotFoundError(f"Input missing: {params['filename']}")
 
-        # 1. Load Model ONCE
         db.update_task_status(task_id, "PROCESSING", 5, "Loading Model...")
         _emit_status(5, "Loading Model...", "prepare")
-        prepare_model_load("realesrgan")
-        try:
-            upsampler = build_model(
-                params['model_name'], params['upscale'], params['tile'],
-                params.get('tile_pad', 10), params.get('fp16', True),
-                weights_dir, params.get('denoise_strength', 0.5)
-            )
-            model_holder["upsampler"] = upsampler
-        except RuntimeError as exc:
-            if not is_cuda_oom(exc):
-                raise
-            logger.warning("CUDA OOM while loading Real-ESRGAN; releasing peer models and retrying once.")
-            prepare_model_load("realesrgan")
-            upsampler = build_model(
-                params['model_name'], params['upscale'], params['tile'],
-                params.get('tile_pad', 10), params.get('fp16', True),
-                weights_dir, params.get('denoise_strength', 0.5)
-            )
-            model_holder["upsampler"] = upsampler
+        upsampler = build_model(
+            params['model_name'], params['upscale'], params['tile'],
+            params.get('tile_pad', 10), params.get('fp16', True),
+            weights_dir, params.get('denoise_strength', 0.5)
+        )
         logger.info("Model loaded: %s", params.get("model_name"))
 
         if params['input_type'] == 'Video':
@@ -97,22 +72,32 @@ def process_enhancement_task(task):
 
             out_name = f"sr_{input_path.stem}.mp4"
 
-            # 2. Previews
             generate_previews(input_path, run_dir, upsampler, params['upscale'])
             if run_dir.joinpath("preview_original.jpg").exists():
                 set_preview_from_path(task_id, "original", run_dir / "preview_original.jpg", 1)
             if run_dir.joinpath("preview_upscaled.jpg").exists():
                 set_preview_from_path(task_id, "upscaled", run_dir / "preview_upscaled.jpg", 1)
             logger.info("Preview generation completed.")
+            send_event(
+                {
+                    "task_id": task_id,
+                    "task_category": "enhance",
+                    "status": "PROCESSING",
+                    "progress": 5,
+                    "message": "Preview generation completed.",
+                    "stage": "prepare",
+                    "preview_frame": 1,
+                    "preview_reset": True,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
             
             duration = get_video_duration(input_path)
             total_frames = get_video_total_frames(input_path)
             if total_frames <= 0:
                 total_frames = max(1, int(round(get_video_duration(input_path) * get_video_fps(input_path))))
             db.upsert_task_progress(task_id, total_frames, 0)
-            # 3. Process Video (reuse upsampler logic)
             if duration > config.SEGMENT_TIME_SECONDS:
-                # Segmented processing
                 db.update_task_status(task_id, "PROCESSING", 10, "Splitting Video...")
                 _emit_status(10, "Splitting Video...", "prepare")
                 logger.info("Segmenting video: %.2fs per segment", config.SEGMENT_TIME_SECONDS)
@@ -121,7 +106,6 @@ def process_enhancement_task(task):
                 
                 segs = sorted([p for p in segments_dir.glob("seg_*.mp4") if not p.stem.endswith("_sr")])
                 if not segs:
-                    # Split
                     run_ffmpeg([
                         "ffmpeg", "-y", "-i", str(input_path), "-c", "copy", "-map", "0",
                         "-segment_time", str(config.SEGMENT_TIME_SECONDS), "-f", "segment",
@@ -209,7 +193,6 @@ def process_enhancement_task(task):
                     run_ffmpeg(fallback_cmd)
                 shutil.rmtree(segments_dir, ignore_errors=True)
             else:
-                # Single pass video
                 db.update_task_status(task_id, "PROCESSING", 20, "Upscaling Video...")
                 logger.info("Processing video in a single pass.")
                 from app.src.Media.segmenter import process_video_with_model
@@ -240,14 +223,12 @@ def process_enhancement_task(task):
                     )
 
         else:
-            # 4. Process Image
             db.update_task_status(task_id, "PROCESSING", 50, "Upscaling Image...")
             img = Image.open(input_path).convert("RGB")
             output, _ = upsampler.enhance(np.array(img)[:,:,::-1], outscale=params['upscale'])
             out_img = Image.fromarray(output[:,:,::-1])
             out_name = f"sr_{input_path.stem}.png"
             out_img.save(output_root / out_name)
-            # Previews for image are just the files themselves
             img.save(run_dir / "preview_original.jpg")
             out_img.save(run_dir / "preview_upscaled.jpg")
             set_preview_from_path(task_id, "original", run_dir / "preview_original.jpg", 1)
@@ -282,8 +263,3 @@ def process_enhancement_task(task):
         )
     finally:
         clear_preview_cache(task_id)
-        model_holder.pop("upsampler", None)
-        if 'upsampler' in locals():
-            del upsampler
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()

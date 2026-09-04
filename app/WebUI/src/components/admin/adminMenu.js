@@ -16,9 +16,8 @@ export const menuTree = Object.freeze([
       {
         key: "runtime_access",
         label: "访问与日志",
-        keywords: "ip ipv6 logs warning error 访问 ip 日志",
+        keywords: "logs warning error 日志",
         children: Object.freeze([
-          { key: "ips", label: "访问IP统计", keywords: "ip ipv6 stats 访问 统计" },
           { key: "logs_warn", label: "系统日志", keywords: "log warn error warning 系统 日志" },
         ]),
       },
@@ -37,16 +36,8 @@ export const menuTree = Object.freeze([
   {
     key: "system",
     label: "系统设置",
-    keywords: "network security proxy password 网络 安全 代理 密码",
+    keywords: "security password 安全 密码",
     children: Object.freeze([
-      {
-        key: "network",
-        label: "网络配置",
-        keywords: "proxy trusted frp nginx 代理 网络",
-        children: Object.freeze([
-          { key: "proxy", label: "受信代理配置", keywords: "proxy trusted frp nginx 代理" },
-        ]),
-      },
       {
         key: "security",
         label: "安全",

@@ -12,8 +12,6 @@ def create_enhance_task(
     client_ip,
     output_root,
     upload_root,
-    max_video_mb,
-    max_image_mb,
     logger,
     reserved_task_id=None,
 ):
@@ -26,20 +24,8 @@ def create_enhance_task(
     input_path = upload_dir / filename
     upload.save(input_path)
 
-    input_type = params["input_type"]
     size_mb = input_path.stat().st_size / (1024 * 1024)
-    max_mb = max_video_mb if input_type == "Video" else max_image_mb
-    if size_mb > max_mb:
-        input_path.unlink(missing_ok=True)
-        db.create_task(
-            task_id,
-            client_ip,
-            {**params, "filename": filename, "upload_path": str(input_path)},
-            {},
-            task_category="enhance",
-        )
-        db.update_task_status(task_id, "FAILED", progress=0, message=f"file exceeds limit ({max_mb} MB)")
-        return task_id, f"file exceeds limit ({max_mb} MB)"
+    input_type = params["input_type"]
 
     if input_type == "Video":
         info = ffprobe_info(input_path)

@@ -5,7 +5,7 @@
     <div class="inline-grid two" style="margin-top: 10px;">
       <div class="param-section">
         <div class="param-title">转录模型</div>
-        <p class="notice" style="margin-bottom: 10px;">步骤：目标解析 -> HASH 校验 -> GPU 热身识别 5 秒静音音频</p>
+        <p class="notice" style="margin-bottom: 10px;">步骤：目标解析 -> 必要文件检查 -> GPU 热身识别 5 秒静音音频</p>
         <div class="field compact" style="margin-bottom: 10px;">
           <label>测试目标模型 ID</label>
           <input
@@ -66,28 +66,26 @@
               <span>耗时</span>
               <strong>{{ modelResultSummary.elapsedSec }}s</strong>
             </div>
-            <div class="debug-kv" v-if="modelResultSummary.hashTotal > 0">
-              <span>HASH校验</span>
-              <strong>{{ modelResultSummary.hashPassed }}/{{ modelResultSummary.hashTotal }}</strong>
+            <div class="debug-kv" v-if="modelResultSummary.fileTotal > 0">
+              <span>文件检查</span>
+              <strong>{{ modelResultSummary.filePassed }}/{{ modelResultSummary.fileTotal }}</strong>
             </div>
           </div>
           <p class="notice" style="margin: 6px 0 0;">{{ modelResultSummary.message }}</p>
         </div>
 
-        <div v-if="modelHashChecks.length" class="hash-table-wrap">
+        <div v-if="modelFileChecks.length" class="hash-table-wrap">
           <table class="hash-table">
             <thead>
               <tr>
                 <th>文件</th>
-                <th>算法</th>
                 <th>状态</th>
-                <th>摘要</th>
+                <th>说明</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(item, idx) in modelHashChecks" :key="`${item.file}-${idx}`">
+              <tr v-for="(item, idx) in modelFileChecks" :key="`${item.file}-${idx}`">
                 <td :title="item.file">{{ shortFile(item.file) }}</td>
-                <td>{{ item.algorithm || "-" }}</td>
                 <td>
                   <span :class="String(item.status || '').toLowerCase() === 'passed' ? 'chip-ok' : 'chip-bad'">
                     {{ String(item.status || '').toLowerCase() === 'passed' ? "通过" : "失败" }}
@@ -95,9 +93,6 @@
                 </td>
                 <td :title="item.message">
                   <span>{{ item.message || "-" }}</span>
-                  <span v-if="item.expected || item.actual" class="hash-meta">
-                    E:{{ shortHash(item.expected) }} / A:{{ shortHash(item.actual) }}
-                  </span>
                 </td>
               </tr>
             </tbody>
@@ -285,11 +280,11 @@ const modelResultSummary = computed(() => {
   const payload = asObject(props.modelResult);
   if (!payload) return null;
   const steps = Array.isArray(payload.steps) ? payload.steps : [];
-  const hashStep = steps.find((item) => String(item?.name || "").toLowerCase() === "hash") || {};
+  const fileStep = steps.find((item) => String(item?.name || "").toLowerCase() === "files") || {};
   const warmupStep = steps.find((item) => String(item?.name || "").toLowerCase() === "warmup") || {};
-  const hashChecks = Array.isArray(hashStep.checks) ? hashStep.checks : [];
-  const hashPassed = hashChecks.filter((item) => String(item?.status || "").toLowerCase() === "passed").length;
-  const hashTotal = hashChecks.length;
+  const fileChecks = Array.isArray(fileStep.checks) ? fileStep.checks : [];
+  const filePassed = fileChecks.filter((item) => String(item?.status || "").toLowerCase() === "passed").length;
+  const fileTotal = fileChecks.length;
   return {
     ok: Boolean(payload.ok),
     backend: String(payload.backend || "-"),
@@ -299,17 +294,17 @@ const modelResultSummary = computed(() => {
     device: String(warmupStep.device || ""),
     fp16: typeof warmupStep.fp16 === "boolean" ? (warmupStep.fp16 ? "是" : "否") : "",
     elapsedSec: Number.isFinite(Number(warmupStep.elapsed_sec)) ? Number(warmupStep.elapsed_sec) : null,
-    hashPassed,
-    hashTotal,
+    filePassed,
+    fileTotal,
   };
 });
 
-const modelHashChecks = computed(() => {
+const modelFileChecks = computed(() => {
   const payload = asObject(props.modelResult);
   if (!payload) return [];
   const steps = Array.isArray(payload.steps) ? payload.steps : [];
-  const hashStep = steps.find((item) => String(item?.name || "").toLowerCase() === "hash") || {};
-  return Array.isArray(hashStep.checks) ? hashStep.checks : [];
+  const fileStep = steps.find((item) => String(item?.name || "").toLowerCase() === "files") || {};
+  return Array.isArray(fileStep.checks) ? fileStep.checks : [];
 });
 
 const shortFile = (path) => {
@@ -317,13 +312,6 @@ const shortFile = (path) => {
   if (!safe) return "-";
   const parts = safe.split("/");
   return parts[parts.length - 1] || safe;
-};
-
-const shortHash = (value) => {
-  const safe = String(value || "").trim();
-  if (!safe) return "-";
-  if (safe.length <= 16) return safe;
-  return `${safe.slice(0, 10)}...${safe.slice(-6)}`;
 };
 
 const _translationStepLabel = (name) => {

@@ -120,19 +120,23 @@ export const useWorkbenchUploads = ({
     if (files.length && !validateFiles(files)) {
       submitError.value = "转录媒体文件名包含非法字符或过长。";
       transcribeForm.mediaFiles = [];
+      transcribeForm.mediaInfo = [];
       transcribeMediaInfo.value = [];
       event.target.value = "";
       return;
     }
 
     transcribeForm.mediaFiles = files;
+    transcribeForm.mediaInfo = [];
     transcribeMediaInfo.value = [];
     const probeErrors = [];
     for (const file of files) {
       try {
         const info = await probeMedia(file, parseJsonSafe);
         transcribeMediaInfo.value.push(info);
+        transcribeForm.mediaInfo.push(info);
       } catch (error) {
+        transcribeForm.mediaInfo.push(null);
         probeErrors.push(`${file.name}: ${error.message}`);
       }
     }

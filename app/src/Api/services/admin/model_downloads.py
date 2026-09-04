@@ -8,7 +8,7 @@ from typing import Callable, Dict, Optional
 
 from app.src.Database import transcription_admin as db_transcription
 
-from .model_checks import verify_model_hashes, warmup_transcription_model
+from .model_checks import verify_model_files, warmup_transcription_model
 from .transcription_catalog import get_model_entry
 from .transcription_config import get_transcription_config
 
@@ -100,23 +100,34 @@ def _run_aria2(
 
 
 def _run_whisper_download(job_id: str, model_entry: Dict, aria2_config: Dict):
-    target_path = Path(model_entry.get("local_path") or "")
+    target_dir = Path(model_entry.get("local_path") or "")
+    download_files = model_entry.get("download_files") or []
+    if not download_files:
+        raise RuntimeError("模型未提供下载文件")
 
-    def on_progress(percent: float, _line: str):
-        db_transcription.update_model_download_job(
-            job_id,
-            status="RUNNING",
-            progress=max(0.0, min(95.0, percent * 0.95 / 100.0 * 100.0)),
-            message=f"下载中: {percent:.0f}%",
+    total_files = len(download_files)
+    for index, item in enumerate(download_files, start=1):
+        filename = str(item.get("name") or "").strip()
+        url = str(item.get("url") or "").strip()
+        if not filename or not url:
+            raise RuntimeError("模型下载文件无效")
+
+        def on_progress(percent: float, _line: str):
+            completed = (index - 1 + max(0.0, min(100.0, percent)) / 100.0) / total_files
+            db_transcription.update_model_download_job(
+                job_id,
+                status="RUNNING",
+                progress=max(0.0, min(95.0, completed * 95.0)),
+                message=f"下载中: {filename} ({index}/{total_files}) {percent:.0f}%",
+            )
+
+        _run_aria2(
+            job_id=job_id,
+            url=url,
+            output_path=target_dir / filename,
+            aria2_config=aria2_config,
+            progress_callback=on_progress,
         )
-
-    _run_aria2(
-        job_id=job_id,
-        url=str(model_entry.get("download_url") or ""),
-        output_path=target_path,
-        aria2_config=aria2_config,
-        progress_callback=on_progress,
-    )
 
 
 def _is_cancel_requested(job_id: str) -> bool:
@@ -136,23 +147,17 @@ def _request_cancel(job_id: str):
             pass
 
 
-def _build_hash_failure_message(hash_result: Dict) -> str:
-    checks = hash_result.get("checks") or []
+def _build_file_check_failure_message(file_result: Dict) -> str:
+    checks = file_result.get("checks") or []
     failed = next((item for item in checks if str(item.get("status") or "").lower() == "failed"), None)
     if not failed:
-        return "HASH 校验失败"
+        return "必要文件检查失败"
 
     file_name = str(failed.get("file") or "").strip()
-    msg = str(failed.get("message") or "HASH 校验失败").strip()
-    expected = str(failed.get("expected") or "").strip()
-    actual = str(failed.get("actual") or "").strip()
+    msg = str(failed.get("message") or "必要文件检查失败").strip()
     parts = [msg]
     if file_name:
         parts.append(f"文件: {file_name}")
-    if expected:
-        parts.append(f"期望: {expected}")
-    if actual:
-        parts.append(f"实际: {actual}")
     return " | ".join(parts)
 
 
@@ -187,19 +192,19 @@ def _run_download_job(job_id: str, model_entry: Dict):
             job_id,
             status="RUNNING",
             progress=98.5,
-            message="下载完成，开始 HASH 校验",
+            message="下载完成，开始文件检查",
         )
 
-        hash_result = verify_model_hashes(model_entry)
-        partial_result["hash"] = hash_result
-        if not hash_result.get("ok"):
-            raise RuntimeError(_build_hash_failure_message(hash_result))
+        file_result = verify_model_files(model_entry)
+        partial_result["files"] = file_result
+        if not file_result.get("ok"):
+            raise RuntimeError(_build_file_check_failure_message(file_result))
 
         db_transcription.update_model_download_job(
             job_id,
             status="RUNNING",
             progress=99.0,
-            message="HASH 校验通过，开始热身",
+            message="文件检查通过，开始热身",
         )
 
         if _is_cancel_requested(job_id):
@@ -214,8 +219,8 @@ def _run_download_job(job_id: str, model_entry: Dict):
             job_id,
             status="COMPLETED",
             progress=100.0,
-            message="下载、校验、热身全部完成",
-            result={"hash": hash_result, "warmup": warmup_result, "model": model_entry},
+            message="下载、检查、热身全部完成",
+            result={"files": file_result, "warmup": warmup_result, "model": model_entry},
             error="",
         )
     except Exception as exc:
@@ -270,10 +275,12 @@ def remove_model_file(model_id: str, backend: str) -> Dict:
     path = Path(model_entry.get("local_path") or "")
     if not path.exists():
         raise ValueError("模型文件不存在")
-    if not path.is_file():
-        raise ValueError("模型路径不是文件")
-
-    path.unlink()
+    if path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+    else:
+        raise ValueError("模型路径无效")
     model_entry["installed"] = False
     return model_entry
 

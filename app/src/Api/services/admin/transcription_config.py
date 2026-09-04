@@ -20,21 +20,8 @@ def default_transcription_config() -> Dict[str, Any]:
         "version": 1,
         "transcription": {
             "backend": "whisper",
-            "active_model": "medium",
-            "allowed_models": [
-                "tiny",
-                "tiny.en",
-                "base",
-                "base.en",
-                "small",
-                "small.en",
-                "medium",
-                "medium.en",
-                "large-v1",
-                "large-v2",
-                "large-v3",
-                "large",
-            ],
+            "active_model": "large-v3",
+            "allowed_models": ["large-v3"],
         },
         "translation": {
             "provider": config.TRANSCRIPTION_TRANSLATOR_PROVIDER or "none",
@@ -79,12 +66,12 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
         backend = "whisper"
     merged["transcription"]["backend"] = backend
     merged["transcription"]["active_model"] = str(
-        merged["transcription"].get("active_model") or "medium"
+        merged["transcription"].get("active_model") or "large-v3"
     ).strip().lower()
 
     backend_supported = get_models_for_backend(backend)
     if merged["transcription"]["active_model"] not in set(backend_supported):
-        merged["transcription"]["active_model"] = "medium"
+        merged["transcription"]["active_model"] = "large-v3"
     merged["transcription"]["allowed_models"] = list(backend_supported)
 
     provider = str(merged["translation"].get("provider") or "none").strip().lower()
@@ -165,7 +152,7 @@ def get_parser_defaults() -> Dict[str, Any]:
     translation = current.get("translation") or {}
     return {
         "transcription_backend": str(transcription.get("backend") or "whisper").strip().lower(),
-        "whisper_model": str(transcription.get("active_model") or "medium").strip().lower(),
+        "whisper_model": str(transcription.get("active_model") or "large-v3").strip().lower(),
         "translator_provider": str(translation.get("provider") or "none").strip().lower(),
         "translator_base_url": str(translation.get("base_url") or "").strip(),
         "translator_model": str(translation.get("model") or "").strip(),

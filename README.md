@@ -12,6 +12,46 @@
 本项目，旨在帮助**转录视频**、**超分辨率增强**、**转换视频格式**、**下载视频**，且均支持批量处理；
 通过容器化，可以快速部署项目，并消除系统环境不一致造成的依赖冲突等运行异常问题。
 
+## 快速部署
+
+新机器推荐先运行初始化脚本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MitaHill/mitahill-better-video/main/scripts/quick-start.sh | bash
+```
+
+`quick-start` 负责检测系统、GPU、网络并拉取项目，检测通过后会自动运行 `quick-deploy`。
+
+如果已经在仓库根目录，也可以运行：
+
+```bash
+bash scripts/quick-start.sh
+```
+
+如果只需要重新部署当前仓库，可以直接运行部署脚本：
+
+```bash
+bash scripts/quick-deploy.sh
+```
+
+`quick-deploy` 会检查 Debian 系统、NVIDIA GPU、Docker、DockerHub、GitHub、Docker GPU 调用能力，然后按项目标准方式构建镜像并启动 `pre-run`。
+脚本会根据系统时区显示中文或英文，并自动区分 WSL2 与标准 Linux。
+
+只检查环境：
+
+```bash
+bash scripts/quick-deploy.sh --check-only
+```
+
+如果 Docker 或 NVIDIA Container Toolkit 缺失，可以显式允许脚本安装依赖：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MitaHill/mitahill-better-video/main/scripts/quick-start.sh | bash -s -- --install-deps
+```
+
+如果 NVIDIA GPU 和互联网正常，但 Docker 或 NVIDIA Container Toolkit 缺失，脚本会询问是否允许自动安装。
+
+如果使用 WSL2 部署，请先阅读 [WSL2 部署提示](docs/WSL2.md)。
 
 ---------------
 
@@ -83,10 +123,6 @@
 ```bash
 docker run --rm --gpus all nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04 nvidia-smi
 ```
-
-如果使用 WSL2 部署，请先阅读 [WSL2 部署提示](docs/WSL2.md)。
-
----------------
 
 ## 快速开始
 
@@ -302,9 +338,9 @@ h265
 
 AV1 编码需要较新的显卡和驱动，不是所有 NVIDIA GPU 都支持。
 
-### 3. Whisper medium OOM
+### 3. Whisper 模型 OOM
 
-小显存不能装下模型。如果 GPU OOM，直接换更小模型。
+转录支持 Faster-Whisper 标准模型。显存不足时任务会直接失败，不会切换到 CPU；可在创建任务时选择已下载的小型模型。
 
 ### 4. 任务文件需要清理
 

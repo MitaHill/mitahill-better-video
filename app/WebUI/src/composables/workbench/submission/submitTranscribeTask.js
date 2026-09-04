@@ -11,6 +11,7 @@ export const submitTranscribeTask = async (ctx) => {
     setStatusQuery,
     joinRoom,
     fetchStatus,
+    prepareTranscribeUploadFiles,
   } = ctx;
 
   ensureCategory(enforceCategory, "transcribe");
@@ -18,7 +19,11 @@ export const submitTranscribeTask = async (ctx) => {
     throw new Error("请至少上传一个要转录的音频或视频文件。");
   }
 
-  const data = buildTranscriptionTaskFormData(transcribeForm);
+  const uploadFiles =
+    typeof prepareTranscribeUploadFiles === "function"
+      ? await prepareTranscribeUploadFiles()
+      : transcribeForm.mediaFiles;
+  const data = buildTranscriptionTaskFormData(transcribeForm, uploadFiles);
   const res = await fetch("/api/transcriptions", { method: "POST", body: data });
   if (!res.ok) {
     await throwSubmitError({

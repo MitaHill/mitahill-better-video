@@ -1,13 +1,13 @@
 <template>
   <div class="panel admin-card">
     <div class="status-row admin-head-row">
-      <h2>系统日志（WARN+）</h2>
+      <h2>系统日志</h2>
       <div class="status-row" style="gap: 8px;">
         <select :value="minLevel" @change="onMinLevelChange">
+          <option value="INFO">INFO+</option>
           <option value="WARNING">WARNING+</option>
           <option value="ERROR">ERROR+</option>
           <option value="CRITICAL">CRITICAL</option>
-          <option value="INFO">INFO+</option>
         </select>
         <input :value="loggerName" placeholder="Logger 名称过滤" @input="onLoggerNameInput" />
         <input :value="keyword" placeholder="关键字过滤" @input="onKeywordInput" />

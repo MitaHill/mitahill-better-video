@@ -58,10 +58,10 @@
               </div>
             </div>
             <AdminOverviewCards :counts="overview.counts" />
-            <p class="notice" style="margin-top: 10px;">
-              维护模式：{{ overview.maintenanceMode ? "已开启（暂停拉取新任务）" : "关闭" }}
-            </p>
-            <p class="notice" style="margin-top: 10px;">当前请求识别IP：{{ proxyConfig.resolvedClientIp || '-' }}</p>
+            <div class="status-row" style="margin-top: 10px; gap: 16px;">
+              <span class="notice">维护模式：{{ overview.maintenanceMode ? "已开启（暂停拉取新任务）" : "关闭" }}</span>
+              <span class="notice">Client IP：{{ proxyConfig.resolvedClientIp || '-' }}</span>
+            </div>
           </div>
 
           <AdminGpuUsageChart
@@ -83,6 +83,7 @@
             :error="overview.error"
             :on-refresh="fetchOverview"
             :on-cancel-task="onTaskCancel"
+            :on-cancel-batch="onBatchCancel"
             :on-delete-task="onTaskDelete"
             :on-delete-batch="onBatchDelete"
             :task-action-loading="taskActionLoading"
@@ -214,6 +215,7 @@ const {
   fetchOverview,
   setMaintenanceMode,
   cancelTaskById,
+  cancelBatchById,
   deleteTaskById,
   deleteBatchById,
   fetchGpuUsage,
@@ -294,6 +296,10 @@ const onStatusFilterChange = (value) => {
 
 const onTaskCancel = async (taskId) => {
   await cancelTaskById(taskId);
+};
+
+const onBatchCancel = async (batchId) => {
+  await cancelBatchById(batchId);
 };
 
 const onTaskDelete = async (taskId) => {

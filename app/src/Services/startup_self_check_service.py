@@ -1,4 +1,3 @@
-import gc
 import json
 import logging
 import os
@@ -16,7 +15,6 @@ from app.src.Api.services import create_enhance_task
 from app.src.Config import settings as config
 from app.src.Database import admin as db_admin
 from app.src.Database import core as db
-from app.src.Worker.gpu_model_coordinator import release_all_models
 from app.src.Worker.pipelines.dispatch import process_task
 
 
@@ -30,14 +28,6 @@ class StartupSelfCheckService:
         self.enabled = bool(((self.config_payload.get("runtime") or {}).get("startup_self_check_enabled")))
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         self.workspace = Path("/workspace/storage/selfcheck") / f"startup_{stamp}"
-
-    @staticmethod
-    def _cleanup_memory():
-        import torch
-
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
 
     def run_if_enabled(self):
         if not self.enabled:
@@ -60,10 +50,8 @@ class StartupSelfCheckService:
             logger.error("Startup self-check traceback:\n%s", traceback.format_exc())
             raise RuntimeError(f"启动自检失败: {exc}") from exc
         finally:
-            release_all_models()
             self._cleanup_task(task_id)
             self.cleanup_workspace()
-            self._cleanup_memory()
 
     def _check_nvidia_smi(self):
         logger.info("Self-check [GPU] running nvidia-smi...")
@@ -106,8 +94,6 @@ class StartupSelfCheckService:
                 client_ip="startup-self-check",
                 output_root=Path("/workspace/storage/output"),
                 upload_root=Path("/workspace/storage/upload"),
-                max_video_mb=config.MAX_VIDEO_SIZE_MB,
-                max_image_mb=config.MAX_IMAGE_SIZE_MB,
                 logger=logger,
                 reserved_task_id=SELF_CHECK_TASK_ID,
             )

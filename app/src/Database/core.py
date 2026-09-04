@@ -146,6 +146,8 @@ def init_db():
         c.execute("CREATE INDEX IF NOT EXISTS idx_task_batch_items_task ON task_batch_items(task_id)")
         conn.commit()
         conn.close()
+        from . import app_logs
+        app_logs.purge_expired_logs()
         logger.debug("Database initialized successfully.")
     except Exception as e:
         logger.critical(f"[FAILED] Failed to initialize database: {e}")
@@ -331,7 +333,7 @@ def update_task_video_info(task_id, video_info):
     conn.close()
 
 def delete_task(task_id):
-    logger.warning(f"Deleting task and all associated files: {task_id}")
+    logger.info(f"Deleting task and all associated files: {task_id}")
     task = get_task(task_id)
     result_paths = []
     if task and task.get("result_path"):
@@ -466,21 +468,6 @@ def cleanup_old_tasks(hours_ttl):
         logger.info(f"Starting cleanup of {len(rows)} tasks...")
         for row in rows:
             delete_task(row[0])
-
-def mark_stuck_tasks(timeout_seconds):
-    cutoff = datetime.datetime.now() - datetime.timedelta(seconds=timeout_seconds)
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute(
-        "SELECT task_id FROM task_queue WHERE status = 'PROCESSING' AND COALESCE(updated_at, created_at) < ?",
-        (cutoff,),
-    )
-    rows = c.fetchall()
-    conn.close()
-    if rows:
-        logger.warning(f"Marking {len(rows)} stuck tasks as FAILED...")
-        for row in rows:
-            update_task_status(row[0], "FAILED", message="Task timed out")
 
 def upsert_task_progress(task_id, total_frames, total_segments):
     conn = get_connection()

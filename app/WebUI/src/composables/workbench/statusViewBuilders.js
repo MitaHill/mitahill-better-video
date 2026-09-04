@@ -53,7 +53,7 @@ export const buildParamRows = (status) => {
   }
   if (params.task_category === "transcribe") {
     const modeLabelMap = {
-      subtitle_zip: "字幕与文本（单文件直出 / 批量 ZIP）",
+      subtitle_zip: "字幕与文本",
       subtitled_video: "带字幕视频（单视频直出 / 批量 ZIP）",
       subtitle_and_video_zip: "字幕与视频（统一 ZIP）",
     };

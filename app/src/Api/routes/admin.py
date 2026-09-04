@@ -141,6 +141,24 @@ def admin_cancel_task(task_id: str):
     return jsonify({"ok": True, "task": task})
 
 
+@bp.post("/api/admin/batches/<batch_id>/cancel")
+def admin_cancel_batch(batch_id: str):
+    _session, err = get_admin_session(request)
+    if err:
+        return jsonify({"error": err}), 401
+    payload = request.get_json(silent=True) or {}
+    reason = str(payload.get("reason") or "已取消（管理员操作）").strip() or "已取消（管理员操作）"
+    try:
+        result = db_admin.cancel_batch(batch_id, reason=reason)
+    except ValueError as exc:
+        message = str(exc)
+        status = 404 if message == "batch not found" else 400
+        return jsonify({"error": message}), status
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"ok": True, **result})
+
+
 @bp.delete("/api/admin/tasks/<task_id>")
 def admin_delete_task(task_id: str):
     _session, err = get_admin_session(request)

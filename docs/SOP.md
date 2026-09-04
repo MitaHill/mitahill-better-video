@@ -26,6 +26,9 @@
 - `app/main.py` 是正常运行时唯一进程管理入口。
 - Flask 提供 API 和静态前端。
 - Worker 由主进程管理为独立子进程。
+- Worker 只负责排队和监督。每个任务在独立子进程中运行。
+- 任务完成、失败、取消或服务停止时，Worker 结束对应任务进程组。
+- 不在常驻 Worker 中缓存 GPU 模型，也不维护跨任务显存回收逻辑。
 - 前端不能启动 Worker。
 - 收到 SIGTERM / SIGINT 时，主进程必须干净结束 Worker。
 
@@ -33,7 +36,7 @@
 
 避免在模块 import 阶段做重活。
 
-GPU 探测、模型 HASH 校验、`nvidia-smi`、模型加载等操作必须放在明确的运行初始化流程里，不写在顶层 import 中。
+GPU 探测、模型必要文件检查、`nvidia-smi`、模型加载等操作必须放在明确的运行初始化流程里，不写在顶层 import 中。
 
 ## 启动自检
 
@@ -46,18 +49,55 @@ GPU 探测、模型 HASH 校验、`nvidia-smi`、模型加载等操作必须放�
 
 ## 性能与清理
 
-- 生产日志默认 `INFO`，避免帧级、tile 级调试日志。
-- 重模型任务必须走轻量 GPU 模型协调器。
-- 加载模型前释放其它已注册模型；显存不足时清晰失败，不继续硬加载。
-- 任务结束后立即释放 GPU 模型，再执行 Python / CUDA 内存清理。
+- 生产日志默认 `INFO`，避免帧级、tile 级调试日志；管理面板保存 INFO+ 日志与 Python warnings。
+- 系统日志文件和数据库日志固定保留 14 天，启动时清理过期记录。
+- 每个重模型任务独占一个任务进程。显存不足时清晰失败，不重试、不降级。
+- 任务进程结束即释放 CUDA 上下文。不要增加跨任务模型注册、空闲显存轮询或 `empty_cache` 兜底。
+- 视频增强首次预览生成后立即发送带预览帧号的实时事件，前端据此刷新原始与增强预览。
 - 转录视频默认使用软字幕流，复制原视频和音频流。
 - 翻译任务输出原文、译文、双语三种字幕；不翻译时只输出原文字幕。
 - 字幕封装使用 `/workspace/storage/tmp/subtitles/` 下的安全临时文件，ffmpeg 结束后立即删除。
-- 转录固定使用原版 OpenAI Whisper。CUDA 必需，不增加 CPU fallback。
-- GTX 960 4G 等旧卡使用 `fp16=False`。如果 `medium` 放不下显存，清晰失败，让用户选择更小的已下载模型。
+- 基础镜像固定使用 FFmpeg 8.1 GPL 静态构建，不使用持续变化的 master 构建，并校验下载文件 SHA256。
+- 转录支持 Faster-Whisper 标准模型：`tiny`、`base`、`small`、`medium` 的多语言与 `.en` 版本，以及 `large-v1`、`large-v2`、`large-v3`。CUDA 必需，不增加 CPU fallback。
+- 转录任务中断后从语音识别开始重新执行，不复用旧字幕或译文。
+- 模型从 Hugging Face 下载 CTranslate2 文件，不在本地转换；检查 `model.bin`、`config.json`、`tokenizer.json` 和模型对应的词表文件，随后用短音频热身。`preprocessor_config.json` 不参与检查。
+- 显存不足时清晰失败，不尝试降级到 CPU 或其它精度。
+- 字幕与文本转录可以启用低数据传输：前端用同源托管的 ffmpeg.wasm 提取 m4a 音频后再提交，后端仍走普通转录任务路径。
+- 上传文件不设应用大小上限，实际可上传大小取决于浏览器、反向代理和持久化磁盘剩余空间。
 - 自动过期删除任务当前禁用。任务文件和数据库记录由管理员在任务总览里显式删除；批量任务按批次 ID 折叠显示，展开后可查看子任务归属；批次状态页通过 WebSocket 接收聚合状态。
 
 ## 构建与部署
+
+快速启动脚本是 `scripts/quick-start.sh`，用于检测环境并拉取项目。检测通过后，会自动运行 `quick-deploy`。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MitaHill/mitahill-better-video/main/scripts/quick-start.sh | bash
+```
+
+部署脚本是 `scripts/quick-deploy.sh`，必须在项目仓库内运行，只负责构建镜像和启动容器。
+
+```bash
+bash scripts/quick-deploy.sh
+```
+
+`quick-deploy` 会检查 Debian 系统、NVIDIA GPU、Docker、DockerHub、GitHub、Docker GPU 调用能力，再执行标准构建和 `pre-run` 启动流程。
+脚本会根据系统时区显示中文或英文，并自动区分 WSL2 与标准 Linux。
+
+只检查环境：
+
+```bash
+bash scripts/quick-deploy.sh --check-only
+```
+
+允许脚本安装缺失依赖：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MitaHill/mitahill-better-video/main/scripts/quick-start.sh | bash -s -- --install-deps
+```
+
+如果 NVIDIA GPU 和互联网正常，但 Docker 或 NVIDIA Container Toolkit 缺失，脚本会询问是否允许自动安装。
+
+脚本模块放在 `scripts/quick-deploy-src/`。WSL2 会自动附加 `docker-compose.wsl2.yaml`，不直接修改 `pre-run/docker-compose.yaml`。
 
 从仓库根目录构建应用镜像：
 

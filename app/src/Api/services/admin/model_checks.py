@@ -1,7 +1,8 @@
-import hashlib
-import gc
+import json
 import logging
 import os
+import subprocess
+import sys
 import tempfile
 import time
 import wave
@@ -10,23 +11,9 @@ from typing import Dict
 
 import requests
 
-from app.src.Worker.gpu_model_coordinator import release_all_models
-
 from .transcription_catalog import get_model_entry, get_storage_roots
 
 logger = logging.getLogger("ADMIN_MODEL_CHECKS")
-
-
-def _digest_of_file(path: Path, algo: str) -> str:
-    safe_algo = str(algo or "").strip().lower()
-    if safe_algo == "sha1":
-        digest = hashlib.sha1()
-    else:
-        digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _speed_grade(latency_sec: float) -> str:
@@ -52,52 +39,27 @@ def _extract_error_detail(resp) -> str:
     return str(error or "").strip() or (resp.text or "").strip()[:180]
 
 
-def verify_model_hashes(model_entry: Dict) -> Dict:
+def verify_model_files(model_entry: Dict) -> Dict:
     backend = str(model_entry.get("backend") or "").strip().lower()
 
     if backend == "whisper":
         model_id = str(model_entry.get("model_id") or "").strip()
         local_path = Path(model_entry.get("local_path") or "")
-        expected = str(model_entry.get("expected_sha256") or "").strip().lower()
-        if not local_path.exists():
-            return {
-                "ok": False,
-                "checks": [
-                    {
-                        "name": "hash",
-                        "status": "failed",
-                        "file": str(local_path),
-                        "message": f"模型文件不存在: {local_path}",
-                    }
-                ],
-            }
-
-        if not expected:
-            return {
-                "ok": False,
-                "checks": [
-                    {
-                        "name": "hash",
-                        "status": "failed",
-                        "file": str(local_path),
-                        "message": "模型 URL 未提供 SHA256",
-                    }
-                ],
-            }
-
-        actual = _digest_of_file(local_path, "sha256")
-        passed = actual == expected
+        required_files = [str(name or "").strip() for name in model_entry.get("required_files") or []]
+        missing_files = [name for name in required_files if not (local_path / name).is_file()]
+        passed = bool(required_files) and not missing_files
         return {
             "ok": passed,
             "checks": [
                 {
-                    "name": "hash",
+                    "name": "files",
                     "status": "passed" if passed else "failed",
-                    "algorithm": "sha256",
                     "file": str(local_path),
-                    "expected": expected,
-                    "actual": actual,
-                    "message": "SHA256 校验通过" if passed else "SHA256 校验失败",
+                    "message": (
+                        "模型必要文件齐全"
+                        if passed
+                        else f"模型文件缺失: {', '.join(missing_files) or '未提供必要文件'}"
+                    ),
                 }
             ],
             "model_id": model_id,
@@ -107,7 +69,7 @@ def verify_model_hashes(model_entry: Dict) -> Dict:
         "ok": False,
         "checks": [
             {
-                "name": "hash",
+                "name": "files",
                 "status": "failed",
                 "message": f"不支持的后端: {backend}",
             }
@@ -130,7 +92,7 @@ def _build_silent_wav() -> Path:
     return path
 
 
-def warmup_transcription_model(model_entry: Dict) -> Dict:
+def _warmup_transcription_model(model_entry: Dict) -> Dict:
     backend = str(model_entry.get("backend") or "").strip().lower()
     model_id = str(model_entry.get("model_id") or "").strip()
     local_path = Path(model_entry.get("local_path") or "")
@@ -148,12 +110,12 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
         if not device:
             raise RuntimeError("CUDA not available. NVIDIA GPU required for transcription.")
 
-        import whisper
+        from app.src.Worker.pipelines.transcription.whisper_engine import load_whisper_model
 
-        release_all_models()
         fp16 = True
-        model = whisper.load_model(model_id, device=device, download_root=str(local_path.parent))
-        model.transcribe(str(wav_path), beam_size=1, language="en", fp16=fp16)
+        model = load_whisper_model(local_path, model_id)
+        segments, _info = model.transcribe(str(wav_path), beam_size=1, language="en")
+        list(segments)
 
         elapsed = time.time() - started
         return {
@@ -182,13 +144,35 @@ def warmup_transcription_model(model_entry: Dict) -> Dict:
             del model
         except Exception:
             pass
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
         try:
             wav_path.unlink(missing_ok=True)
         except Exception:
             pass
+
+
+def warmup_transcription_model(model_entry: Dict) -> Dict:
+    """Run a CUDA warmup outside the Flask process."""
+    command = [
+        sys.executable,
+        "-m",
+        "app.src.Api.services.admin.model_check_entrypoint",
+        json.dumps(model_entry, ensure_ascii=False),
+    ]
+    try:
+        result = subprocess.run(command, text=True, capture_output=True, timeout=180, check=False)
+    except subprocess.TimeoutExpired:
+        logger.error("Warmup subprocess timed out after 180 seconds")
+        return {"ok": False, "message": "模型热身超时"}
+
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    if result.returncode == 0 and lines:
+        try:
+            return json.loads(lines[-1])
+        except json.JSONDecodeError:
+            pass
+    detail = (result.stderr or result.stdout or "").strip()
+    logger.error("Warmup subprocess failed: %s", detail)
+    return {"ok": False, "message": detail or f"模型热身子进程失败，退出码: {result.returncode}"}
 
 
 def test_translation_provider(translation_config: Dict) -> Dict:

@@ -33,7 +33,15 @@
           <tr v-for="task in tableRows" :key="task.row_key" :class="rowClass(task)">
             <td>
               <button
-                v-if="task.is_batch && canDelete(task.status)"
+                v-if="task.is_batch && canCancel(task.status)"
+                type="button"
+                :disabled="loading || taskActionLoading(task.batch_id)"
+                @click="confirmCancelBatch(task.batch_id)"
+              >
+                {{ taskActionLoading(task.batch_id) ? "取消中..." : "取消" }}
+              </button>
+              <button
+                v-else-if="task.is_batch && canDelete(task.status)"
                 type="button"
                 :disabled="loading || taskActionLoading(task.batch_id)"
                 @click="confirmDeleteBatch(task.batch_id)"
@@ -132,6 +140,10 @@ const props = defineProps({
     required: true,
   },
   onCancelTask: {
+    type: Function,
+    required: true,
+  },
+  onCancelBatch: {
     type: Function,
     required: true,
   },
@@ -276,6 +288,11 @@ const copyTaskId = async (taskId) => {
 const confirmDelete = (taskId) => {
   if (!window.confirm(`确认删除任务 ${taskId}？相关文件和数据库记录将被永久删除。`)) return;
   props.onDeleteTask(taskId);
+};
+
+const confirmCancelBatch = (batchId) => {
+  if (!window.confirm(`确认取消批次 ${batchId}？该批次下排队中和处理中的任务将被标记为取消。`)) return;
+  props.onCancelBatch(batchId);
 };
 
 const confirmDeleteBatch = (batchId) => {

@@ -337,6 +337,26 @@ def cancel_task(task_id: str, reason: str = "已取消（管理员操作）") ->
     return latest or task
 
 
+def cancel_batch(batch_id: str, reason: str = "已取消（管理员操作）") -> Dict:
+    safe_batch_id = str(batch_id or "").strip()
+    if not safe_batch_id:
+        raise ValueError("batch_id is required")
+
+    batch = db_core.get_batch(safe_batch_id)
+    if not batch:
+        raise ValueError("batch not found")
+
+    items = db_core.list_batch_items(safe_batch_id)
+    canceled = []
+    for item in items:
+        task_id = item.get("task_id")
+        status = str(item.get("status") or "").upper()
+        if task_id and status in {"PENDING", "PROCESSING"}:
+            cancel_task(task_id, reason=reason)
+            canceled.append(task_id)
+    return {"batch_id": safe_batch_id, "canceled_task_ids": canceled}
+
+
 def delete_task(task_id: str) -> None:
     safe_task_id = str(task_id or "").strip()
     if not safe_task_id:

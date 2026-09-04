@@ -1,0 +1,6 @@
+services:
+  better_video:
+    environment:
+      - LD_LIBRARY_PATH=/usr/lib/wsl/lib:/usr/local/lib/python3.10/site-packages/torch/lib:/usr/local/lib/python3.10/dist-packages/torch/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64
+    volumes:
+      - /usr/lib/wsl/lib:/usr/lib/wsl/lib:ro

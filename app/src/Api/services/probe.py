@@ -4,7 +4,7 @@ from pathlib import Path
 from app.src.Utils.http import ffprobe_info, is_filename_safe, secure_filename
 
 
-def probe_uploaded_media(upload, upload_root, max_mb):
+def probe_uploaded_media(upload, upload_root):
     if not upload or not upload.filename:
         return None, "file is required"
     if not is_filename_safe(upload.filename):
@@ -17,9 +17,6 @@ def probe_uploaded_media(upload, upload_root, max_mb):
     path = probe_dir / f"{token}_{filename}"
     upload.save(path)
     size_mb = path.stat().st_size / (1024 * 1024)
-    if size_mb > max_mb:
-        path.unlink(missing_ok=True)
-        return None, f"file exceeds limit ({max_mb} MB)"
     try:
         info = ffprobe_info(path)
         info["filename"] = filename

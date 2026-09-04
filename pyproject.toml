@@ -13,7 +13,8 @@ base = [
     "torch==1.13.1+cu116",
     "torchvision==0.14.1+cu116",
     "cython==0.29.36",
-    "openai-whisper==20231117",
+    "faster-whisper==0.9.0",
+    "ctranslate2==3.24.0",
     "basicsr==1.4.2",
     "facexlib==0.2.5",
     "gfpgan==1.3.5",
@@ -47,4 +48,4 @@ torchvision = { index = "pytorch-cu116" }
 
 [tool.uv]
 package = false
-no-build-isolation-package = ["openai-whisper", "basicsr", "facexlib", "gfpgan"]
+no-build-isolation-package = ["faster-whisper", "av", "basicsr", "facexlib", "gfpgan"]

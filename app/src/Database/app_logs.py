@@ -7,6 +7,7 @@ from .core import get_connection
 
 _LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 _LEVEL_WEIGHT = {name: idx for idx, name in enumerate(_LEVELS)}
+LOG_RETENTION_DAYS = 14
 
 
 def _now() -> datetime.datetime:
@@ -42,8 +43,17 @@ def insert_log(level: str, logger_name: str, message: str, extra: Dict | None = 
     conn.close()
 
 
+def purge_expired_logs():
+    cutoff = _now() - datetime.timedelta(days=LOG_RETENTION_DAYS)
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM app_logs WHERE created_at < ?", (cutoff,))
+    conn.commit()
+    conn.close()
+
+
 def list_logs(
-    min_level: str = "WARNING",
+    min_level: str = "INFO",
     limit: int = 200,
     offset: int = 0,
     logger_name: str = "",

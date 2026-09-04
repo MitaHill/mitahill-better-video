@@ -1,6 +1,7 @@
-export const buildTranscriptionTaskFormData = (transcribeForm) => {
+export const buildTranscriptionTaskFormData = (transcribeForm, uploadFiles = null) => {
   const data = new FormData();
-  transcribeForm.mediaFiles.forEach((file) => data.append("media_files", file));
+  const files = Array.isArray(uploadFiles) ? uploadFiles : transcribeForm.mediaFiles;
+  files.forEach((file) => data.append("media_files", file));
 
   data.append("transcribe_mode", transcribeForm.transcribeMode);
   data.append("subtitle_format", transcribeForm.subtitleFormat);

@@ -15,9 +15,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 
-ARG INSTALL_PREBUILT_FFMPEG=0
-ARG FFMPEG_BUILD_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
-ARG FFMPEG_BUILD_SHA256=c5156dd8059afc7b42b4ea19ae0b7df67b8361036ccef110aa0078196ac00028
+ARG INSTALL_PREBUILT_FFMPEG=1
+ARG FFMPEG_BUILD_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-n8.1.2-50-g1a748fe2cd-linux64-gpl-8.1.tar.xz
+ARG FFMPEG_BUILD_SHA256=ea0aa14aa7a45bba0825616c5b2a1c331d8ca19dff4fa51f941587fc16affb27
 
 # Core system dependencies and tooling
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -42,18 +42,27 @@ WORKDIR /workspace
 
 # Python dependencies (heavy, rarely changes)
 COPY pyproject.toml uv.lock /workspace/
-RUN uv export --locked --no-emit-project --no-default-groups --group base \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev \
+        libswresample-dev libswscale-dev && \
+    uv export --locked --no-emit-project --no-default-groups --group base \
         --format requirements.txt --no-hashes --output-file /tmp/base-requirements.txt && \
     uv pip install --system setuptools==69.5.1 wheel==0.45.1 numpy==1.24.4 cython==0.29.36 && \
     uv pip install --system \
         --index https://download.pytorch.org/whl/cu116 \
         --index-strategy unsafe-best-match \
-        --no-build-isolation-package openai-whisper \
+        --no-build-isolation-package faster-whisper \
+        --no-build-isolation-package av \
         --no-build-isolation-package basicsr \
         --no-build-isolation-package facexlib \
         --no-build-isolation-package gfpgan \
         --requirements /tmp/base-requirements.txt && \
-    rm -f /tmp/base-requirements.txt
+    rm -f /tmp/base-requirements.txt && \
+    apt-get purge -y \
+        libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev \
+        libswresample-dev libswscale-dev && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
 # Pre-download Real-ESRGAN weights (huge layer, fixed)
 RUN mkdir -p /workspace/app/models/video && \
@@ -65,3 +74,10 @@ RUN mkdir -p /workspace/app/models/video && \
     wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth && \
     wget -q -O /workspace/app/models/video/Real_HAT_GAN_SRx4.pth https://huggingface.co/jaideepsingh/upscale_models/resolve/867e7c0ad519aba5d36b5bb4ef4a4a91781914c4/HAT/Real_HAT_GAN_SRx4.pth && \
     wget -q -O /workspace/app/models/video/HAT-L_SRx4_ImageNet-pretrain.pth https://huggingface.co/jaideepsingh/upscale_models/resolve/867e7c0ad519aba5d36b5bb4ef4a4a91781914c4/HAT/HAT-L_SRx4_ImageNet-pretrain.pth
+
+# Official inference packages. Their dependency sets conflict on BasicSR, while
+# this project only imports their model and inference modules already covered above.
+RUN uv pip install --system einops==0.8.1 && \
+    uv pip install --system --no-deps \
+        "git+https://github.com/xinntao/Real-ESRGAN.git@a4abfb2979a7bbff3f69f58f58ae324608821e27" \
+        "git+https://github.com/XPixelGroup/HAT.git@1638a9a822581657811867bf670717f8371fc3e5"

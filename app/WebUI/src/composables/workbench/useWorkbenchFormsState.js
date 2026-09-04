@@ -75,6 +75,9 @@ export const useWorkbenchFormsState = () => {
     beamSize: 5,
     bestOf: 5,
     mediaFiles: [],
+    mediaInfo: [],
+    lowDataTransfer: false,
+    lowDataMessage: "",
   });
   const transcribeMediaInfo = ref([]);
   const downloadForm = reactive({

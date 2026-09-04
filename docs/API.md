@@ -233,6 +233,14 @@ Header:
 - `PENDING`/`PROCESSING`：置为 `FAILED`，消息为“已取消（管理员操作）”
 - `COMPLETED`/`FAILED`：返回当前任务状态（幂等）
 
+### POST /api/admin/batches/<batch_id>/cancel
+Header:
+- `Authorization: Bearer <token>`
+
+取消批次下仍在排队或处理中的子任务。
+- `PENDING`/`PROCESSING` 子任务：置为 `FAILED`，消息为“已取消（管理员操作）”
+- 已结束子任务保持原状态
+
 ### DELETE /api/admin/tasks/<task_id>
 Header:
 - `Authorization: Bearer <token>`
@@ -306,8 +314,8 @@ Request (example):
 {
   "transcription": {
     "backend": "whisper",
-    "active_model": "medium",
-    "allowed_models": ["small", "medium", "large-v3", "large"]
+    "active_model": "large-v3",
+    "allowed_models": ["tiny.en", "tiny", "base.en", "base", "small.en", "small", "medium.en", "medium", "large-v1", "large-v2", "large-v3"]
   },
   "translation": {
     "provider": "openai_compatible",
@@ -321,7 +329,7 @@ Request (example):
 Header:
 - `Authorization: Bearer <token>`
 
-返回 OpenAI Whisper 模型目录，以及本地安装状态。
+返回所有标准 Faster-Whisper 模型目录，以及本地安装状态。
 
 ### POST /api/admin/transcription/models/download
 Header:
@@ -331,7 +339,7 @@ Header:
 
 Request:
 ```json
-{ "backend": "whisper", "model_id": "medium" }
+{ "backend": "whisper", "model_id": "large-v3" }
 ```
 
 ### GET /api/admin/transcription/models/downloads
@@ -352,18 +360,18 @@ Header:
 
 执行转录模型测试：
 1. 目标解析（读取当前管理配置中的 backend + active_model）
-2. HASH 校验
+2. 必要文件检查
 3. GPU 热身（5秒静音音频识别）
 
 Request (optional):
 ```json
 {
-  "mode": "hash",
+  "mode": "files",
   "backend": "whisper",
-  "model_id": "medium"
+  "model_id": "large-v3"
 }
 ```
-- `mode=hash`：执行到 HASH 校验即返回
+- `mode=files`：执行到必要文件检查即返回
 - `mode=warmup` / `mode=full`：执行完整链路
 - 不传 `backend/model_id` 时，使用管理页当前配置中的目标模型
 
@@ -378,10 +386,10 @@ Header:
 Header:
 - `Authorization: Bearer <token>`
 
-读取数据库中的系统日志（默认 WARN+）。
+读取数据库中的系统日志（默认 INFO+）。
 
 Query:
-- `min_level` (`WARNING` | `ERROR` | `CRITICAL` | `INFO`)
+- `min_level` (`INFO` | `WARNING` | `ERROR` | `CRITICAL`)
 - `logger` (optional)
 - `q` (optional keyword)
 - `limit` (optional)

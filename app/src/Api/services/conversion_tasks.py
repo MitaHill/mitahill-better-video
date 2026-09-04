@@ -43,7 +43,6 @@ def create_conversion_task(
     params,
     output_root,
     upload_root,
-    max_upload_mb,
 ):
     media_files = _collect_conversion_uploads(req)
     if not media_files:
@@ -53,7 +52,7 @@ def create_conversion_task(
     media_dir = upload_dir / "media"
     media_dir.mkdir(parents=True, exist_ok=True)
 
-    saved, err = save_uploaded_files(media_files, media_dir, max_upload_mb)
+    saved, err = save_uploaded_files(media_files, media_dir)
     if err:
         return None, err
     if not saved:
