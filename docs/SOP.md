@@ -59,6 +59,9 @@ GPU 探测、模型必要文件检查、`nvidia-smi`、模型加载等操作必�
 - 字幕封装使用 `/workspace/storage/tmp/subtitles/` 下的安全临时文件，ffmpeg 结束后立即删除。
 - 基础镜像固定使用 FFmpeg 8.1 GPL 静态构建，不使用持续变化的 master 构建，并校验下载文件 SHA256。
 - 转录支持 Faster-Whisper 标准模型：`tiny`、`base`、`small`、`medium` 的多语言与 `.en` 版本，以及 `large-v1`、`large-v2`、`large-v3`。CUDA 必需，不增加 CPU fallback。
+- ElevenLabs Scribe v2 属于实验性云端转录。密钥由管理页面保存，单个文件按 3GB 上限校验，失败时不自动重试或回退到本地模型。
+- 云端转录只在上传阶段报告字节进度；上传完成后显示云端处理中，不伪造服务端推理百分比。
+- 取消云端任务会终止本地请求进程，但远端任务可能已经开始并产生费用。
 - 转录任务中断后从语音识别开始重新执行，不复用旧字幕或译文。
 - 模型从 Hugging Face 下载 CTranslate2 文件，不在本地转换；检查 `model.bin`、`config.json`、`tokenizer.json` 和模型对应的词表文件，随后用短音频热身。`preprocessor_config.json` 不参与检查。
 - 显存不足时清晰失败，不尝试降级到 CPU 或其它精度。

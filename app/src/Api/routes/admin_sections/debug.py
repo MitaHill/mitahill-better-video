@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 
-from ...services.admin import run_transcription_model_test, run_translation_provider_test
+from ...services.admin import run_elevenlabs_connection_test, run_transcription_model_test, run_translation_provider_test
 from ...services.admin_auth import get_admin_session
 
 bp = Blueprint("api_admin_debug", __name__)
@@ -26,5 +26,15 @@ def admin_test_translation_provider():
     if err:
         return jsonify({"error": err}), 401
     result = run_translation_provider_test()
+    status_code = 200 if result.get("ok") else 400
+    return jsonify(result), status_code
+
+
+@bp.post("/api/admin/debug/test-elevenlabs")
+def admin_test_elevenlabs():
+    _session, err = get_admin_session(request)
+    if err:
+        return jsonify({"error": err}), 401
+    result = run_elevenlabs_connection_test()
     status_code = 200 if result.get("ok") else 400
     return jsonify(result), status_code

@@ -112,7 +112,7 @@ entry and admin transcription tools.
 
 Fields:
 - `media_files` (required, multiple; also compatible with `files` / `file`)
-- `transcription_backend` (`whisper`)
+- `transcription_backend` (`whisper` | `elevenlabs`)
 - `transcribe_mode` (`subtitle_zip` | `subtitled_video` | `subtitle_and_video_zip`)
 - `subtitle_format` (`srt` | `vtt`)
 - `whisper_model`
@@ -301,7 +301,7 @@ Request:
 Header:
 - `Authorization: Bearer <token>`
 
-读取转录与翻译配置。管理页面当前仅暴露翻译源设置；转录模型由任务创建页选择。
+读取转录、ElevenLabs 和翻译配置。`elevenlabs.api_key` 不会返回，仅提供 `api_key_configured`。
 
 ### PUT /api/admin/config/transcription-sources
 Header:
@@ -321,9 +321,20 @@ Request (example):
     "provider": "openai_compatible",
     "base_url": "http://127.0.0.1:8000/v1",
     "model": "qwen2.5:7b"
+  },
+  "elevenlabs": {
+    "api_key": "xi-..."
   }
 }
 ```
+
+ElevenLabs 密钥为空时保留现有值；传入 `clear_api_key: true` 时清除密钥。
+
+### POST /api/admin/debug/test-elevenlabs
+Header:
+- `Authorization: Bearer <token>`
+
+使用服务端保存的 API Key 查询 ElevenLabs 用户信息，不提交音频、不产生转录任务。
 
 ### GET /api/admin/transcription/models
 Header:

@@ -7,6 +7,8 @@ const STAGE_LABELS = {
   audio: "音频处理中",
   finalize: "后处理",
   transcribe: "语音识别中",
+  transcribe_upload: "上传转录音频",
+  transcribe_cloud: "云端转录中",
   write_subtitle: "写入字幕",
   translate: "翻译中",
   render_video: "封装字幕视频",
@@ -52,6 +54,7 @@ export const buildParamRows = (status) => {
     ];
   }
   if (params.task_category === "transcribe") {
+    const transcriptionBackend = params.transcription_backend || "whisper";
     const modeLabelMap = {
       subtitle_zip: "字幕与文本",
       subtitled_video: "带字幕视频（单视频直出 / 批量 ZIP）",
@@ -63,15 +66,20 @@ export const buildParamRows = (status) => {
     };
     return [
       { label: "任务类别", value: "视频转录" },
+      { label: "转录引擎", value: transcriptionBackend === "elevenlabs" ? "ElevenLabs Scribe v2" : "Faster-Whisper" },
       { label: "转录类型", value: modeLabelMap[params.transcribe_mode] || params.transcribe_mode || "-" },
       { label: "字幕格式", value: (params.subtitle_format || "-").toUpperCase() },
-      { label: "Whisper 模型", value: params.whisper_model || "-" },
+      ...(transcriptionBackend === "whisper" ? [{ label: "Whisper 模型", value: params.whisper_model || "-" }] : []),
       { label: "语言", value: params.language || "auto" },
       { label: "翻译到", value: params.translate_to || "-" },
       { label: "翻译提供器", value: providerLabelMap[params.translator_provider] || params.translator_provider || "-" },
-      { label: "温度", value: params.temperature ?? "-" },
-      { label: "Beam Size", value: params.beam_size ?? "-" },
-      { label: "Best Of", value: params.best_of ?? "-" },
+      ...(transcriptionBackend === "whisper"
+        ? [
+            { label: "温度", value: params.temperature ?? "-" },
+            { label: "Beam Size", value: params.beam_size ?? "-" },
+            { label: "Best Of", value: params.best_of ?? "-" },
+          ]
+        : []),
       { label: "最大行宽", value: params.max_line_chars ?? "-" },
     ];
   }

@@ -64,6 +64,7 @@ export const useWorkbenchFormsState = () => {
 
   const convertMediaInfo = ref([]);
   const transcribeForm = reactive({
+    transcriptionBackend: "whisper",
     transcribeMode: "subtitle_zip",
     subtitleFormat: "srt",
     whisperModel: "",

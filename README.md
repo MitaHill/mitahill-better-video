@@ -59,7 +59,7 @@ curl -fsSL https://raw.githubusercontent.com/MitaHill/mitahill-better-video/main
 
 - **增强** - 基于 Real-ESRGAN 进行超分辨率增强
 - **转换** - 提供常用视频封装、编码和水印能力
-- **转录** - 使用 Whisper 进行语音识别，生成字幕
+- **转录** - 支持本地 Faster-Whisper 和实验性 ElevenLabs Scribe 云端识别
 - **翻译** - 支持 OpenAI 兼容格式的翻译服务
 - **容器化** - 默认使用 Docker
 
@@ -83,6 +83,7 @@ curl -fsSL https://raw.githubusercontent.com/MitaHill/mitahill-better-video/main
 ### 3. 转录任务
 
 - Whisper 模型本地识别
+- ElevenLabs Scribe v2 云端识别（实验性）
 - 可选择已安装模型
 - 支持原文字幕、译文字幕和双语字幕
 - 生成带软字幕的视频文件
@@ -247,8 +248,8 @@ pre-run/storage/models/transcription/whisper/
 
 ### 视频转录
 
-1. 进入管理页面下载 Whisper 模型
-2. 在转录任务中选择已安装模型
+1. 进入管理页面下载 Whisper 模型，或配置 ElevenLabs API Key
+2. 在转录任务中选择本地或云端引擎
 3. 选择是否翻译到目标语言
 4. 提交任务
 5. 下载字幕、文本或带字幕视频
@@ -260,6 +261,8 @@ pre-run/storage/models/transcription/whisper/
 - 双语
 
 如果不翻译，则只嵌入原文字幕。
+
+ElevenLabs 模式固定使用 Scribe v2。音频会发送到 ElevenLabs，并按照服务商规则计费；API Key 仅保存在服务端管理配置中。
 
 ### 视频转换
 

@@ -4,7 +4,7 @@ VALID_TRANSCRIBE_MODES = {"subtitle_zip", "subtitled_video", "subtitle_and_video
 VALID_SUBTITLE_FORMATS = {"srt", "vtt"}
 VALID_TRANSLATOR_PROVIDERS = {"none", "openai_compatible"}
 VALID_TRANSLATOR_FALLBACK_MODES = {"model_full_text", "source_text"}
-VALID_TRANSCRIPTION_BACKENDS = {"whisper"}
+VALID_TRANSCRIPTION_BACKENDS = {"whisper", "elevenlabs"}
 
 
 def _to_int(value, default=0, min_value=None, max_value=None):

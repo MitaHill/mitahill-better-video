@@ -125,6 +125,12 @@ export const useWorkbenchController = () => {
         throw new Error(data.error || "读取转录运行配置失败");
       }
       transcriptionRuntimeConfig.value = data;
+      if (
+        transcribeForm.transcriptionBackend === "elevenlabs"
+        && !data?.transcription?.elevenlabs_configured
+      ) {
+        transcribeForm.transcriptionBackend = "whisper";
+      }
       syncTranscriptionModel();
     } catch (error) {
       console.warn(error);

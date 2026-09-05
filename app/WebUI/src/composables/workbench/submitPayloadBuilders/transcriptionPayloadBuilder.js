@@ -3,6 +3,7 @@ export const buildTranscriptionTaskFormData = (transcribeForm, uploadFiles = nul
   const files = Array.isArray(uploadFiles) ? uploadFiles : transcribeForm.mediaFiles;
   files.forEach((file) => data.append("media_files", file));
 
+  data.append("transcription_backend", transcribeForm.transcriptionBackend || "whisper");
   data.append("transcribe_mode", transcribeForm.transcribeMode);
   data.append("subtitle_format", transcribeForm.subtitleFormat);
   data.append("whisper_model", transcribeForm.whisperModel);
