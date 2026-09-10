@@ -78,6 +78,7 @@ Gitea Actions 工作流位于 `.gitea/workflows/build-images.yml`。推送到 `d
 - `v*` 标签使用原版本号作为镜像标签
 - 基础镜像发布到同名的 `mitahill-better-video-base` 包，并使用相同标签
 - 仓库 Actions Secrets 必须配置 `REGISTRY_USERNAME` 和 `REGISTRY_TOKEN`
+- Runner 与 Gitea 共用 Docker 宿主机时，工作流通过 `127.0.0.1:3300` 回传镜像，避免大镜像经过公网反向代理
 
 快速启动脚本是 `scripts/quick-start.sh`，用于检测环境并拉取项目。检测通过后，会自动运行 `quick-deploy`。
 

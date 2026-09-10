@@ -13,9 +13,9 @@ permissions:
   contents: read
 
 env:
-  REGISTRY: gitea.mitahill.com
-  IMAGE_NAME: gitea.mitahill.com/mitahill/mitahill-better-video
-  BASE_IMAGE_NAME: gitea.mitahill.com/mitahill/mitahill-better-video-base
+  REGISTRY: 127.0.0.1:3300
+  IMAGE_NAME: 127.0.0.1:3300/mitahill/mitahill-better-video
+  BASE_IMAGE_NAME: 127.0.0.1:3300/mitahill/mitahill-better-video-base
   LOCAL_BASE_IMAGE: base_better_video:20260210-2330
 
 jobs:
@@ -29,8 +29,14 @@ jobs:
       - name: 检查 Docker
         run: docker info
 
-      - name: 登录容器注册表
-        run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login "$REGISTRY" --username "${{ secrets.REGISTRY_USERNAME }}" --password-stdin
+      - name: 配置内网注册表认证
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+        run: |
+          mkdir -p "$HOME/.docker"
+          auth="$(printf '%s:%s' "$REGISTRY_USERNAME" "$REGISTRY_TOKEN" | base64 -w 0)"
+          printf '{"auths":{"%s":{"auth":"%s"}}}\n' "$REGISTRY" "$auth" > "$HOME/.docker/config.json"
 
       - name: 确定镜像标签
         id: image_tag
