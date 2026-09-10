@@ -68,6 +68,13 @@ GPU 探测、模型必要文件检查、`nvidia-smi`、模型加载等操作必�
 
 ## 构建与部署
 
+Gitea Actions 在 `dev`、`main` 和版本标签推送时构建镜像，并发布到 Docker Hub：
+
+- `dev` 发布为 `kindmitaishere/mitahill-better-video:dev`
+- `main` 发布为 `kindmitaishere/mitahill-better-video:latest`
+- `v*` 标签使用原版本号作为镜像标签
+- 仓库 Actions Secrets 必须配置 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`
+
 快速启动脚本是 `scripts/quick-start.sh`，用于检测环境并拉取项目。检测通过后，会自动运行 `quick-deploy`。
 
 ```bash
