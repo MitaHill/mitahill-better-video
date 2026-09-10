@@ -71,6 +71,14 @@ GPU 探测、模型必要文件检查、`nvidia-smi`、模型加载等操作必�
 
 ## 构建与部署
 
+Gitea Actions 工作流位于 `.gitea/workflows/build-images.yml`。推送到 `dev`、`main` 或创建 `v*` 标签时，会依次构建基础镜像和应用镜像，并发布到 Gitea 容器注册表。
+
+- `dev` 发布为 `gitea.mitahill.com/mitahill/mitahill-better-video:dev`
+- `main` 发布为 `gitea.mitahill.com/mitahill/mitahill-better-video:latest`
+- `v*` 标签使用原版本号作为镜像标签
+- 基础镜像发布到同名的 `mitahill-better-video-base` 包，并使用相同标签
+- 仓库 Actions Secrets 必须配置 `REGISTRY_USERNAME` 和 `REGISTRY_TOKEN`
+
 快速启动脚本是 `scripts/quick-start.sh`，用于检测环境并拉取项目。检测通过后，会自动运行 `quick-deploy`。
 
 ```bash

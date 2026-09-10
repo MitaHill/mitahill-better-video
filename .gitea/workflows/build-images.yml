@@ -1,0 +1,74 @@
+name: 构建容器镜像
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: gitea.mitahill.com
+  IMAGE_NAME: gitea.mitahill.com/mitahill/mitahill-better-video
+  BASE_IMAGE_NAME: gitea.mitahill.com/mitahill/mitahill-better-video-base
+  LOCAL_BASE_IMAGE: base_better_video:20260210-2330
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v4
+
+      - name: 检查 Docker
+        run: docker info
+
+      - name: 登录容器注册表
+        run: echo "${{ secrets.REGISTRY_TOKEN }}" | docker login "$REGISTRY" --username "${{ secrets.REGISTRY_USERNAME }}" --password-stdin
+
+      - name: 确定镜像标签
+        id: image_tag
+        env:
+          ACTION_REF: ${{ gitea.ref }}
+        run: |
+          case "$ACTION_REF" in
+            refs/heads/main) tag="latest" ;;
+            refs/heads/dev) tag="dev" ;;
+            refs/tags/v*) tag="${ACTION_REF#refs/tags/}" ;;
+            *) tag="manual" ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: 读取基础镜像缓存
+        run: |
+          docker pull "$BASE_IMAGE_NAME:${{ steps.image_tag.outputs.tag }}" || true
+
+      - name: 构建基础镜像
+        run: |
+          docker build \
+            --cache-from "$BASE_IMAGE_NAME:${{ steps.image_tag.outputs.tag }}" \
+            --file deploy/docker/base/Dockerfile \
+            --tag "$LOCAL_BASE_IMAGE" \
+            .
+
+      - name: 构建应用镜像
+        run: |
+          docker pull "$IMAGE_NAME:${{ steps.image_tag.outputs.tag }}" || true
+          docker build \
+            --cache-from "$IMAGE_NAME:${{ steps.image_tag.outputs.tag }}" \
+            --file deploy/docker/for-app/Dockerfile \
+            --tag "better_video:latest" \
+            .
+
+      - name: 推送镜像
+        run: |
+          docker tag "$LOCAL_BASE_IMAGE" "$BASE_IMAGE_NAME:${{ steps.image_tag.outputs.tag }}"
+          docker tag "better_video:latest" "$IMAGE_NAME:${{ steps.image_tag.outputs.tag }}"
+          docker push "$BASE_IMAGE_NAME:${{ steps.image_tag.outputs.tag }}"
+          docker push "$IMAGE_NAME:${{ steps.image_tag.outputs.tag }}"
