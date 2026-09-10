@@ -13,9 +13,9 @@ permissions:
   contents: read
 
 env:
-  REGISTRY: 127.0.0.1:3300
-  IMAGE_NAME: 127.0.0.1:3300/mitahill/mitahill-better-video
-  BASE_IMAGE_NAME: 127.0.0.1:3300/mitahill/mitahill-better-video-base
+  REGISTRY: 192.168.9.4:3300
+  IMAGE_NAME: 192.168.9.4:3300/mitahill/mitahill-better-video
+  BASE_IMAGE_NAME: 192.168.9.4:3300/mitahill/mitahill-better-video-base
   LOCAL_BASE_IMAGE: base_better_video:20260210-2330
 
 jobs:
@@ -29,14 +29,10 @@ jobs:
       - name: 检查 Docker
         run: docker info
 
-      - name: 配置内网注册表认证
-        env:
-          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
-          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+      - name: 安装内网镜像传输工具
         run: |
-          mkdir -p "$HOME/.docker"
-          auth="$(printf '%s:%s' "$REGISTRY_USERNAME" "$REGISTRY_TOKEN" | base64 -w 0)"
-          printf '{"auths":{"%s":{"auth":"%s"}}}\n' "$REGISTRY" "$auth" > "$HOME/.docker/config.json"
+          apt-get update
+          apt-get install -y --no-install-recommends skopeo
 
       - name: 确定镜像标签
         id: image_tag
@@ -52,31 +48,54 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: 读取基础镜像缓存
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
         run: |
-          docker pull "$BASE_IMAGE_NAME:${{ steps.image_tag.outputs.tag }}" || true
+          skopeo copy \
+            --src-tls-verify=false \
+            --src-creds "$REGISTRY_USERNAME:$REGISTRY_TOKEN" \
+            "docker://$BASE_IMAGE_NAME:${{ steps.image_tag.outputs.tag }}" \
+            "docker-daemon:$LOCAL_BASE_IMAGE" || true
 
       - name: 构建基础镜像
         run: |
           docker build \
-            --cache-from "$BASE_IMAGE_NAME:${{ steps.image_tag.outputs.tag }}" \
+            --cache-from "$LOCAL_BASE_IMAGE" \
             --file deploy/docker/base/Dockerfile \
             --network host \
             --tag "$LOCAL_BASE_IMAGE" \
             .
 
       - name: 构建应用镜像
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
         run: |
-          docker pull "$IMAGE_NAME:${{ steps.image_tag.outputs.tag }}" || true
+          skopeo copy \
+            --src-tls-verify=false \
+            --src-creds "$REGISTRY_USERNAME:$REGISTRY_TOKEN" \
+            "docker://$IMAGE_NAME:${{ steps.image_tag.outputs.tag }}" \
+            "docker-daemon:better_video:cache" || true
           docker build \
-            --cache-from "$IMAGE_NAME:${{ steps.image_tag.outputs.tag }}" \
+            --cache-from "better_video:cache" \
             --file deploy/docker/for-app/Dockerfile \
             --network host \
             --tag "better_video:latest" \
             .
 
       - name: 推送镜像
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
         run: |
-          docker tag "$LOCAL_BASE_IMAGE" "$BASE_IMAGE_NAME:${{ steps.image_tag.outputs.tag }}"
-          docker tag "better_video:latest" "$IMAGE_NAME:${{ steps.image_tag.outputs.tag }}"
-          docker push "$BASE_IMAGE_NAME:${{ steps.image_tag.outputs.tag }}"
-          docker push "$IMAGE_NAME:${{ steps.image_tag.outputs.tag }}"
+          skopeo copy \
+            --dest-tls-verify=false \
+            --dest-creds "$REGISTRY_USERNAME:$REGISTRY_TOKEN" \
+            "docker-daemon:$LOCAL_BASE_IMAGE" \
+            "docker://$BASE_IMAGE_NAME:${{ steps.image_tag.outputs.tag }}"
+          skopeo copy \
+            --dest-tls-verify=false \
+            --dest-creds "$REGISTRY_USERNAME:$REGISTRY_TOKEN" \
+            "docker-daemon:better_video:latest" \
+            "docker://$IMAGE_NAME:${{ steps.image_tag.outputs.tag }}"
