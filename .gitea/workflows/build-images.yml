@@ -54,6 +54,7 @@ jobs:
           docker build \
             --cache-from "$BASE_IMAGE_NAME:${{ steps.image_tag.outputs.tag }}" \
             --file deploy/docker/base/Dockerfile \
+            --network host \
             --tag "$LOCAL_BASE_IMAGE" \
             .
 
@@ -63,6 +64,7 @@ jobs:
           docker build \
             --cache-from "$IMAGE_NAME:${{ steps.image_tag.outputs.tag }}" \
             --file deploy/docker/for-app/Dockerfile \
+            --network host \
             --tag "better_video:latest" \
             .
 
