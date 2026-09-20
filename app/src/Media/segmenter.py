@@ -176,9 +176,18 @@ def process_video_with_model(
             raise RuntimeError(f"No frames extracted for {input_path.name}")
 
         if resume_from_frame > 1:
-            check_path = frames_out / f"f_{resume_from_frame - 1:06d}.jpg"
-            if not check_path.exists():
-                resume_from_frame = 1
+            # 断点续跑只信任连续的前缀。以前只看 resume_from_frame-1 这一帧，
+            # 更早的空洞会被下面的循环跳过、一路带到合帧前的校验，任务每次都在
+            # 同一处失败且没有自愈路径。这里从第一个缺号处重新开始。
+            existing_out = {p.name for p in frames_out.glob("f_*.jpg")}
+            resume_from_frame = next(
+                (
+                    index
+                    for index, f_path in enumerate(frame_list[:resume_from_frame - 1], start=1)
+                    if f_path.name not in existing_out
+                ),
+                resume_from_frame,
+            )
 
         if task_id and segment_key:
             recorder = ProgressRecorder(
@@ -284,12 +293,14 @@ def process_video_with_model(
             recorder.flush(force=True)
 
         # 合帧用 f_%06d.jpg + -start_number 1，缺号处 ffmpeg 会直接停下，
-        # 产出一个被截断的视频。这里先确认帧数完整，缺帧就明确失败。
-        done_frames = len(list(frames_out.glob("f_*.jpg")))
-        if done_frames != total:
+        # 产出一个被截断的视频。这里逐个核对抽出来的帧都有对应输出：只比总数
+        # 的话，frames_out 里的残留文件会把空洞补平，也会报出负数的缺帧数。
+        done_names = {p.name for p in frames_out.glob("f_*.jpg")}
+        missing = [f_path.name for f_path in frame_list if f_path.name not in done_names]
+        if missing:
             raise RuntimeError(
-                f"Upscaled frames incomplete for {input_path.name}: {done_frames}/{total} "
-                f"({total - done_frames} missing)"
+                f"Upscaled frames incomplete for {input_path.name}: "
+                f"{total - len(missing)}/{total} ({len(missing)} missing, first {missing[0]})"
             )
 
         # 4. Recombine

@@ -6,10 +6,10 @@ from app.src.Utils import ffmpeg
 
 
 class FakeCompletedProcess:
-    def __init__(self, stdout="", stderr=""):
+    def __init__(self, stdout="", stderr="", returncode=0):
         self.stdout = stdout
         self.stderr = stderr
-        self.returncode = 0
+        self.returncode = returncode
 
 
 ENCODER_LISTING = """Encoders:
@@ -60,6 +60,47 @@ class FfmpegEncoderCacheTests(unittest.TestCase):
             recovered = ffmpeg.get_ffmpeg_encoders()
             self.assertEqual(run.call_count, 1)
         self.assertIn("h264_nvenc", recovered)
+
+    def _fake_run(self, probe_returncode):
+        """列清单永远成功，试编码按参数决定成败。"""
+
+        def run(args, **_kwargs):
+            if "-encoders" in args:
+                return FakeCompletedProcess(stdout=ENCODER_LISTING)
+            return FakeCompletedProcess(stderr="nvenc busy", returncode=probe_returncode)
+
+        return run
+
+    def test_empty_listing_is_not_cached(self):
+        # ffmpeg 正常退出但没解析出任何已知编码器，同样按探测失败处理
+        empty = FakeCompletedProcess(stdout="Encoders:\n V..... libvpx  VP8\n")
+        with patch.object(ffmpeg.subprocess, "run", return_value=empty) as run:
+            self.assertEqual(ffmpeg.get_ffmpeg_encoders(), frozenset())
+            self.assertEqual(ffmpeg.get_ffmpeg_encoders(), frozenset())
+            self.assertEqual(run.call_count, 2)
+
+        with patch.object(
+            ffmpeg.subprocess, "run", return_value=FakeCompletedProcess(stdout=ENCODER_LISTING)
+        ):
+            self.assertIn("h264_nvenc", ffmpeg.get_ffmpeg_encoders())
+
+    def test_usable_encoder_is_probed_only_once(self):
+        with patch.object(ffmpeg.subprocess, "run", side_effect=self._fake_run(0)) as run:
+            self.assertEqual(ffmpeg.get_available_output_codecs(), ["h264", "h265"])
+            after_first = run.call_count
+            self.assertEqual(ffmpeg.get_available_output_codecs(), ["h264", "h265"])
+            self.assertEqual(run.call_count, after_first)
+
+    def test_unusable_encoder_is_not_cached(self):
+        # NVENC 会话被占满这类瞬时失败不能永久生效，否则整个进程此后都没有可用编码器
+        with patch.object(ffmpeg.subprocess, "run", side_effect=self._fake_run(1)) as run:
+            self.assertEqual(ffmpeg.get_available_output_codecs(), [])
+            after_first = run.call_count
+            self.assertEqual(ffmpeg.get_available_output_codecs(), [])
+            self.assertGreater(run.call_count, after_first)
+
+        with patch.object(ffmpeg.subprocess, "run", side_effect=self._fake_run(0)):
+            self.assertIn("h264", ffmpeg.get_available_output_codecs())
 
 
 if __name__ == "__main__":

@@ -50,13 +50,19 @@ class SegmentFrameIntegrityTests(unittest.TestCase):
             stack.enter_context(patch.object(segmenter.config, "FFMPEG_USE_GPU", False))
             yield run_ffmpeg
 
-    def _process(self, upsampler):
+    def _process(self, upsampler, resume_from_frame=1):
         segmenter.process_video_with_model(
             self.input_path,
             self.output_path,
             upsampler,
             {"upscale": 2, "output_codec": "h264", "keep_audio": True},
+            resume_from_frame=resume_from_frame,
         )
+
+    def _frames_out(self):
+        out_dir = self.tmp_dir / "tmp_seg_000" / "out"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return out_dir
 
     def test_missing_frame_fails_before_recombining(self):
         upsampler = FakeUpsampler(skip_frames={"f_000002.jpg"})
@@ -77,6 +83,34 @@ class SegmentFrameIntegrityTests(unittest.TestCase):
             args = run_ffmpeg.call_args[0][0]
         self.assertIn(str(self.output_path), args)
         self.assertEqual(len(upsampler.calls), self.TOTAL_FRAMES)
+
+    def test_resume_restarts_at_first_gap(self):
+        # 第 2 帧是之前静默跳过留下的空洞。断点记录停在第 4 帧，
+        # 续跑必须回到空洞处补上，而不是把洞带到合帧前再失败。
+        frames_out = self._frames_out()
+        (frames_out / "f_000001.jpg").write_bytes(b"sr")
+        (frames_out / "f_000003.jpg").write_bytes(b"sr")
+
+        upsampler = FakeUpsampler()
+        with self._stubbed_ffmpeg() as run_ffmpeg:
+            self._process(upsampler, resume_from_frame=4)
+            run_ffmpeg.assert_called_once()
+        self.assertEqual(upsampler.calls, ["f_000002.jpg"])
+
+    def test_stray_output_does_not_mask_missing_frame(self):
+        # frames_out 里的残留文件会把总数补平。只比总数的话这里会放行，
+        # 合帧就产出被截断的视频。
+        (self._frames_out() / "f_000009.jpg").write_bytes(b"stale")
+
+        upsampler = FakeUpsampler(skip_frames={"f_000002.jpg"})
+        with self._stubbed_ffmpeg() as run_ffmpeg:
+            with self.assertRaises(RuntimeError) as ctx:
+                self._process(upsampler)
+            run_ffmpeg.assert_not_called()
+        message = str(ctx.exception)
+        self.assertIn(f"2/{self.TOTAL_FRAMES}", message)
+        self.assertIn("1 missing", message)
+        self.assertIn("f_000002.jpg", message)
 
 
 if __name__ == "__main__":
