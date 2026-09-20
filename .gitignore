@@ -152,3 +152,6 @@ app/frontend/node_modules/
 app/frontend/dist/
 app/WebUI/node_modules/
 app/WebUI/dist/
+
+# 远程实例连接凭据，只存本机，禁止上传
+scripts/loop/remote_key.json
