@@ -219,14 +219,15 @@ git push origin v0.1.0-beta
 
 已在真实 GitHub Actions 上验证：
 
-- `dev` 与 `main` 的 push 触发：构建基础镜像、构建应用镜像、运行 21 个单元测试、推送镜像，全部成功。`kindmitaishere/mitahill-better-video:dev` 与 `:latest` 已出现在 Docker Hub，大小约 3.49 GB。
+- `dev` 与 `main` 的 push 触发：构建基础镜像、构建应用镜像、运行 21 个单元测试、推送镜像，全部成功，镜像大小约 3.49 GB。
 - 手动触发 `workflow_dispatch`：可用。
 - 各分支的 push 只触发一次运行，不同分支并行执行。
+- **清空 Docker Hub 仓库并推送 `latest`**：`main` 分支的一次真实运行（2026-09-20）中，清空步骤通过 Docker Hub API 成功删除了 `latest`、`dev`、`20260115-1522` 三个标签，随后推送 `latest`，结果仓库里只剩 `latest`（约 3.49 GB）。说明当前 Token 具有 Delete 权限。
 - FFmpeg 链接失效和 `wget` 网络故障两个问题的修复。
 
 尚未在真实环境中验证（工作流语法和逻辑已在本地检查过）：
 
-- **清空 Docker Hub 仓库与打 `latest` 标签**：删除循环用模拟接口验证过（分页删除直到清空、权限不足时失败退出、推送命令在 `latest`、`dev`、版本标签三种情况下的输出），但没有对真实的 Docker Hub API 执行过，也未确认当前 Token 是否具有 Delete 权限。第一次真实运行时请留意该步骤的日志。
+- **`dev` 分支和版本标签的“额外打 `latest`”路径**：真实运行只覆盖了 `main`（标签本身就是 `latest`，不需要额外 `docker tag`）。额外打标签的命令在本地用替身 `docker` 验证过输出，尚未在真实运行中执行。
 - **PR 开启与关闭的触发**：包括“已合并的 PR 关闭会被跳过”这一条件。
 - **`v*` 标签触发的 `release` 任务**：包括预览版标记、标题、说明中的 Docker 命令，以及 `--prerelease=false` 对正式版的处理。
 
