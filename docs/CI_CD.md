@@ -201,15 +201,6 @@ git push origin v0.1.0-beta
 - **不要使用带日期的 `autobuild-YYYY-MM-DD-...` 固定链接。** BtbN 会清理旧的 autobuild 发行版，这类链接过一段时间会变成 404，构建会以 `wget` 退出码 8 失败。这正是 `dev` 分支曾经失败的原因。
 - 代价：`latest` 是滚动版本，不同时间构建得到的 FFmpeg 小版本可能不同，构建不完全可复现。如果需要完全固定版本，需要自己托管 FFmpeg 压缩包。
 
-### 推理包的源码下载
-
-Real-ESRGAN 和 HAT 用 `codeload.github.com/<owner>/<repo>/tar.gz/<commit>` 取提交号对应的源码包，再用 `uv pip install --no-deps --no-build-isolation` 安装：
-
-- 这样基础镜像不必常驻 `git`（约 190 MB），提交号仍然固定，构建可复现。
-- `--no-build-isolation` 是必须的：两个包的 `setup.py` 要用系统里已经装好的 torch 和 setuptools，隔离的构建环境里没有。
-- 安装后有一步自检：`realesrgan` 正常 import，且 HAT 的 `hat/archs/hat_arch.py` 在预期路径上（`Media/hat_adapter.py` 按文件路径加载它）。源码包结构变了会在构建时就失败，不会留到运行时。
-- **自检不能 `import hat`。** HAT 的包根会注册和 BasicSR 冲突的训练架构，和 `realesrgan` 在同一个进程里 import 必然抛 `UNetDiscriminatorSN` 重复注册。应用本身也刻意绕开包根，这是 `hat_adapter.py` 用文件路径加载的原因。
-
 ### 下载重试
 
 `wget`、`curl` 的下载都加了重试：
