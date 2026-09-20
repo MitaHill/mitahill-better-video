@@ -83,11 +83,50 @@ jobs:
             "kindmitaishere/mitahill-better-video:$IMAGE_TAG" \
             python3 -m unittest -v $modules
 
-      - name: 推送应用镜像
+      # 构建和测试都通过后才清空仓库，避免构建失败时 Docker Hub 上一个镜像都不剩。
+      - name: 清空 Docker Hub 仓库旧镜像
+        if: github.event_name != 'pull_request'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          api="https://hub.docker.com/v2/repositories/kindmitaishere/mitahill-better-video/tags"
+
+          jwt=$(jq -n --arg u "$DOCKERHUB_USERNAME" --arg p "$DOCKERHUB_TOKEN" '{username: $u, password: $p}' \
+            | curl -fsS -H "Content-Type: application/json" -d @- https://hub.docker.com/v2/users/login \
+            | jq -r '.token')
+          if [ -z "$jwt" ] || [ "$jwt" = "null" ]; then
+            echo "Docker Hub API 登录失败" >&2
+            exit 1
+          fi
+
+          # 每轮取第一页并全部删除，直到仓库为空；最多 20 轮，防止删除无效时死循环
+          for round in $(seq 1 20); do
+            tags=$(curl -fsS -H "Authorization: JWT $jwt" "$api?page_size=100" | jq -r '.results[].name')
+            if [ -z "$tags" ]; then
+              echo "仓库已清空"
+              exit 0
+            fi
+            for tag in $tags; do
+              curl -fsS -o /dev/null -X DELETE -H "Authorization: JWT $jwt" "$api/$tag/"
+              echo "已删除标签 $tag"
+            done
+          done
+          echo "清空 20 轮后仓库仍有标签，请检查 Token 权限" >&2
+          exit 1
+
+      - name: 推送应用镜像并打最新标签
         if: github.event_name != 'pull_request'
         env:
           IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
-        run: docker push "kindmitaishere/mitahill-better-video:$IMAGE_TAG"
+        run: |
+          repo="kindmitaishere/mitahill-better-video"
+          docker push "$repo:$IMAGE_TAG"
+          if [ "$IMAGE_TAG" != "latest" ]; then
+            docker tag "$repo:$IMAGE_TAG" "$repo:latest"
+            docker push "$repo:latest"
+          fi
 
       - name: 清理构建残留
         if: always()
@@ -129,12 +168,13 @@ jobs:
             echo "README.md 中缺少 release-docker 标记段落" >&2
             exit 1
           fi
-          docker_section=$(printf '%s\n' "$docker_section" | sed "s#kindmitaishere/mitahill-better-video:latest#kindmitaishere/mitahill-better-video:${TAG}#g")
 
           {
             echo "$summary"
             echo
             echo "## Docker 镜像"
+            echo
+            echo "Docker Hub 仓库只保留最近一次构建的镜像，因此这里统一使用 \`latest\` 标签。"
             echo
             echo "$docker_section"
           } > release-notes.md
