@@ -16,8 +16,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
 COPY --from=uv /uv /uvx /usr/local/bin/
 
 ARG INSTALL_PREBUILT_FFMPEG=1
-ARG FFMPEG_BUILD_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-n8.1.2-50-g1a748fe2cd-linux64-gpl-8.1.tar.xz
-ARG FFMPEG_BUILD_SHA256=ea0aa14aa7a45bba0825616c5b2a1c331d8ca19dff4fa51f941587fc16affb27
+ARG FFMPEG_BUILD_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz
+ARG FFMPEG_CHECKSUM_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/checksums.sha256
 
 # Core system dependencies and tooling
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -27,13 +27,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$INSTALL_PREBUILT_FFMPEG" = "1" ]; then \
+        FFMPEG_BUILD_FILE="${FFMPEG_BUILD_URL##*/}" && \
         mkdir -p /tmp/ffmpeg-build && \
-        wget -q -O /tmp/ffmpeg.tar.xz "$FFMPEG_BUILD_URL" && \
-        echo "$FFMPEG_BUILD_SHA256  /tmp/ffmpeg.tar.xz" | sha256sum -c - && \
-        tar -xf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg-build --strip-components=1 && \
+        wget -q -O "/tmp/$FFMPEG_BUILD_FILE" "$FFMPEG_BUILD_URL" && \
+        wget -q -O /tmp/checksums.sha256 "$FFMPEG_CHECKSUM_URL" && \
+        grep "  $FFMPEG_BUILD_FILE$" /tmp/checksums.sha256 | (cd /tmp && sha256sum -c -) && \
+        tar -xf "/tmp/$FFMPEG_BUILD_FILE" -C /tmp/ffmpeg-build --strip-components=1 && \
         install -m 0755 /tmp/ffmpeg-build/bin/ffmpeg /usr/local/bin/ffmpeg && \
         install -m 0755 /tmp/ffmpeg-build/bin/ffprobe /usr/local/bin/ffprobe && \
-        rm -rf /tmp/ffmpeg-build /tmp/ffmpeg.tar.xz; \
+        rm -rf /tmp/ffmpeg-build "/tmp/$FFMPEG_BUILD_FILE" /tmp/checksums.sha256; \
     fi && \
     ffmpeg -hide_banner -version && \
     ffmpeg -hide_banner -encoders | grep -E "h264_nvenc|hevc_nvenc" >/dev/null
