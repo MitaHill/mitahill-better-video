@@ -3,6 +3,10 @@
 ## Overview
 - Flask provides REST endpoints for task submission, status, previews, and download.
 - Worker runs in a dedicated subprocess started by `app/main.py`.
+- `app/main.py` prints the startup banner before configuring logging, so the art lands
+  above every log line. It goes straight to stdout: logging would prefix each line with a
+  timestamp and level and break the art, and would also push dozens of rows into the log
+  database. Only the main process prints it.
 - Vue (Vite) builds to static assets served by Flask from `app/WebUI/dist`.
 
 ## Design Standard

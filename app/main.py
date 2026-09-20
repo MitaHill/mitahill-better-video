@@ -11,6 +11,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.src.Config.logging_setup import configure_logging
+from app.src.Utils.banner import print_banner
 from app.src.Services.gpu_sampler_service import GpuSamplerService
 from app.src.Services.startup_self_check_service import run_startup_self_check_subprocess
 from app.src.Services.worker_service import WorkerService
@@ -30,6 +31,7 @@ def _build_gpu_sampler_service():
 
 
 def main():
+    print_banner()
     configure_logging(component="server")
     from app.src.Config import settings as config
     from app.src.Database import core as db
