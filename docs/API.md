@@ -336,6 +336,8 @@ Header:
 
 使用服务端保存的 API Key 查询 ElevenLabs 用户信息，不提交音频、不产生转录任务。
 
+若 Key 为受限权限（未授予 `user_read`），用户信息接口会返回 401 `missing_permissions`。此时改为向转录接口发送一次不带文件的探测请求：只要鉴权通过（非 401/403）即判定连接正常，返回的 `tier` 与 `status` 为 `unknown`。探测请求不携带音频，也不会产生转录任务。
+
 ### GET /api/admin/transcription/models
 Header:
 - `Authorization: Bearer <token>`

@@ -88,6 +88,38 @@ def _raise_api_error(response):
     raise RuntimeError(f"ElevenLabs 转录请求失败（HTTP {status or '未知'}）")
 
 
+def _is_missing_permission(response):
+    # 受限权限 key 访问 /v1/user 会返回 401 missing_permissions，这不代表 key 无效
+    try:
+        detail = (response.json() or {}).get("detail") or {}
+    except ValueError:
+        return False
+    if not isinstance(detail, dict):
+        return False
+    return str(detail.get("status") or "").strip().lower() == "missing_permissions"
+
+
+def _probe_scribe_permission(api_key):
+    # 不带文件请求转录接口：鉴权通过时服务端返回参数校验错误，鉴权失败时仍是 401/403
+    try:
+        response = requests.post(
+            SCRIBE_URL,
+            headers={"xi-api-key": api_key},
+            data={"model_id": "scribe_v2"},
+            timeout=(10, 30),
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError(f"无法连接 ElevenLabs：{exc}") from exc
+    if int(getattr(response, "status_code", 0) or 0) in (401, 403):
+        _raise_api_error(response)
+    return {
+        "ok": True,
+        "tier": "unknown",
+        "status": "unknown",
+        "message": "ElevenLabs 连接正常（当前 Key 无 user_read 权限，未能读取套餐信息）",
+    }
+
+
 def test_connection(api_key):
     safe_key = str(api_key or "").strip()
     if not safe_key:
@@ -101,6 +133,8 @@ def test_connection(api_key):
     except requests.RequestException as exc:
         raise RuntimeError(f"无法连接 ElevenLabs：{exc}") from exc
     if not response.ok:
+        if _is_missing_permission(response):
+            return _probe_scribe_permission(safe_key)
         _raise_api_error(response)
     try:
         payload = response.json()
