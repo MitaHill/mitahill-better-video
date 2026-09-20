@@ -29,25 +29,24 @@ WORKDIR /workspace
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 
+# --- CACHE BUSTER TO ENSURE SOURCE CODE IS ALWAYS RE-COPIED AND RE-VERIFIED ---
+RUN echo "Triggering Re-build (Force Update 2026-01-08-1051)"
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends fonts-noto-cjk && \
     rm -rf /var/lib/apt/lists/*
 
-# 1. Install web backend dependencies
-# 依赖装在源码之前：只改应用代码时这一层能命中缓存，每次 dev 推送少推一层。
+# 1. Copy Source Code (app-only)
+COPY app/ /workspace/app/
+
+# 2. Install web backend dependencies
 COPY pyproject.toml uv.lock /workspace/
 RUN uv export --locked --no-emit-project --no-default-groups --group app \
         --format requirements.txt --no-hashes --output-file /tmp/app-requirements.txt && \
     uv pip install --system --requirements /tmp/app-requirements.txt && \
     rm -f /tmp/app-requirements.txt
 
-# --- CACHE BUSTER TO ENSURE SOURCE CODE IS ALWAYS RE-COPIED AND RE-VERIFIED ---
-RUN echo "Triggering Re-build (Force Update 2026-01-08-1051)"
-
-# 2. Copy Source Code (app-only)
-COPY app/ /workspace/app/
-
-# 3. Copy built frontend assets
+# 4. Copy built frontend assets
 COPY --from=frontend-build /frontend/dist /workspace/app/WebUI/dist
 
 EXPOSE 8501
