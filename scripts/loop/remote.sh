@@ -7,7 +7,7 @@ json_field() {
 }
 
 load_remote() {
-  [ -f "$KEY_JSON" ] || die "缺少 $KEY_JSON，请参考同目录的 remote_key.example.json 创建"
+  [ -f "$KEY_JSON" ] || die "缺少 ${KEY_JSON}，请参考同目录的 remote_key.example.json 创建"
   # 凭据文件必须被忽略，否则拒绝继续，避免被 git add / commit 带走
   git check-ignore -q "$KEY_JSON" || die "remote_key.json 没有被 .gitignore 忽略，拒绝继续"
   chmod 600 "$KEY_JSON"
@@ -44,6 +44,6 @@ remote() {
 
 check_remote() {
   remote true 2>/dev/null \
-    || die "无法连接 $REMOTE_HOST:$SSH_PORT。请检查 remote_key.json 中的 key_file / password，
+    || die "无法连接 ${REMOTE_HOST}:${SSH_PORT}。请检查 remote_key.json 中的 key_file / password，
 或先在终端建立一条免密连接：ssh -o ControlMaster=yes -o ControlPath=~/.ssh/cm-%C -o ControlPersist=1h -fN $REMOTE_HOST"
 }

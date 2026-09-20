@@ -6,7 +6,7 @@ check() {
   gh auth status >/dev/null 2>&1 || die "gh 未登录，请先 gh auth login"
   load_remote
   check_remote
-  echo "前置条件检查通过：分支 $BRANCH，gh 已登录，远程 $REMOTE_HOST 可连接"
+  echo "前置条件检查通过：分支 ${BRANCH}，gh 已登录，远程 $REMOTE_HOST 可连接"
 }
 
 sync() {
@@ -36,7 +36,7 @@ ship() {
     die "最新提交含 [skip ci]，不会触发构建，无镜像可部署"
   fi
 
-  log "推送 $BRANCH（${sha:0:7}）"
+  log "推送 ${BRANCH}（${sha:0:7}）"
   git push origin "$BRANCH"
 
   log "等待 GitHub Actions 构建（约 7 分钟）"
