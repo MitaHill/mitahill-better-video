@@ -279,7 +279,8 @@ git push origin v0.1.0-beta
 
 | 文件 | 作用 |
 | --- | --- |
-| `dev-loop.sh` | 入口：参数分发、公共函数 |
+| `dev-loop.sh` | 入口：参数分发、公共函数、步骤清单定义 |
+| `progress.sh` | 步骤进度清单（`✓` 完成 / `*` 进行中 / `-` 跳过 / `✗` 失败 / `·` 待执行） |
 | `remote.sh` | 读取 `remote_key.json`，封装 SSH 调用 |
 | `ship.sh` | `check`、`sync`、`ship`（提交、推送、等构建） |
 | `deploy.sh` | `deploy` 的本机侧 |
@@ -303,6 +304,23 @@ git push origin v0.1.0-beta
 | `scripts/loop/dev-loop.sh deploy` | 只让远程重新拉取镜像并运行，默认 `:dev` |
 | `DEPLOY_TAG=latest scripts/loop/dev-loop.sh deploy` | 部署稳定版镜像 |
 | `scripts/loop/dev-loop.sh check` | 检查分支、`gh` 登录和远程连接 |
+
+### 进度显示
+
+脚本会打印一张步骤清单，样式与 `gh run watch` 的作业步骤一致：
+
+```
+  ✓ 前置检查 (2s) 分支 dev，gh 已登录，root@192.168.9.4 可连接
+  - 提交本地改动 工作区干净，直接推送已有提交
+  ✓ 推送 dev 触发构建 (3s) 528db61
+  * 等待 GitHub Actions 构建与测试
+  · 远程部署与健康检查
+```
+
+- 在终端里原地重绘整张清单；`git push`、`gh run watch`、远程部署这类会自己刷屏的命令跑完后，清单会重新整张打印在它们的输出下方
+- 重定向到文件或管道时自动退化为逐行输出（`==> [3/5] 推送 dev 触发构建` + 结果行），不写入任何光标控制字符，适合留存日志
+- 出错或被 Ctrl-C 中断时，当前步骤标成 `✗`，不会停在 `*` 上
+- 清单内容由 `dev-loop.sh` 的 `case` 分支用 `prog_init` 声明，各函数只调用 `prog_next` 取下一步，因此 `check`、`deploy` 单独执行和被 `ship` 串起来时都不需要关心自己排第几
 
 规则：
 

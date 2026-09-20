@@ -9,6 +9,7 @@
 #   check   只检查前置条件（分支、gh 登录、remote_key.json、远程 SSH 连接）
 #
 # 模块：
+#   progress.sh    步骤进度清单（✓ / * / - / ✗）
 #   remote.sh      读取 remote_key.json、封装 SSH 调用
 #   ship.sh        check / sync / ship
 #   deploy.sh      deploy（本机侧）
@@ -24,14 +25,16 @@ KEY_JSON="$LOOP_DIR/remote_key.json"
 
 cd "$ROOT_DIR"
 
-log() { printf '\n==> %s\n' "$*"; }
-die() { printf '错误：%s\n' "$*" >&2; exit 1; }
+log() { prog_dirty; printf '\n==> %s\n' "$*"; }
+die() { prog_fail_current; printf '错误：%s\n' "$*" >&2; exit 1; }
 
 need_dev() {
   [ "$(git branch --show-current)" = "$BRANCH" ] \
     || die "当前不在 $BRANCH 分支。main 的推送会清空 Docker Hub 仓库，请先 git switch $BRANCH"
 }
 
+# shellcheck source=scripts/loop/progress.sh
+. "$LOOP_DIR/progress.sh"
 # shellcheck source=scripts/loop/remote.sh
 . "$LOOP_DIR/remote.sh"
 # shellcheck source=scripts/loop/deploy.sh
@@ -39,10 +42,22 @@ need_dev() {
 # shellcheck source=scripts/loop/ship.sh
 . "$LOOP_DIR/ship.sh"
 
+# 运行中途被中断或出错时，把当前步骤标成 ✗，不要停在 * 上
+trap 'prog_fail_current' ERR INT TERM
+
 case "${1:-ship}" in
-  ship) ship "${2:-}" ;;
-  sync) sync ;;
-  deploy) deploy ;;
-  check) check ;;
+  ship)
+    prog_init "前置检查" "提交本地改动" "推送 ${BRANCH} 触发构建" \
+              "等待 GitHub Actions 构建与测试" "远程部署与健康检查"
+    ship "${2:-}" ;;
+  sync)
+    prog_init "拉取 ${BRANCH} 最新提交"
+    sync ;;
+  deploy)
+    prog_init "远程部署与健康检查"
+    deploy ;;
+  check)
+    prog_init "前置检查"
+    check ;;
   *) die "未知参数：$1（可用：ship sync deploy check）" ;;
 esac
