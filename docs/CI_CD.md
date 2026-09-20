@@ -207,7 +207,8 @@ Real-ESRGAN 和 HAT 用 `codeload.github.com/<owner>/<repo>/tar.gz/<commit>` 取
 
 - 这样基础镜像不必常驻 `git`（约 190 MB），提交号仍然固定，构建可复现。
 - `--no-build-isolation` 是必须的：两个包的 `setup.py` 要用系统里已经装好的 torch 和 setuptools，隔离的构建环境里没有。
-- 安装后有一步 `python3 -c "import realesrgan, hat"`，源码包结构变了会在构建时就失败，不会留到运行时。
+- 安装后有一步自检：`realesrgan` 正常 import，且 HAT 的 `hat/archs/hat_arch.py` 在预期路径上（`Media/hat_adapter.py` 按文件路径加载它）。源码包结构变了会在构建时就失败，不会留到运行时。
+- **自检不能 `import hat`。** HAT 的包根会注册和 BasicSR 冲突的训练架构，和 `realesrgan` 在同一个进程里 import 必然抛 `UNetDiscriminatorSN` 重复注册。应用本身也刻意绕开包根，这是 `hat_adapter.py` 用文件路径加载的原因。
 
 ### 下载重试
 
