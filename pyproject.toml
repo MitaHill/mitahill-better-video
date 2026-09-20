@@ -32,7 +32,6 @@ app = [
     "flask-socketio==5.3.6",
     "eventlet==0.36.1",
     "requests-toolbelt==1.0.0",
-    "yt-dlp[default]==2026.7.4",
 ]
 dev = [
     "uv==0.8.13",

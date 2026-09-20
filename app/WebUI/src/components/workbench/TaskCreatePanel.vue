@@ -28,7 +28,6 @@
       :get-field-policy="getFieldPolicy"
       :runtime-config="transcriptionRuntimeConfig"
     />
-    <DownloadTaskForm v-else :download-form="downloadForm" :on-probe-source="onProbeDownloadSource" />
 
     <div class="action-row">
       <button @click="submitTask" :disabled="loadingSubmit">
@@ -43,7 +42,6 @@
 
 <script setup>
 import ConvertTaskForm from "./ConvertTaskForm.vue";
-import DownloadTaskForm from "./DownloadTaskForm.vue";
 import EnhanceTaskForm from "./EnhanceTaskForm.vue";
 import TranscribeTaskForm from "./TranscribeTaskForm.vue";
 import { computed } from "vue";
@@ -71,10 +69,6 @@ const props = defineProps({
   },
   transcribeMediaInfo: {
     type: Array,
-    required: true,
-  },
-  downloadForm: {
-    type: Object,
     required: true,
   },
   loadingSubmit: {
@@ -109,10 +103,6 @@ const props = defineProps({
     type: Function,
     required: true,
   },
-  onProbeDownloadSource: {
-    type: Function,
-    required: true,
-  },
   addWatermarkSegment: {
     type: Function,
     required: true,
@@ -138,14 +128,12 @@ const props = defineProps({
 const panelTitle = computed(() => {
   if (props.activeCategory === "convert") return "创建转换任务";
   if (props.activeCategory === "transcribe") return "创建转录任务";
-  if (props.activeCategory === "download") return "创建下载任务";
   return "创建增强任务";
 });
 
 const submitText = computed(() => {
   if (props.activeCategory === "convert") return "转换任务开始";
   if (props.activeCategory === "transcribe") return "转录任务开始";
-  if (props.activeCategory === "download") return "下载任务开始";
   return "增强任务开始";
 });
 </script>
