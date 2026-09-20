@@ -80,6 +80,9 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     loadingTranslationTest: false,
     translationTestError: "",
     translationTestResult: null,
+    loadingElevenLabsTest: false,
+    elevenLabsTestError: "",
+    elevenLabsTestResult: null,
   });
 
   const logsView = reactive({
@@ -712,6 +715,28 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     }
   };
 
+  const testElevenLabs = async () => {
+    if (!auth.token) return;
+    debugTools.loadingElevenLabsTest = true;
+    debugTools.elevenLabsTestError = "";
+    debugTools.elevenLabsTestResult = null;
+    try {
+      const res = await fetch("/api/admin/debug/test-elevenlabs", {
+        method: "POST",
+        headers: _authHeaders(),
+      });
+      const payload = await parseJsonSafe(res);
+      if (!res.ok) {
+        throw new Error(payload.error || "ElevenLabs 连接测试失败");
+      }
+      debugTools.elevenLabsTestResult = payload;
+    } catch (error) {
+      debugTools.elevenLabsTestError = error.message;
+    } finally {
+      debugTools.loadingElevenLabsTest = false;
+    }
+  };
+
   const fetchAdminLogs = async () => {
     if (!auth.token) return;
     logsView.loading = true;
@@ -772,6 +797,7 @@ export const useWorkbenchAdmin = ({ parseJsonSafe }) => {
     deleteModelDownloadJob,
     testTranscriptionModel,
     testTranslationProvider,
+    testElevenLabs,
     fetchAdminLogs,
   };
 };

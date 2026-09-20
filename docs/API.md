@@ -112,7 +112,7 @@ entry and admin transcription tools.
 
 Fields:
 - `media_files` (required, multiple; also compatible with `files` / `file`)
-- `transcription_backend` (`whisper`)
+- `transcription_backend` (`whisper` | `elevenlabs`)
 - `transcribe_mode` (`subtitle_zip` | `subtitled_video` | `subtitle_and_video_zip`)
 - `subtitle_format` (`srt` | `vtt`)
 - `whisper_model`
@@ -127,50 +127,6 @@ Response:
 ```json
 { "task_id": "<uuid>" }
 ```
-
-## Download APIs
-
-### POST /api/downloads/probe
-**Content-Type**: `multipart/form-data`
-
-Fields:
-- `url` or `source_url` (required)
-- `cookie_file` (optional, Netscape cookies.txt format, max 5MB)
-
-`cookie_file` is saved to `/workspace/storage/data/download_cookies.txt` and
-will be reused by later probe/download requests. Uploading a new file replaces
-the old one.
-
-### POST /api/downloads/tasks
-**Content-Type**: `multipart/form-data`
-
-Fields:
-- `source_url` (required, one URL per line for batch download)
-- `download_mode` (`video` | `audio` | `subtitle_only`)
-- `quality_selector`
-- `video_output_format`
-- `audio_output_format`
-- `subtitle_output_format`
-- `subtitle_languages`
-- `subtitle_include_auto`
-- `cookie_file` (optional, Netscape cookies.txt format, max 5MB)
-
-When present, `cookie_file` updates the persistent download Cookie. If the
-stored Cookie exists but no longer works for a source, the download fails
-directly.
-Created tasks use a per-task Cookie snapshot, so later Cookie uploads do not
-change already queued tasks.
-
-yt-dlp downloads use conservative defaults: one fragment at a time, 9M/s
-download rate limit, short request sleeps, and retry enabled.
-
-Response:
-```json
-{ "task_id": "<uuid>", "task_ids": ["<uuid>", "..."], "errors": [{ "url": "...", "error": "..." }] }
-```
-
-`errors` is only present for batch requests with partial invalid URLs. A `201`
-response means at least one task was created.
 
 ## Admin APIs (Password Auth)
 
@@ -301,7 +257,7 @@ Request:
 Header:
 - `Authorization: Bearer <token>`
 
-读取转录与翻译配置。管理页面当前仅暴露翻译源设置；转录模型由任务创建页选择。
+读取转录、ElevenLabs 和翻译配置。`elevenlabs.api_key` 不会返回，仅提供 `api_key_configured`。
 
 ### PUT /api/admin/config/transcription-sources
 Header:
@@ -321,9 +277,22 @@ Request (example):
     "provider": "openai_compatible",
     "base_url": "http://127.0.0.1:8000/v1",
     "model": "qwen2.5:7b"
+  },
+  "elevenlabs": {
+    "api_key": "xi-..."
   }
 }
 ```
+
+ElevenLabs 密钥为空时保留现有值；传入 `clear_api_key: true` 时清除密钥。
+
+### POST /api/admin/debug/test-elevenlabs
+Header:
+- `Authorization: Bearer <token>`
+
+使用服务端保存的 API Key 查询 ElevenLabs 用户信息，不提交音频、不产生转录任务。
+
+若 Key 为受限权限（未授予 `user_read`），用户信息接口会返回 401 `missing_permissions`。此时改为向转录接口发送一次不带文件的探测请求：只要鉴权通过（非 401/403）即判定连接正常，返回的 `tier` 与 `status` 为 `unknown`。探测请求不携带音频，也不会产生转录任务。
 
 ### GET /api/admin/transcription/models
 Header:

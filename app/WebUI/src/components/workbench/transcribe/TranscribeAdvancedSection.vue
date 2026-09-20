@@ -2,7 +2,7 @@
   <div class="param-section">
     <div class="param-title">转录参数</div>
 
-    <div class="inline-grid three">
+    <div v-if="transcribeForm.transcriptionBackend === 'whisper'" class="inline-grid three">
       <div class="field compact">
         <label>温度</label>
         <input

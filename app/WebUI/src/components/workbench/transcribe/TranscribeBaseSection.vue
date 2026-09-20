@@ -39,12 +39,28 @@
 
     <div class="inline-grid two">
       <div class="field compact">
+        <label>转录引擎</label>
+        <select v-model="transcribeForm.transcriptionBackend">
+          <option value="whisper">Faster-Whisper（本地）</option>
+          <option value="elevenlabs" :disabled="!elevenLabsConfigured">ElevenLabs Scribe v2（云端）</option>
+        </select>
+        <p v-if="!elevenLabsConfigured" class="notice">可在管理中心配置 ElevenLabs API Key。</p>
+      </div>
+      <div v-if="transcribeForm.transcriptionBackend === 'whisper'" class="field compact">
         <label>Whisper 模型</label>
         <select v-model="transcribeForm.whisperModel" :disabled="isDisabled('whisperModel') || !whisperModelOptions.length">
           <option v-for="model in whisperModelOptions" :key="model" :value="model">{{ model }}</option>
         </select>
         <p v-if="!whisperModelOptions.length" class="notice">未检测到已安装模型，请先在管理中心下载模型。</p>
       </div>
+      <div v-else class="field compact">
+        <label>模型</label>
+        <input value="scribe_v2" disabled />
+        <p class="notice">音频会发送至 ElevenLabs，并可能产生费用。</p>
+      </div>
+    </div>
+
+    <div class="inline-grid two">
       <div class="field compact">
         <label>语言</label>
         <select v-model="transcribeForm.language" :disabled="isDisabled('language')">
@@ -128,6 +144,8 @@ const selectedFileCount = computed(() => {
   const files = props.transcribeForm?.mediaFiles;
   return Array.isArray(files) ? files.length : 0;
 });
+
+const elevenLabsConfigured = computed(() => Boolean(props.runtimeConfig?.transcription?.elevenlabs_configured));
 
 const transcribeModeOptions = computed(() =>
   allowed("transcribeMode", ["subtitle_zip", "subtitled_video", "subtitle_and_video_zip"]).map((value) => ({

@@ -64,6 +64,7 @@ export const useWorkbenchFormsState = () => {
 
   const convertMediaInfo = ref([]);
   const transcribeForm = reactive({
+    transcriptionBackend: "whisper",
     transcribeMode: "subtitle_zip",
     subtitleFormat: "srt",
     whisperModel: "",
@@ -80,34 +81,6 @@ export const useWorkbenchFormsState = () => {
     lowDataMessage: "",
   });
   const transcribeMediaInfo = ref([]);
-  const downloadForm = reactive({
-    sourceUrl: "",
-    sourceTitle: "",
-    sourceDurationSec: 0,
-    sourceWidth: 0,
-    sourceHeight: 0,
-    sourceFps: 0,
-    sourceSizeMb: 0,
-    probeWidth: 0,
-    probeHeight: 0,
-    probeFps: 0,
-    probeSizeMb: 0,
-    downloadMode: "video",
-    qualitySelector: "bestvideo*+bestaudio/best",
-    qualityOptions: [],
-    maxQualityLabel: "",
-    videoOutputFormat: "mp4",
-    audioOutputFormat: "mp3",
-    subtitleOutputFormat: "srt",
-    subtitleLanguagesOptions: [],
-    subtitleLanguages: [],
-    subtitleIncludeAuto: true,
-    cookieFile: null,
-    probeLoading: false,
-    probeReady: false,
-    probeError: "",
-    probeMessage: "",
-  });
 
   const addWatermarkSegment = () => {
     const label = String.fromCharCode(65 + convertForm.watermarkTimeline.length);
@@ -124,7 +97,6 @@ export const useWorkbenchFormsState = () => {
     convertMediaInfo,
     transcribeForm,
     transcribeMediaInfo,
-    downloadForm,
     addWatermarkSegment,
     removeWatermarkSegment,
   };

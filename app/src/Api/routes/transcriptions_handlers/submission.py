@@ -2,13 +2,21 @@ from app.src.Database import core as db
 
 from ...constants import OUTPUT_ROOT, UPLOAD_ROOT
 from ...services import create_transcription_tasks
-from .params import apply_transcription_form_params, validate_translation_provider_guard
+from .params import (
+    apply_transcription_form_params,
+    validate_transcription_backend_guard,
+    validate_translation_provider_guard,
+)
 
 
 def submit_transcription_request(req, client_ip):
     params, err = apply_transcription_form_params(req.form)
     if err:
         return {"error": err}, 400
+
+    backend_guard_error = validate_transcription_backend_guard(params)
+    if backend_guard_error:
+        return {"error": backend_guard_error}, 400
 
     provider_guard_error = validate_translation_provider_guard(params)
     if provider_guard_error:

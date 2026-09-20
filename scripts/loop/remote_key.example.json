@@ -1,0 +1,8 @@
+{
+  "host": "192.168.9.4",
+  "user": "root",
+  "port": 22,
+  "key_file": "",
+  "password": "",
+  "remote_dir": "/root/mitahill-better-video"
+}

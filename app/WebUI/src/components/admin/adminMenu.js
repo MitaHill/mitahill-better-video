@@ -26,6 +26,7 @@ export const menuTree = Object.freeze([
         label: "转录中心",
         keywords: "transcribe transcription subtitle whisper model translate 转录 字幕 模型 翻译",
         children: Object.freeze([
+          { key: "transcribe_cfg_elevenlabs", label: "ElevenLabs Scribe", keywords: "elevenlabs scribe api cloud 云端 转录" },
           { key: "transcribe_cfg_translation", label: "翻译源设置", keywords: "translate provider openai 翻译 源" },
           { key: "transcribe_cfg_catalog", label: "转录模型目录", keywords: "catalog download model transcription 模型 目录 下载" },
           { key: "debug_tests", label: "测试", keywords: "debug test transcription whisper translate provider 调试 测试 转录 翻译" },

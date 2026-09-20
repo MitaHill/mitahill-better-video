@@ -16,6 +16,10 @@ build_images() {
 start_container() {
   cd "$ROOT_DIR/pre-run"
 
+  # .env 被 git 忽略，缺失时 compose 会把挂载源建成目录
+  [ -d .env ] && rmdir .env
+  [ -e .env ] || touch .env
+
   if [ "$IS_WSL" -eq 1 ]; then
     info "$(msg start_wsl)"
     docker compose \

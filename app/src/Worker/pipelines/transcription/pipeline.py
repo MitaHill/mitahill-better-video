@@ -16,10 +16,10 @@ from .io_ops import (
     write_text_file,
     zip_outputs,
 )
+from .engine import ENGINE
 from .options import normalize_transcription_options
 from .progress import emit_progress
 from .translation import build_bilingual_segments, create_translator, translate_segments
-from .whisper_engine import ENGINE
 
 logger = logging.getLogger("TRANSCRIBE")
 
@@ -123,31 +123,32 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
     audio_path, info, created_temp_audio = extract_transcribe_audio(media_path, run_dir)
 
     try:
-        last_transcribe_emit = {"time": 0.0, "ratio": -1.0}
+        last_transcribe_emit = {"time": 0.0, "ratio": -1.0, "stage": ""}
 
-        def _transcribe_progress(done, total_count):
-            if total_count <= 0:
-                return
-            ratio = max(0.0, min(1.0, float(done) / float(total_count)))
+        def _transcribe_progress(event):
+            ratio = max(0.0, min(1.0, float(event.get("ratio") or 0.0)))
+            stage = event.get("stage") or "transcribe"
             now = time.monotonic()
             if (
-                ratio < 1.0
+                stage == last_transcribe_emit["stage"]
+                and ratio < 1.0
                 and now - last_transcribe_emit["time"] < 1.0
                 and ratio - last_transcribe_emit["ratio"] < 0.01
             ):
                 return
             last_transcribe_emit["time"] = now
             last_transcribe_emit["ratio"] = ratio
+            last_transcribe_emit["stage"] = stage
             emit_progress(
                 task_id,
                 _build_transcribe_progress(index, total, ratio, has_translation),
-                f"转录文件 {index}/{total}: 语音识别中 {done:.1f}/{total_count:.1f} 秒",
+                f"转录文件 {index}/{total}: {event.get('message') or '语音识别中'}",
                 file_index=index,
                 file_count=total,
-                stage="transcribe",
-                unit_done=done,
-                unit_total=total_count,
-                unit_label="音频秒",
+                stage=stage,
+                unit_done=event.get("unit_done"),
+                unit_total=event.get("unit_total"),
+                unit_label=event.get("unit_label"),
             )
 
         emit_progress(
@@ -160,13 +161,7 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
         )
         result = ENGINE.transcribe(
             audio_path,
-            backend=options.get("transcription_backend", "whisper"),
-            model_name=options.get("whisper_model", "large-v3"),
-            language=options.get("language", "auto"),
-            temperature=options.get("temperature", 0.0),
-            beam_size=options.get("beam_size", 5),
-            best_of=options.get("best_of", 5),
-            task_id=task_id,
+            options=options,
             progress_callback=_transcribe_progress,
         )
         source_segments = _extract_segments(result)
@@ -292,6 +287,11 @@ def _process_single_media(task_id, media_item, options, run_dir, index, total, t
                     "runtime_mode": "scheduler",
                     "transcription_backend": options.get("transcription_backend", "whisper"),
                     "whisper_model": options.get("whisper_model", "large-v3"),
+                    "transcription_model": (
+                        "scribe_v2"
+                        if options.get("transcription_backend") == "elevenlabs"
+                        else options.get("whisper_model", "large-v3")
+                    ),
                     "translate_to": options.get("translate_to", ""),
                     "subtitle_format": options.get("subtitle_format", "srt"),
                     "transcribe_mode": options.get("transcribe_mode", "subtitle_zip"),
