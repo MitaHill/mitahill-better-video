@@ -121,6 +121,8 @@ curl -fsSL https://raw.githubusercontent.com/MitaHill/mitahill-better-video/main
 
 脚本模块放在 `scripts/quick-deploy-src/`。WSL2 会自动附加 `docker-compose.wsl2.yaml`，不直接修改 `pre-run/docker-compose.yaml`。
 
+`pre-run/.env` 被 git 忽略，全新克隆后不存在，应用也不依赖它。若直接 `docker compose up`，Docker 会把缺失的 `.env` 建成目录。`quick-deploy` 启动前会自动处理：`.env` 是目录则删除，不存在则创建空文件。手动从 `pre-run/` 部署时，先 `touch .env`。
+
 从仓库根目录构建应用镜像：
 
 ```bash
