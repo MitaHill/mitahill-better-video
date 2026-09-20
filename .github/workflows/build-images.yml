@@ -38,14 +38,18 @@ jobs:
         env:
           ACTION_REF: ${{ github.ref }}
         run: |
+          # release=true 表示稳定发布（main 和版本标签）：清空仓库旧镜像并打 latest 标签。
+          # dev 只推送 dev 标签，不清空仓库，也不覆盖 latest。
+          release=false
           case "$ACTION_REF" in
-            refs/heads/main) tag="latest" ;;
+            refs/heads/main) tag="latest"; release=true ;;
             refs/heads/dev) tag="dev" ;;
-            refs/tags/v*) tag="${ACTION_REF#refs/tags/}" ;;
+            refs/tags/v*) tag="${ACTION_REF#refs/tags/}"; release=true ;;
             refs/pull/*) tag="pr-test" ;;
             *) tag="manual" ;;
           esac
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
 
       - name: 登录 Docker Hub
         if: github.event_name != 'pull_request'
@@ -85,7 +89,7 @@ jobs:
 
       # 构建和测试都通过后才清空仓库，避免构建失败时 Docker Hub 上一个镜像都不剩。
       - name: 清空 Docker Hub 仓库旧镜像
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && steps.image_tag.outputs.release == 'true'
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -120,10 +124,11 @@ jobs:
         if: github.event_name != 'pull_request'
         env:
           IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
+          RELEASE: ${{ steps.image_tag.outputs.release }}
         run: |
           repo="kindmitaishere/mitahill-better-video"
           docker push "$repo:$IMAGE_TAG"
-          if [ "$IMAGE_TAG" != "latest" ]; then
+          if [ "$RELEASE" = "true" ] && [ "$IMAGE_TAG" != "latest" ]; then
             docker tag "$repo:$IMAGE_TAG" "$repo:latest"
             docker push "$repo:latest"
           fi

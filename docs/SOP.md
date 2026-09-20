@@ -74,11 +74,11 @@ GitHub Actions 在以下情况自动触发一次构建：
 - 针对 `dev` 或 `main` 的 PR 开启（`opened`）或关闭（`closed`）；PR 已合并时由随后的 push 触发，不重复构建
 - PR 事件只构建并运行单元测试，不登录也不推送 Docker Hub
 
-构建并通过单元测试后发布到 Docker Hub。推送前会先清空该仓库的全部旧标签，再推送本次的标签和 `latest`，所以仓库里只保留最近一次构建的镜像：
+构建并通过单元测试后发布到 Docker Hub：
 
-- `dev` 发布为 `kindmitaishere/mitahill-better-video:dev` 和 `latest`
-- `main` 发布为 `kindmitaishere/mitahill-better-video:latest`
-- `v*` 标签使用原版本号作为镜像标签，同时打 `latest`
+- `dev` 发布为 `kindmitaishere/mitahill-better-video:dev`，不清空仓库，不动 `latest`
+- `main` 发布为 `kindmitaishere/mitahill-better-video:latest`，推送前先清空该仓库的全部旧标签
+- `v*` 标签使用原版本号作为镜像标签，同时打 `latest`，推送前同样先清空旧标签
 - 仓库 Actions Secrets 必须配置 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`，Token 需要 Read, Write, Delete 权限
 - 完整规则、注意事项和故障处理见 `docs/CI_CD.md`
 
