@@ -1,8 +1,32 @@
 from ...parsers import parse_transcription_task_params
+from ...services.admin.transcription_catalog import build_whisper_model_entry
+from ...services.admin.transcription_config import get_elevenlabs_api_key
+
+
+VALID_TRANSCRIPTION_BACKENDS = {"whisper", "elevenlabs"}
 
 
 def apply_transcription_form_params(form):
+    backend = str(form.get("transcription_backend") or "whisper").strip().lower()
+    if backend not in VALID_TRANSCRIPTION_BACKENDS:
+        return None, f"不支持的转录引擎: {backend}"
     return parse_transcription_task_params(form), None
+
+
+def validate_transcription_backend_guard(params):
+    backend = str(params.get("transcription_backend") or "whisper").strip().lower()
+    if backend == "elevenlabs":
+        if not get_elevenlabs_api_key():
+            return "ElevenLabs API Key 尚未配置，请先在管理中心完成配置。"
+        return None
+
+    model_id = str(params.get("whisper_model") or "").strip().lower()
+    model = build_whisper_model_entry(model_id)
+    if not model:
+        return f"不支持的 Whisper 模型: {model_id}"
+    if not model.get("installed"):
+        return f"Whisper 模型尚未安装: {model_id}"
+    return None
 
 
 def validate_translation_provider_guard(params):

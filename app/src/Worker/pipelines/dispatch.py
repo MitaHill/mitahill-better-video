@@ -6,7 +6,6 @@ from app.src.Database import core as db
 from app.src.Notifications.events import send_event
 
 from .conversion import process_conversion_task
-from .download import process_download_task
 from .enhancement import process_enhancement_task
 from .transcription import process_transcription_task
 
@@ -42,9 +41,7 @@ def process_task(task):
             process_transcription_task(task)
             return
         if category == "download":
-            logger.info("Task %s routed to download pipeline.", task_id)
-            process_download_task(task)
-            return
+            raise RuntimeError("下载功能已移除，该任务无法执行")
 
         process_enhancement_task(task)
     except Exception as exc:

@@ -245,6 +245,8 @@ git push origin v0.1.0-beta
 - 各分支的 push 只触发一次运行，不同分支并行执行。
 - **`dev` 只推 `dev` 标签**：`dev` 分支的一次真实运行（2026-09-20）中，清空步骤被跳过，仓库里 `latest` 保持不变，新增 `dev` 标签。
 - **清空 Docker Hub 仓库并推送 `latest`**：`main` 分支的一次真实运行（2026-09-20）中，清空步骤通过 Docker Hub API 成功删除了 `latest`、`dev`、`20260115-1522` 三个标签，随后推送 `latest`，结果仓库里只剩 `latest`（约 3.49 GB）。说明当前 Token 具有 Delete 权限。
+- **`scripts/tests/` 路径下的单元测试**：`dev` 提交 `b06715b` 的真实运行（2026-09-20，运行 #2，总耗时 4 分 56 秒）中，`scripts/tests` 挂载为容器内的 `/workspace/tests`，按 `tests.test_xxx` 模块名执行，测试步骤通过，随后推送 `dev` 标签；清空仓库和 `release` 任务按预期跳过。
+- **本机开发循环端到端**（第 12 节）：同一次运行中，`scripts/loop/dev-loop.sh ship` 完成提交、推送 `dev`、等待构建、远程停止并删除旧容器、拉取 `:dev` 镜像并重建、删除旧标签镜像，`/api/health` 返回 `ok`，容器日志无 traceback 或 error。此前还用 `DEPLOY_TAG=latest` 单独验证过 `deploy` 子命令，并在远程镜像内用 `scripts/tests` 的挂载方式跑通了 3 个旧测试。
 - FFmpeg 链接失效和 `wget` 网络故障两个问题的修复。
 
 尚未在真实环境中验证（工作流语法和逻辑已在本地检查过）：
@@ -254,3 +256,85 @@ git push origin v0.1.0-beta
 - **`v*` 标签触发的 `release` 任务**：包括预览版标记、标题、说明中的 Docker 命令，以及 `--prerelease=false` 对正式版的处理。
 
 这两项都会在 GitHub 上产生公开内容（PR、发行版与镜像标签），需要在确认后用一个测试 PR 和一个测试标签来验证。
+
+本机开发循环（第 12 节）尚未走过的路径：
+
+- **构建或测试失败**：打印失败步骤日志并停止、不部署的分支，逻辑已检查，但没有用真实的失败构建验证过。
+- **`remote_key.json` 的 `key_file` 和 `password` 登录**：目前只验证了复用已建立的 SSH 连接（ControlMaster）这一种方式。
+- **`sync` 子命令**，以及“远程 `dev` 有本机没有的提交”时的拒绝逻辑。
+
+## 12. 本机开发循环与远程运行器
+
+开发在本机进行，构建和测试交给 GitHub Actions，运行验证在一台远程 GPU 机器上。远程机器只是“运行器”，不保存源码，也没有 Git 仓库。
+
+远程运行目录（默认 `/root/mitahill-better-video/`）只保留：
+
+- `docker-compose.yaml`：镜像写为 `kindmitaishere/mitahill-better-video:${TAG:-dev}`，其余与 `pre-run/docker-compose.yaml` 一致
+- `.env`：挂载到容器 `/workspace/config/.env` 的文件，内容可为空。必须是文件，挂载点不存在时 Docker 会把它建成目录
+- `storage/`：持久化数据（上传、输出、数据库、日志、模型缓存）
+
+### 脚本目录
+
+`scripts/loop/` 下：
+
+| 文件 | 作用 |
+| --- | --- |
+| `dev-loop.sh` | 入口：参数分发、公共函数、步骤清单定义 |
+| `progress.sh` | 步骤进度清单（`✓` 完成 / `*` 进行中 / `-` 跳过 / `✗` 失败 / `·` 待执行） |
+| `remote.sh` | 读取 `remote_key.json`，封装 SSH 调用 |
+| `ship.sh` | `check`、`sync`、`ship`（提交、推送、等构建） |
+| `deploy.sh` | `deploy` 的本机侧 |
+| `remote-run.sh` | 通过 SSH 送到远程执行的重部署脚本，不在本机运行 |
+| `remote_key.example.json` | 凭据文件模板 |
+| `remote_key.json` | 实际凭据，已被 `.gitignore` 忽略，不提交 |
+
+### 一条命令跑完一轮
+
+`scripts/loop/dev-loop.sh` 在本机执行，通过 SSH 连接远程运行器，流程是：
+
+1. 有未提交的改动时，用给定的提交信息提交（只暂存已跟踪文件）
+2. 推送 `dev`，触发工作流；用 `gh run watch` 等待构建和单元测试完成，失败时打印失败步骤日志并停止，不部署
+3. 远程停止并删除 `better_video` 容器，拉取 `:dev` 镜像并重建，成功后删除旧镜像（只删本项目的镜像），轮询 `/api/health`
+4. 输出镜像、容器状态、日志中的错误行数和最近日志，由人判断满意与否：满意则结束，不满意则继续修改并再次执行
+
+| 命令 | 作用 |
+| --- | --- |
+| `scripts/loop/dev-loop.sh ship "fix: 说明"` | 提交、推送、等构建、远程部署、反馈（默认） |
+| `scripts/loop/dev-loop.sh sync` | 从远程仓库拉取 `dev` 的最新状态到本机 |
+| `scripts/loop/dev-loop.sh deploy` | 只让远程重新拉取镜像并运行，默认 `:dev` |
+| `DEPLOY_TAG=latest scripts/loop/dev-loop.sh deploy` | 部署稳定版镜像 |
+| `scripts/loop/dev-loop.sh check` | 检查分支、`gh` 登录和远程连接 |
+
+### 进度显示
+
+脚本会打印一张步骤清单，样式与 `gh run watch` 的作业步骤一致：
+
+```
+  ✓ 前置检查 (2s) 分支 dev，gh 已登录，root@192.168.9.4 可连接
+  - 提交本地改动 工作区干净，直接推送已有提交
+  ✓ 推送 dev 触发构建 (3s) 528db61
+  * 等待 GitHub Actions 构建与测试
+  · 远程部署与健康检查
+```
+
+- 在终端里原地重绘整张清单；`git push`、`gh run watch`、远程部署这类会自己刷屏的命令跑完后，清单会重新整张打印在它们的输出下方
+- 重定向到文件或管道时自动退化为逐行输出（`==> [3/5] 推送 dev 触发构建` + 结果行），不写入任何光标控制字符，适合留存日志
+- 出错或被 Ctrl-C 中断时，当前步骤标成 `✗`，不会停在 `*` 上
+- 清单内容由 `dev-loop.sh` 的 `case` 分支用 `prog_init` 声明，各函数只调用 `prog_next` 取下一步，因此 `check`、`deploy` 单独执行和被 `ship` 串起来时都不需要关心自己排第几
+
+规则：
+
+- 只在 `dev` 分支上运行。`main` 的推送会清空 Docker Hub 仓库（见第 4 节）
+- 提交信息含 `[skip ci]` 时不会触发构建，脚本会拒绝部署
+- 部署 `:dev` 要求 Docker Hub 上有 `dev` 标签。`main` 或版本标签构建成功后会清空仓库，`dev` 标签随之消失，需要先推送一次 `dev`
+- 每次部署都会完整拉取约 3.5 GB 的镜像
+- 行为改动仍需在页面提交一个小任务，确认完成并能在管理页删除
+
+### 远程连接凭据 `remote_key.json`
+
+脚本读取 `scripts/loop/remote_key.json` 获取远程连接信息，格式见同目录的 `remote_key.example.json`：`host`、`user`、`port`、`key_file`（私钥路径）、`password`、`remote_dir`。
+
+- 该文件已加入 `.gitignore`，**不得提交**。脚本运行时检查它确实被忽略，否则拒绝继续，并把权限设为 `600`
+- 认证优先级：`key_file`，其次 `password`；两者都为空时复用已建立的 SSH 连接（ControlMaster）或 ssh-agent
+- 推荐使用密钥。密码是明文存放，只适合个人机器
+- 所有 SSH 调用共用一个 ControlMaster（`ControlPath=~/.ssh/cm-%C`，保持 1 小时），只认证一次

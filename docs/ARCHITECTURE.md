@@ -25,7 +25,7 @@
 ## Process Model
 - **Main process**: Flask API server
 - **Worker process**: long-running task scheduling loop
-- **Task process**: one child process per task, including download, conversion,
+- **Task process**: one child process per task, including conversion,
   enhancement, and transcription
 
 ## Processing Model
@@ -52,9 +52,11 @@
 - `app/WebUI/src/components/workbench/enhance/*`: enhance section modules.
 - `app/WebUI/src/components/workbench/convert/*`: conversion section modules.
 - `app/src/Worker/pipelines/transcription/translation/*`: 转录翻译提供器与分段翻译子模块（仅 OpenAI 兼容 Chat Completions 格式）。
-- `app/src/Worker/pipelines/transcription/whisper_engine.py`: 转录执行器（Faster-Whisper 标准模型；CUDA FP16 运行）。
+- `app/src/Worker/pipelines/transcription/engine.py`: 转录引擎入口，将本地与云端结果统一为字幕分段。
+- `app/src/Worker/pipelines/transcription/whisper_engine.py`: Faster-Whisper 执行器（CUDA FP16）。
+- `app/src/Worker/pipelines/transcription/scribe_engine.py`: ElevenLabs Scribe v2 适配器，负责流式上传和单词时间戳分段。
 - `app/src/Media/hat_adapter.py`: 官方 HAT 架构的薄推理适配层，负责 BGR/RGB、分片、倍率输出；HAT 当前固定 fp32。
-- `app/src/Api/task_parsers/*`: 后端任务参数解析按类别原子化拆分（enhance/convert/transcribe/download）；`app/src/Api/parsers.py` 仅保留兼容导出层。
+- `app/src/Api/task_parsers/*`: 后端任务参数解析按类别原子化拆分（enhance/convert/transcribe）；`app/src/Api/parsers.py` 仅保留兼容导出层。
 - `app/src/Api/routes/transcriptions_handlers/*`: 转录路由子处理器（参数应用、提交处理、运行时配置载荷）原子化拆分。
 - `app/WebUI/src/components/workbench/TaskStatusPanel.vue`: status panel shell.
 - `app/WebUI/src/components/workbench/status/StatusQueryHeader.vue`: status query row + task list.
@@ -65,7 +67,7 @@
 - `app/WebUI/src/composables/useWorkbenchController.js`: workbench state orchestration and API interactions.
 - `app/WebUI/src/composables/workbench/*`: atomic workbench logic units (theme/routing/forms/uploads/status/submission/builders).
 - `app/WebUI/src/composables/workbench/submitPayloadBuilders/*`: 按任务类别拆分的提交载荷构建器（index 聚合导出）。
-- `app/WebUI/src/composables/workbench/submission/*`: 提交流程原子模块（通用动作 + enhance/convert/transcribe/download 各自 submitter）。
+- `app/WebUI/src/composables/workbench/submission/*`: 提交流程原子模块（通用动作 + enhance/convert/transcribe 各自 submitter）。
 - `app/WebUI/src/composables/workbench/useTranscribeLowDataMode.js`: 字幕与文本转录的低数据传输逻辑，前端用 ffmpeg.wasm 提取音频后复用原提交接口。
 - `app/WebUI/src/composables/workbench/useWorkbenchAdmin.js`: 管理鉴权与总览数据获取。
 - `app/WebUI/src/constants/workbench.js`: category path and menu constants.
@@ -82,10 +84,11 @@
 - Outputs: `/workspace/storage/output/run_<task_id>/results/`
 - Run scratch: `/workspace/storage/output/run_<task_id>/`
 - Uploads: `/workspace/storage/upload/run_<task_id>/`
-- Persistent download Cookie: `/workspace/storage/data/download_cookies.txt`
-- Task categories in unified queue: `enhance` / `convert` / `transcribe` / `download`
+- Task categories in unified queue: `enhance` / `convert` / `transcribe`
 - Transcription model cache roots:
-  - `whisper`: `/workspace/storage/models/transcription/whisper/*.pt`
+  - `whisper`: `/workspace/storage/models/transcription/whisper/<model_id>/`
+
+ElevenLabs API Key 保存在 SQLite 管理配置中。公开运行配置、任务参数和日志不包含密钥原文。
 
 ## SQLite Runtime Rules
 - SQLite runs in WAL mode with `synchronous=NORMAL`, `temp_store=MEMORY`, and a

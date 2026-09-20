@@ -125,6 +125,19 @@
             :on-save="saveTranslationConfig"
           />
 
+          <AdminElevenLabsSettingsForm
+            v-if="activeMenuKey === 'transcribe_cfg_elevenlabs'"
+            :config-data="transcriptionConfig.data || {}"
+            :loading="transcriptionConfig.loading"
+            :error="transcriptionConfig.error"
+            :message="transcriptionConfig.message"
+            :test-loading="debugTools.loadingElevenLabsTest"
+            :test-error="debugTools.elevenLabsTestError"
+            :test-result="debugTools.elevenLabsTestResult"
+            :on-save="saveElevenLabsConfig"
+            :on-test="testElevenLabs"
+          />
+
           <AdminTranscriptionModelPanel
             v-if="activeMenuKey === 'transcribe_cfg_catalog'"
             :models="transcriptionModels.items"
@@ -179,6 +192,7 @@ import { useWorkbenchAdmin } from "../../composables/workbench/useWorkbenchAdmin
 import { parseJsonSafe } from "../../composables/workbench/utils";
 import { filterMenuTree } from "./adminMenu";
 import AdminDebugToolsPanel from "./AdminDebugToolsPanel.vue";
+import AdminElevenLabsSettingsForm from "./AdminElevenLabsSettingsForm.vue";
 import AdminGpuUsageChart from "./AdminGpuUsageChart.vue";
 import AdminIpTable from "./AdminIpTable.vue";
 import AdminLoginCard from "./AdminLoginCard.vue";
@@ -232,6 +246,7 @@ const {
   deleteModelDownloadJob,
   testTranscriptionModel,
   testTranslationProvider,
+  testElevenLabs,
   fetchAdminLogs,
 } = useWorkbenchAdmin({ parseJsonSafe });
 
@@ -337,6 +352,12 @@ const saveTranslationConfig = async (payload) => {
   await fetchTranscriptionConfig();
 };
 
+const saveElevenLabsConfig = async (payload) => {
+  await updateTranscriptionConfig(payload, "ElevenLabs 配置已保存");
+  if (transcriptionConfig.error) return;
+  await fetchTranscriptionConfig();
+};
+
 const refreshTranscriptionCatalog = async () => {
   await fetchTranscriptionModels();
   await fetchModelDownloadJobs();
@@ -383,7 +404,7 @@ const loadByMenuKey = async (value) => {
     await fetchRealIpConfig();
     return;
   }
-  if (value === "transcribe_cfg_translation") {
+  if (["transcribe_cfg_translation", "transcribe_cfg_elevenlabs"].includes(value)) {
     await fetchTranscriptionConfig();
     return;
   }

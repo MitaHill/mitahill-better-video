@@ -1,11 +1,9 @@
 import { submitConvertTask } from "./submitConvertTask";
-import { submitDownloadTask } from "./submitDownloadTask";
 import { submitEnhanceTask } from "./submitEnhanceTask";
 import { submitTranscribeTask } from "./submitTranscribeTask";
 
 const submitterMap = Object.freeze({
   convert: submitConvertTask,
-  download: submitDownloadTask,
   transcribe: submitTranscribeTask,
   enhance: submitEnhanceTask,
 });
@@ -19,5 +17,4 @@ export {
   submitEnhanceTask,
   submitConvertTask,
   submitTranscribeTask,
-  submitDownloadTask,
 };

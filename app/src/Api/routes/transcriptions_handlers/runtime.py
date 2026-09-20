@@ -19,6 +19,7 @@ def build_transcription_runtime_payload():
             "backend": str(defaults.get("transcription_backend") or "whisper").strip().lower(),
             "active_model": str(defaults.get("whisper_model") or "large-v3").strip().lower(),
             "installed_models": installed_models,
+            "elevenlabs_configured": bool(defaults.get("elevenlabs_api_key_configured")),
         },
         "translation": {
             "provider": provider,

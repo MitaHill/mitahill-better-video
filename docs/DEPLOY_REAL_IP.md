@@ -35,6 +35,9 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        # 大文件上传和长任务的状态请求需要更长的超时，默认 60 秒容易中断
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
         proxy_pass http://127.0.0.1:8501;
     }
 }
@@ -60,6 +63,9 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        # 大文件上传和长任务的状态请求需要更长的超时，默认 60 秒容易中断
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
         proxy_pass http://127.0.0.1:8501;
     }
 }

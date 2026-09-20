@@ -59,6 +59,9 @@ GPU 探测、模型必要文件检查、`nvidia-smi`、模型加载等操作必�
 - 字幕封装使用 `/workspace/storage/tmp/subtitles/` 下的安全临时文件，ffmpeg 结束后立即删除。
 - 基础镜像固定使用 FFmpeg 8.1 GPL 静态构建，不使用持续变化的 master 构建，并校验下载文件 SHA256。
 - 转录支持 Faster-Whisper 标准模型：`tiny`、`base`、`small`、`medium` 的多语言与 `.en` 版本，以及 `large-v1`、`large-v2`、`large-v3`。CUDA 必需，不增加 CPU fallback。
+- ElevenLabs Scribe v2 属于实验性云端转录。密钥由管理页面保存，单个文件按 3GB 上限校验，失败时不自动重试或回退到本地模型。
+- 云端转录只在上传阶段报告字节进度；上传完成后显示云端处理中，不伪造服务端推理百分比。
+- 取消云端任务会终止本地请求进程，但远端任务可能已经开始并产生费用。
 - 转录任务中断后从语音识别开始重新执行，不复用旧字幕或译文。
 - 模型从 Hugging Face 下载 CTranslate2 文件，不在本地转换；检查 `model.bin`、`config.json`、`tokenizer.json` 和模型对应的词表文件，随后用短音频热身。`preprocessor_config.json` 不参与检查。
 - 显存不足时清晰失败，不尝试降级到 CPU 或其它精度。
@@ -117,6 +120,8 @@ curl -fsSL https://raw.githubusercontent.com/MitaHill/mitahill-better-video/main
 如果 NVIDIA GPU 和互联网正常，但 Docker 或 NVIDIA Container Toolkit 缺失，脚本会询问是否允许自动安装。
 
 脚本模块放在 `scripts/quick-deploy-src/`。WSL2 会自动附加 `docker-compose.wsl2.yaml`，不直接修改 `pre-run/docker-compose.yaml`。
+
+`pre-run/.env` 被 git 忽略，全新克隆后不存在，应用也不依赖它。若直接 `docker compose up`，Docker 会把缺失的 `.env` 建成目录。`quick-deploy` 启动前会自动处理：`.env` 是目录则删除，不存在则创建空文件。手动从 `pre-run/` 部署时，先 `touch .env`。
 
 从仓库根目录构建应用镜像：
 

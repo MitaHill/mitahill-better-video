@@ -161,3 +161,15 @@ def run_translation_provider_test() -> Dict:
     if not result.get("ok"):
         logger.error("Translation source test failed: %s", result.get("error"))
     return result
+
+
+def run_elevenlabs_connection_test() -> Dict:
+    from app.src.Worker.pipelines.transcription.scribe_engine import test_connection
+
+    current = get_transcription_config()
+    api_key = str((current.get("elevenlabs") or {}).get("api_key") or "").strip()
+    try:
+        return test_connection(api_key)
+    except Exception as exc:
+        logger.error("ElevenLabs connection test failed: %s", exc)
+        return {"ok": False, "error": str(exc)}

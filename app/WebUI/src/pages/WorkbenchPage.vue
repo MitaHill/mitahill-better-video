@@ -16,16 +16,14 @@
           :convert-media-info="convertMediaInfo"
           :transcribe-form="transcribeForm"
           :transcribe-media-info="transcribeMediaInfo"
-          :download-form="downloadForm"
-          :loading-submit="loading.submit"
+              :loading-submit="loading.submit"
           :submit-error="submitError"
           :submit-warnings="submitWarnings"
           :on-enhance-file-change="onEnhanceFileChange"
           :on-convert-media-change="onConvertMediaChange"
           :on-transcribe-media-change="onTranscribeMediaChange"
           :on-watermark-images-change="onWatermarkImagesChange"
-          :on-probe-download-source="probeDownloadSource"
-          :add-watermark-segment="addWatermarkSegment"
+              :add-watermark-segment="addWatermarkSegment"
           :remove-watermark-segment="removeWatermarkSegment"
           :get-field-policy="getFieldPolicy"
           :transcription-runtime-config="transcriptionRuntimeConfig"
@@ -74,7 +72,6 @@ const {
   convertMediaInfo,
   transcribeForm,
   transcribeMediaInfo,
-  downloadForm,
   taskIds,
   submitError,
   submitWarnings,
@@ -93,7 +90,6 @@ const {
   onConvertMediaChange,
   onTranscribeMediaChange,
   onWatermarkImagesChange,
-  probeDownloadSource,
   addWatermarkSegment,
   removeWatermarkSegment,
   transcriptionRuntimeConfig,

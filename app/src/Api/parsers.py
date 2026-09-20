@@ -9,7 +9,6 @@ from .task_parsers import (
     float_from_form,
     int_from_form,
     parse_conversion_task_params,
-    parse_download_task_params,
     parse_enhance_task_params,
     parse_transcription_task_params,
     parse_watermark_timeline,
@@ -23,5 +22,4 @@ __all__ = [
     "parse_enhance_task_params",
     "parse_conversion_task_params",
     "parse_transcription_task_params",
-    "parse_download_task_params",
 ]

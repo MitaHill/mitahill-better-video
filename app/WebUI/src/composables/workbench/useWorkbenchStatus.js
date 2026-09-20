@@ -101,9 +101,6 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     if (category === "transcribe") {
       return Array.isArray(task?.task_params?.media_files) ? task.task_params.media_files.length : 0;
     }
-    if (category === "download") {
-      return 1;
-    }
     return 0;
   };
 
@@ -125,7 +122,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
       live.itemCount = toNumber(taskProgress.total_segments, 0) || inferItemCountFromStatus(task);
     }
     if (!live.itemLabel && live.itemCount) {
-      live.itemLabel = category === "enhance" ? "分段" : category === "download" ? "任务" : "文件";
+      live.itemLabel = category === "enhance" ? "分段" : "文件";
     }
 
     if (category === "enhance") {
@@ -143,7 +140,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
   const isPreviewSupported = computed(() => {
     if (status.value?.is_batch) return false;
     const category = status.value?.task_params?.task_category || "";
-    return category !== "convert" && category !== "transcribe" && category !== "download";
+    return category !== "convert" && category !== "transcribe";
   });
 
   const resolution = computed(() => {
@@ -268,7 +265,7 @@ export const useWorkbenchStatus = ({ parseJsonSafe }) => {
     live.itemLabel =
       String(payload.item_label || "").trim() ||
       live.itemLabel ||
-      (live.itemCount ? (category === "enhance" ? "分段" : category === "download" ? "任务" : "文件") : "");
+      (live.itemCount ? (category === "enhance" ? "分段" : "文件") : "");
     live.unitDone = toNumber(payload.unit_done ?? payload.segment_frame, live.unitDone);
     live.unitTotal = toNumber(payload.unit_total ?? payload.segment_total, live.unitTotal);
     live.unitLabel = String(payload.unit_label || "").trim() || live.unitLabel || (live.unitTotal ? "帧" : "");

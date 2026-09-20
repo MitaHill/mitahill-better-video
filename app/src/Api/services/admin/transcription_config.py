@@ -31,6 +31,9 @@ def default_transcription_config() -> Dict[str, Any]:
             "prompt": config.TRANSCRIPTION_TRANSLATOR_PROMPT,
             "fallback_mode": "model_full_text",
         },
+        "elevenlabs": {
+            "api_key": "",
+        },
         "download": {
             "aria2": {
                 "split": 16,
@@ -88,6 +91,11 @@ def _normalize_config(raw: Dict[str, Any]) -> Dict[str, Any]:
     merged["translation"]["fallback_mode"] = fallback_mode
     merged["translation"].pop("timeout_sec", None)
 
+    elevenlabs = merged.get("elevenlabs") or {}
+    merged["elevenlabs"] = {
+        "api_key": str(elevenlabs.get("api_key") or "").strip(),
+    }
+
     aria2 = merged["download"].get("aria2") or {}
     try:
         split = int(aria2.get("split") or 16)
@@ -140,16 +148,40 @@ def get_transcription_config() -> Dict[str, Any]:
 
 
 def update_transcription_config(payload: Dict[str, Any]) -> Dict[str, Any]:
-    merged = _deep_merge(get_transcription_config(), payload or {})
+    patch = copy.deepcopy(payload or {})
+    elevenlabs = patch.get("elevenlabs")
+    if isinstance(elevenlabs, dict):
+        clear_api_key = elevenlabs.pop("clear_api_key", False) is True
+        if clear_api_key:
+            elevenlabs["api_key"] = ""
+        elif not str(elevenlabs.get("api_key") or "").strip():
+            elevenlabs.pop("api_key", None)
+
+    merged = _deep_merge(get_transcription_config(), patch)
     normalized = _normalize_config(merged)
     db_transcription.set_transcription_config(normalized)
     return normalized
+
+
+def get_public_transcription_config() -> Dict[str, Any]:
+    current = copy.deepcopy(get_transcription_config())
+    elevenlabs = current.get("elevenlabs") or {}
+    configured = bool(str(elevenlabs.pop("api_key", "") or "").strip())
+    elevenlabs["api_key_configured"] = configured
+    current["elevenlabs"] = elevenlabs
+    return current
+
+
+def get_elevenlabs_api_key() -> str:
+    current = get_transcription_config()
+    return str((current.get("elevenlabs") or {}).get("api_key") or "").strip()
 
 
 def get_parser_defaults() -> Dict[str, Any]:
     current = get_transcription_config()
     transcription = current.get("transcription") or {}
     translation = current.get("translation") or {}
+    elevenlabs = current.get("elevenlabs") or {}
     return {
         "transcription_backend": str(transcription.get("backend") or "whisper").strip().lower(),
         "whisper_model": str(transcription.get("active_model") or "large-v3").strip().lower(),
@@ -159,4 +191,5 @@ def get_parser_defaults() -> Dict[str, Any]:
         "translator_api_key": str(translation.get("api_key") or "").strip(),
         "translator_prompt": str(translation.get("prompt") or "").strip(),
         "translator_fallback_mode": str(translation.get("fallback_mode") or "model_full_text").strip().lower(),
+        "elevenlabs_api_key_configured": bool(str(elevenlabs.get("api_key") or "").strip()),
     }

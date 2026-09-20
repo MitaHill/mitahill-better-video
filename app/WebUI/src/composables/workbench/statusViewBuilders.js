@@ -7,10 +7,11 @@ const STAGE_LABELS = {
   audio: "音频处理中",
   finalize: "后处理",
   transcribe: "语音识别中",
+  transcribe_upload: "上传转录音频",
+  transcribe_cloud: "云端转录中",
   write_subtitle: "写入字幕",
   translate: "翻译中",
   render_video: "封装字幕视频",
-  download: "下载中",
   package: "封装处理中",
   completed: "已完成",
 };
@@ -26,7 +27,6 @@ export const resolveStageLabel = (stage, category = "") => {
   if (safeCategory === "enhance") return "增强处理中";
   if (safeCategory === "convert") return "处理中";
   if (safeCategory === "transcribe") return "转录处理中";
-  if (safeCategory === "download") return "下载处理中";
   return "";
 };
 
@@ -52,6 +52,7 @@ export const buildParamRows = (status) => {
     ];
   }
   if (params.task_category === "transcribe") {
+    const transcriptionBackend = params.transcription_backend || "whisper";
     const modeLabelMap = {
       subtitle_zip: "字幕与文本",
       subtitled_video: "带字幕视频（单视频直出 / 批量 ZIP）",
@@ -63,34 +64,21 @@ export const buildParamRows = (status) => {
     };
     return [
       { label: "任务类别", value: "视频转录" },
+      { label: "转录引擎", value: transcriptionBackend === "elevenlabs" ? "ElevenLabs Scribe v2" : "Faster-Whisper" },
       { label: "转录类型", value: modeLabelMap[params.transcribe_mode] || params.transcribe_mode || "-" },
       { label: "字幕格式", value: (params.subtitle_format || "-").toUpperCase() },
-      { label: "Whisper 模型", value: params.whisper_model || "-" },
+      ...(transcriptionBackend === "whisper" ? [{ label: "Whisper 模型", value: params.whisper_model || "-" }] : []),
       { label: "语言", value: params.language || "auto" },
       { label: "翻译到", value: params.translate_to || "-" },
       { label: "翻译提供器", value: providerLabelMap[params.translator_provider] || params.translator_provider || "-" },
-      { label: "温度", value: params.temperature ?? "-" },
-      { label: "Beam Size", value: params.beam_size ?? "-" },
-      { label: "Best Of", value: params.best_of ?? "-" },
+      ...(transcriptionBackend === "whisper"
+        ? [
+            { label: "温度", value: params.temperature ?? "-" },
+            { label: "Beam Size", value: params.beam_size ?? "-" },
+            { label: "Best Of", value: params.best_of ?? "-" },
+          ]
+        : []),
       { label: "最大行宽", value: params.max_line_chars ?? "-" },
-    ];
-  }
-  if (params.task_category === "download") {
-    const modeLabel = {
-      video: "视频",
-      audio: "仅音频",
-      subtitle_only: "仅字幕",
-    };
-    return [
-      { label: "任务类别", value: "视频下载" },
-      { label: "下载类型", value: modeLabel[params.download_mode] || params.download_mode || "-" },
-      { label: "源链接", value: params.source_url || "-" },
-      { label: "清晰度选择", value: params.quality_selector || "-" },
-      { label: "视频封装", value: (params.video_output_format || "-").toUpperCase() },
-      { label: "音频格式", value: (params.audio_output_format || "-").toUpperCase() },
-      { label: "字幕格式", value: (params.subtitle_output_format || "-").toUpperCase() },
-      { label: "字幕语言", value: Array.isArray(params.subtitle_languages) ? params.subtitle_languages.join(", ") || "-" : "-" },
-      { label: "包含自动字幕", value: formatBool(params.subtitle_include_auto) },
     ];
   }
 
