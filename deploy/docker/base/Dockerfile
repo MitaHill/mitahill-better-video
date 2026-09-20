@@ -86,6 +86,9 @@ RUN mkdir -p /workspace/app/models/video && \
 # this project only imports their model and inference modules already covered above.
 # 取提交号对应的源码包而不是 git+https：装一个 git 要多占 190MB，而这里只需要
 # 把源码解开。--no-build-isolation 让 setup.py 能用系统里已有的 torch 和 setuptools。
+# 自检只验应用真正用到的东西：realesrgan 正常 import，HAT 的 hat_arch.py 在预期路径上
+# （Media/hat_adapter.py 按文件路径加载它）。不要 import hat 包根，它会注册和 BasicSR
+# 冲突的训练架构，和 realesrgan 同时 import 必然抛 UNetDiscriminatorSN 重复注册。
 ARG REALESRGAN_COMMIT=a4abfb2979a7bbff3f69f58f58ae324608821e27
 ARG HAT_COMMIT=1638a9a822581657811867bf670717f8371fc3e5
 RUN uv pip install --system einops==0.8.1 && \
@@ -99,4 +102,4 @@ RUN uv pip install --system einops==0.8.1 && \
     uv pip install --system --no-deps --no-build-isolation \
         /tmp/srcpkg/realesrgan /tmp/srcpkg/hat && \
     rm -rf /tmp/srcpkg /tmp/realesrgan.tar.gz /tmp/hat.tar.gz && \
-    python3 -c "import realesrgan, hat"
+    python3 -c "import realesrgan, pathlib; from importlib.metadata import distribution; assert pathlib.Path(distribution('hat').locate_file('hat/archs/hat_arch.py')).is_file()"
