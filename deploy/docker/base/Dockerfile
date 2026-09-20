@@ -29,8 +29,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN if [ "$INSTALL_PREBUILT_FFMPEG" = "1" ]; then \
         FFMPEG_BUILD_FILE="${FFMPEG_BUILD_URL##*/}" && \
         mkdir -p /tmp/ffmpeg-build && \
-        wget -q -O "/tmp/$FFMPEG_BUILD_FILE" "$FFMPEG_BUILD_URL" && \
-        wget -q -O /tmp/checksums.sha256 "$FFMPEG_CHECKSUM_URL" && \
+        wget -q --tries=5 --waitretry=5 --retry-connrefused --timeout=60 -O "/tmp/$FFMPEG_BUILD_FILE" "$FFMPEG_BUILD_URL" && \
+        wget -q --tries=5 --waitretry=5 --retry-connrefused --timeout=60 -O /tmp/checksums.sha256 "$FFMPEG_CHECKSUM_URL" && \
         grep "  $FFMPEG_BUILD_FILE$" /tmp/checksums.sha256 | (cd /tmp && sha256sum -c -) && \
         tar -xf "/tmp/$FFMPEG_BUILD_FILE" -C /tmp/ffmpeg-build --strip-components=1 && \
         install -m 0755 /tmp/ffmpeg-build/bin/ffmpeg /usr/local/bin/ffmpeg && \
@@ -68,14 +68,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Pre-download Real-ESRGAN weights (huge layer, fixed)
 RUN mkdir -p /workspace/app/models/video && \
-    wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth && \
-    wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/RealESRNet_x4plus.pth && \
-    wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth && \
-    wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth && \
-    wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth && \
-    wget -q -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth && \
-    wget -q -O /workspace/app/models/video/Real_HAT_GAN_SRx4.pth https://huggingface.co/jaideepsingh/upscale_models/resolve/867e7c0ad519aba5d36b5bb4ef4a4a91781914c4/HAT/Real_HAT_GAN_SRx4.pth && \
-    wget -q -O /workspace/app/models/video/HAT-L_SRx4_ImageNet-pretrain.pth https://huggingface.co/jaideepsingh/upscale_models/resolve/867e7c0ad519aba5d36b5bb4ef4a4a91781914c4/HAT/HAT-L_SRx4_ImageNet-pretrain.pth
+    wget -q --tries=5 --waitretry=5 --retry-connrefused --timeout=60 -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth && \
+    wget -q --tries=5 --waitretry=5 --retry-connrefused --timeout=60 -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/RealESRNet_x4plus.pth && \
+    wget -q --tries=5 --waitretry=5 --retry-connrefused --timeout=60 -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth && \
+    wget -q --tries=5 --waitretry=5 --retry-connrefused --timeout=60 -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth && \
+    wget -q --tries=5 --waitretry=5 --retry-connrefused --timeout=60 -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth && \
+    wget -q --tries=5 --waitretry=5 --retry-connrefused --timeout=60 -P /workspace/app/models/video https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth && \
+    wget -q --tries=5 --waitretry=5 --retry-connrefused --timeout=60 -O /workspace/app/models/video/Real_HAT_GAN_SRx4.pth https://huggingface.co/jaideepsingh/upscale_models/resolve/867e7c0ad519aba5d36b5bb4ef4a4a91781914c4/HAT/Real_HAT_GAN_SRx4.pth && \
+    wget -q --tries=5 --waitretry=5 --retry-connrefused --timeout=60 -O /workspace/app/models/video/HAT-L_SRx4_ImageNet-pretrain.pth https://huggingface.co/jaideepsingh/upscale_models/resolve/867e7c0ad519aba5d36b5bb4ef4a4a91781914c4/HAT/HAT-L_SRx4_ImageNet-pretrain.pth
 
 # Official inference packages. Their dependency sets conflict on BasicSR, while
 # this project only imports their model and inference modules already covered above.
