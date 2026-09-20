@@ -125,7 +125,22 @@ _CODEC_ENCODERS = {
 }
 
 
+_ENCODERS_CACHE = None
+
+
+def reset_ffmpeg_encoders_cache():
+    """清掉进程内的编码器探测缓存（供测试使用）。"""
+    global _ENCODERS_CACHE
+    _ENCODERS_CACHE = None
+
+
 def get_ffmpeg_encoders():
+    # 编码器在容器生命周期内不会变，但这个函数处在任务提交和合帧路径上，
+    # 不缓存就会每次 fork 一个 ffmpeg。探测失败不写缓存，
+    # 否则一次瞬时失败会让整个进程此后一直认为没有可用编码器。
+    global _ENCODERS_CACHE
+    if _ENCODERS_CACHE is not None:
+        return _ENCODERS_CACHE
     try:
         result = subprocess.run(
             ["ffmpeg", "-hide_banner", "-encoders"],
@@ -135,10 +150,13 @@ def get_ffmpeg_encoders():
             check=True,
         )
     except Exception:
-        return set()
+        return frozenset()
     text = f"{result.stdout}\n{result.stderr}"
     known = {encoder for pair in _CODEC_ENCODERS.values() for encoder in pair}
-    return {name for name in {item for line in text.splitlines() for item in line.split()} if name in known}
+    _ENCODERS_CACHE = frozenset(
+        name for name in {item for line in text.splitlines() for item in line.split()} if name in known
+    )
+    return _ENCODERS_CACHE
 
 
 @lru_cache(maxsize=None)

@@ -283,6 +283,15 @@ def process_video_with_model(
             recorder.record(total, f"Upscaling {input_path.name}: {total}/{total} frames")
             recorder.flush(force=True)
 
+        # 合帧用 f_%06d.jpg + -start_number 1，缺号处 ffmpeg 会直接停下，
+        # 产出一个被截断的视频。这里先确认帧数完整，缺帧就明确失败。
+        done_frames = len(list(frames_out.glob("f_*.jpg")))
+        if done_frames != total:
+            raise RuntimeError(
+                f"Upscaled frames incomplete for {input_path.name}: {done_frames}/{total} "
+                f"({total - done_frames} missing)"
+            )
+
         # 4. Recombine
         fps = get_video_fps(input_path)
         cmd = [

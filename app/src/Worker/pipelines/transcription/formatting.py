@@ -17,11 +17,18 @@ def format_vtt_time(seconds):
 
 
 def format_segment_text(text, max_line_chars):
-    payload = " ".join(str(text or "").split())
+    # 双语字幕靠真实换行区分译文行和原文行，所以这里按行处理，
+    # 不能先把整段压成一行，否则换行会被吞掉。
+    source_lines = [" ".join(line.split()) for line in str(text or "").split("\n")]
+    source_lines = [line for line in source_lines if line]
+    if not source_lines:
+        return ""
     if max_line_chars <= 0:
-        return payload
-    lines = textwrap.wrap(payload, width=max_line_chars)
-    return "\n".join(lines) if lines else payload
+        return "\n".join(source_lines)
+    out = []
+    for line in source_lines:
+        out.extend(textwrap.wrap(line, width=max_line_chars) or [line])
+    return "\n".join(out)
 
 
 def segments_to_srt(segments, max_line_chars=42):
