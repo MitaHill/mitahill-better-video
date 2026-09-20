@@ -38,7 +38,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends fonts-noto-cjk && \
     rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL -o /tmp/deno.zip "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-x86_64-unknown-linux-gnu.zip" && \
+RUN curl -fsSL --retry 5 --retry-all-errors -o /tmp/deno.zip "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-x86_64-unknown-linux-gnu.zip" && \
     unzip -q /tmp/deno.zip -d /usr/local/bin && \
     chmod 0755 /usr/local/bin/deno && \
     rm -f /tmp/deno.zip && \
