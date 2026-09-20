@@ -34,6 +34,10 @@
 - Each segment follows the same lifecycle: extract frames, upscale, encode the
   segment, then release intermediate frames before moving on.
 - This avoids full-video frame extraction for multi-hour inputs.
+- Before encoding, the upscaled frame count must match the extracted frame count.
+  A frame the upscaler failed to write would make `ffmpeg -start_number 1` stop at
+  the gap and emit a silently truncated video, so a missing frame fails the task
+  instead.
 - A task process starts its own CUDA context and owns every loaded model. It exits
   after the task reaches a terminal state, so the container releases its GPU
   context regardless of success, failure, cancellation, or OOM.
