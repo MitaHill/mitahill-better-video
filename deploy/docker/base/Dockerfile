@@ -20,10 +20,13 @@ ARG FFMPEG_BUILD_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/lat
 ARG FFMPEG_CHECKSUM_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/checksums.sha256
 
 # Core system dependencies and tooling
+# 这一层只放运行时真的需要的包。编译工具链在依赖安装那一层装、用完即清；
+# libgomp1 显式装成手动包，免得那一层的 autoremove 把它当编译器依赖删掉，
+# numpy / opencv 运行时还要用。
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg git wget curl ca-certificates xz-utils build-essential pkg-config \
+    ffmpeg wget curl ca-certificates xz-utils libgomp1 \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libxfixes3 libxkbcommon0 \
-    unzip aria2 tzdata \
+    aria2 tzdata \
  && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "$INSTALL_PREBUILT_FFMPEG" = "1" ]; then \
@@ -45,6 +48,7 @@ WORKDIR /workspace
 # Python dependencies (heavy, rarely changes)
 COPY pyproject.toml uv.lock /workspace/
 RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential pkg-config \
         libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev \
         libswresample-dev libswscale-dev && \
     uv export --locked --no-emit-project --no-default-groups --group base \
@@ -61,6 +65,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         --requirements /tmp/base-requirements.txt && \
     rm -f /tmp/base-requirements.txt && \
     apt-get purge -y \
+        build-essential pkg-config \
         libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev \
         libswresample-dev libswscale-dev && \
     apt-get autoremove -y && \
@@ -79,7 +84,19 @@ RUN mkdir -p /workspace/app/models/video && \
 
 # Official inference packages. Their dependency sets conflict on BasicSR, while
 # this project only imports their model and inference modules already covered above.
+# 取提交号对应的源码包而不是 git+https：装一个 git 要多占 190MB，而这里只需要
+# 把源码解开。--no-build-isolation 让 setup.py 能用系统里已有的 torch 和 setuptools。
+ARG REALESRGAN_COMMIT=a4abfb2979a7bbff3f69f58f58ae324608821e27
+ARG HAT_COMMIT=1638a9a822581657811867bf670717f8371fc3e5
 RUN uv pip install --system einops==0.8.1 && \
-    uv pip install --system --no-deps \
-        "git+https://github.com/xinntao/Real-ESRGAN.git@a4abfb2979a7bbff3f69f58f58ae324608821e27" \
-        "git+https://github.com/XPixelGroup/HAT.git@1638a9a822581657811867bf670717f8371fc3e5"
+    mkdir -p /tmp/srcpkg/realesrgan /tmp/srcpkg/hat && \
+    wget -q --tries=5 --waitretry=5 --retry-connrefused --timeout=60 -O /tmp/realesrgan.tar.gz \
+        "https://codeload.github.com/xinntao/Real-ESRGAN/tar.gz/${REALESRGAN_COMMIT}" && \
+    wget -q --tries=5 --waitretry=5 --retry-connrefused --timeout=60 -O /tmp/hat.tar.gz \
+        "https://codeload.github.com/XPixelGroup/HAT/tar.gz/${HAT_COMMIT}" && \
+    tar -xf /tmp/realesrgan.tar.gz -C /tmp/srcpkg/realesrgan --strip-components=1 && \
+    tar -xf /tmp/hat.tar.gz -C /tmp/srcpkg/hat --strip-components=1 && \
+    uv pip install --system --no-deps --no-build-isolation \
+        /tmp/srcpkg/realesrgan /tmp/srcpkg/hat && \
+    rm -rf /tmp/srcpkg /tmp/realesrgan.tar.gz /tmp/hat.tar.gz && \
+    python3 -c "import realesrgan, hat"
