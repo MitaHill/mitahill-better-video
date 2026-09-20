@@ -48,7 +48,7 @@ jobs:
             --tag base_better_video:20260210-2330 \
             .
 
-      - name: 构建并推送应用镜像
+      - name: 构建应用镜像
         env:
           IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
         run: |
@@ -57,7 +57,22 @@ jobs:
             --network host \
             --tag "kindmitaishere/mitahill-better-video:$IMAGE_TAG" \
             .
-          docker push "kindmitaishere/mitahill-better-video:$IMAGE_TAG"
+
+      - name: 在镜像内运行单元测试
+        env:
+          IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
+        run: |
+          modules=$(ls tests/test_*.py | sed 's/\.py$//; s#/#.#')
+          docker run --rm \
+            --volume "$PWD/tests:/workspace/tests:ro" \
+            --workdir /workspace \
+            "kindmitaishere/mitahill-better-video:$IMAGE_TAG" \
+            python3 -m unittest -v $modules
+
+      - name: 推送应用镜像
+        env:
+          IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
+        run: docker push "kindmitaishere/mitahill-better-video:$IMAGE_TAG"
 
       - name: 清理构建残留
         if: always()
