@@ -9,7 +9,7 @@
 ![GitHub last commit](https://img.shields.io/github/last-commit/MitaHill/mitahill-better-video)
 ![GitHub repo size](https://img.shields.io/github/repo-size/MitaHill/mitahill-better-video)
 
-本项目，旨在帮助**转录视频**、**超分辨率增强**、**转换视频格式**、**下载视频**，且均支持批量处理；
+本项目，旨在帮助**转录视频**、**超分辨率增强**、**转换视频格式**，且均支持批量处理；
 通过容器化，可以快速部署项目，并消除系统环境不一致造成的依赖冲突等运行异常问题。
 
 ## 快速部署

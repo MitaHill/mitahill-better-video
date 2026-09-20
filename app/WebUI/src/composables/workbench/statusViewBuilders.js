@@ -12,7 +12,6 @@ const STAGE_LABELS = {
   write_subtitle: "写入字幕",
   translate: "翻译中",
   render_video: "封装字幕视频",
-  download: "下载中",
   package: "封装处理中",
   completed: "已完成",
 };
@@ -28,7 +27,6 @@ export const resolveStageLabel = (stage, category = "") => {
   if (safeCategory === "enhance") return "增强处理中";
   if (safeCategory === "convert") return "处理中";
   if (safeCategory === "transcribe") return "转录处理中";
-  if (safeCategory === "download") return "下载处理中";
   return "";
 };
 
@@ -81,24 +79,6 @@ export const buildParamRows = (status) => {
           ]
         : []),
       { label: "最大行宽", value: params.max_line_chars ?? "-" },
-    ];
-  }
-  if (params.task_category === "download") {
-    const modeLabel = {
-      video: "视频",
-      audio: "仅音频",
-      subtitle_only: "仅字幕",
-    };
-    return [
-      { label: "任务类别", value: "视频下载" },
-      { label: "下载类型", value: modeLabel[params.download_mode] || params.download_mode || "-" },
-      { label: "源链接", value: params.source_url || "-" },
-      { label: "清晰度选择", value: params.quality_selector || "-" },
-      { label: "视频封装", value: (params.video_output_format || "-").toUpperCase() },
-      { label: "音频格式", value: (params.audio_output_format || "-").toUpperCase() },
-      { label: "字幕格式", value: (params.subtitle_output_format || "-").toUpperCase() },
-      { label: "字幕语言", value: Array.isArray(params.subtitle_languages) ? params.subtitle_languages.join(", ") || "-" : "-" },
-      { label: "包含自动字幕", value: formatBool(params.subtitle_include_auto) },
     ];
   }
 
