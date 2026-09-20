@@ -51,7 +51,7 @@
 3. 登录 Docker Hub（PR 事件跳过）
 4. 构建基础镜像 `base_better_video:20260210-2330`（`deploy/docker/base/Dockerfile`）
 5. 构建应用镜像（`deploy/docker/for-app/Dockerfile`）
-6. 在镜像内运行单元测试：把 `tests/` 只读挂载到 `/workspace/tests`，对 `tests/test_*.py` 全部模块执行 `python3 -m unittest -v`
+6. 在镜像内运行单元测试：把 `scripts/tests/` 只读挂载到容器内的 `/workspace/tests`，对 `scripts/tests/test_*.py` 全部模块（模块名 `tests.test_xxx`）执行 `python3 -m unittest -v`
 7. 清空 Docker Hub 仓库旧镜像（仅 `main` 和 `v*` 标签；PR 和 `dev` 跳过，见第 4 节）
 8. 推送应用镜像；`main` 和 `v*` 标签额外打 `latest`（PR 事件跳过）
 9. 清理构建残留（始终执行）
@@ -213,7 +213,7 @@ git push origin v0.1.0-beta
 ### 其他
 
 - 构建命令带 `--network host`，在 GitHub 托管 Runner 上可以正常工作。
-- 应用镜像只 `COPY app/`，`tests/` 不在镜像里，测试步骤通过挂载提供。
+- 应用镜像只 `COPY app/`，`scripts/tests/` 不在镜像里，测试步骤通过挂载提供。
 
 ## 9. 常见故障处理
 
