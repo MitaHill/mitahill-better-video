@@ -68,12 +68,23 @@ GPU 探测、模型必要文件检查、`nvidia-smi`、模型加载等操作必�
 
 ## 构建与部署
 
-GitHub Actions 在 `dev`、`main` 和版本标签推送时构建镜像，并发布到 Docker Hub：
+GitHub Actions 在以下情况自动触发一次构建：
+
+- 推送（含提交）到 `dev` 或 `main`，或推送 `v*` 标签
+- 针对 `dev` 或 `main` 的 PR 开启（`opened`）或关闭（`closed`）；PR 已合并时由随后的 push 触发，不重复构建
+- PR 事件只构建并运行单元测试，不登录也不推送 Docker Hub
+
+构建通过后发布到 Docker Hub：
 
 - `dev` 发布为 `kindmitaishere/mitahill-better-video:dev`
 - `main` 发布为 `kindmitaishere/mitahill-better-video:latest`
 - `v*` 标签使用原版本号作为镜像标签
 - 仓库 Actions Secrets 必须配置 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`
+
+推送 `v*` 标签且镜像构建成功后，会自动创建或更新 GitHub 发行版：
+
+- 以 `alpha`、`beta` 结尾的标签一律标记为预览版（预发行版），标题追加“预览版”
+- 发行版说明包含 Docker 拉取和运行命令，内容取自 `README.md` 中 `release-docker:start` 与 `release-docker:end` 标记之间的段落，镜像标签自动替换为发行版标签；修改命令时只需改 README
 
 快速启动脚本是 `scripts/quick-start.sh`，用于检测环境并拉取项目。检测通过后，会自动运行 `quick-deploy`。
 

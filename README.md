@@ -167,6 +167,35 @@ http://服务器地址:8501
 http://127.0.0.1:8501
 ```
 
+### 使用 Docker Hub 镜像（免构建）
+
+<!-- release-docker:start -->
+拉取镜像：
+
+```bash
+docker pull kindmitaishere/mitahill-better-video:latest
+```
+
+运行容器（需要 NVIDIA Driver 与 NVIDIA Container Toolkit，先在当前目录准备好 `.env` 配置文件）：
+
+```bash
+mkdir -p storage
+docker run -d \
+  --name better_video \
+  --gpus all \
+  --network host \
+  --restart unless-stopped \
+  -e NVIDIA_VISIBLE_DEVICES=all \
+  -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,video \
+  -e TZ=Asia/Shanghai \
+  -v "$PWD/storage:/workspace/storage" \
+  -v "$PWD/.env:/workspace/config/.env" \
+  kindmitaishere/mitahill-better-video:latest
+```
+
+启动后访问 `http://127.0.0.1:8501`。
+<!-- release-docker:end -->
+
 ---------------
 
 ## 运行目录说明

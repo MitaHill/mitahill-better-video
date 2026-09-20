@@ -7,14 +7,26 @@ on:
       - main
     tags:
       - "v*"
+  pull_request:
+    types:
+      - opened
+      - closed
+    branches:
+      - dev
+      - main
   workflow_dispatch:
 
 concurrency:
-  group: docker-image-build
+  group: docker-image-build-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build:
+    # PR 合并后会由目标分支的 push 事件构建，这里跳过已合并的 closed，避免同一次变更触发两次。
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.action == 'opened' ||
+      github.event.pull_request.merged == false
     runs-on: ubuntu-latest
 
     steps:
@@ -30,11 +42,13 @@ jobs:
             refs/heads/main) tag="latest" ;;
             refs/heads/dev) tag="dev" ;;
             refs/tags/v*) tag="${ACTION_REF#refs/tags/}" ;;
+            refs/pull/*) tag="pr-test" ;;
             *) tag="manual" ;;
           esac
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: 登录 Docker Hub
+        if: github.event_name != 'pull_request'
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -70,6 +84,7 @@ jobs:
             python3 -m unittest -v $modules
 
       - name: 推送应用镜像
+        if: github.event_name != 'pull_request'
         env:
           IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
         run: docker push "kindmitaishere/mitahill-better-video:$IMAGE_TAG"
@@ -77,3 +92,55 @@ jobs:
       - name: 清理构建残留
         if: always()
         run: docker image prune --force
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v4
+
+      - name: 创建或更新发行版
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # 以 alpha、beta 结尾的版本一律标为预览版（预发行版）
+          case "$TAG" in
+            *alpha|*beta)
+              title="$TAG 预览版"
+              prerelease_flag="--prerelease"
+              summary="预览版：功能与接口可能变动，不建议用于生产环境。"
+              ;;
+            *)
+              title="$TAG"
+              prerelease_flag="--prerelease=false"
+              summary="正式版。"
+              ;;
+          esac
+
+          # Docker 拉取与运行命令取自 README.md 中 release-docker 标记之间的内容
+          docker_section=$(sed -n '/<!-- release-docker:start -->/,/<!-- release-docker:end -->/p' README.md | sed '1d;$d')
+          if [ -z "$docker_section" ]; then
+            echo "README.md 中缺少 release-docker 标记段落" >&2
+            exit 1
+          fi
+          docker_section=$(printf '%s\n' "$docker_section" | sed "s#kindmitaishere/mitahill-better-video:latest#kindmitaishere/mitahill-better-video:${TAG}#g")
+
+          {
+            echo "$summary"
+            echo
+            echo "## Docker 镜像"
+            echo
+            echo "$docker_section"
+          } > release-notes.md
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$title" --notes-file release-notes.md $prerelease_flag
+          else
+            gh release create "$TAG" --verify-tag --title "$title" --notes-file release-notes.md $prerelease_flag
+          fi
