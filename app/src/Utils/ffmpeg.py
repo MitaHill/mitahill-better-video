@@ -2,7 +2,6 @@ import subprocess
 import json
 import logging
 from datetime import datetime
-from functools import lru_cache
 from pathlib import Path
 
 logger = logging.getLogger("FFMPEG")
@@ -125,7 +124,25 @@ _CODEC_ENCODERS = {
 }
 
 
+_ENCODERS_CACHE = None
+_ENCODER_USABLE_CACHE = {}
+
+
+def reset_ffmpeg_encoders_cache():
+    """清掉进程内的编码器探测缓存（供测试使用）。"""
+    global _ENCODERS_CACHE
+    _ENCODERS_CACHE = None
+    _ENCODER_USABLE_CACHE.clear()
+
+
 def get_ffmpeg_encoders():
+    # 编码器在容器生命周期内不会变，但这个函数处在任务提交和合帧路径上，
+    # 不缓存就会每次 fork 一个 ffmpeg。只缓存探测出编码器的结果：
+    # 异常和空结果都算探测没成功，写进缓存会让一次瞬时失败把整个进程
+    # 永久卡在"没有可用编码器"。
+    global _ENCODERS_CACHE
+    if _ENCODERS_CACHE:
+        return _ENCODERS_CACHE
     try:
         result = subprocess.run(
             ["ffmpeg", "-hide_banner", "-encoders"],
@@ -135,14 +152,26 @@ def get_ffmpeg_encoders():
             check=True,
         )
     except Exception:
-        return set()
+        return frozenset()
     text = f"{result.stdout}\n{result.stderr}"
     known = {encoder for pair in _CODEC_ENCODERS.values() for encoder in pair}
-    return {name for name in {item for line in text.splitlines() for item in line.split()} if name in known}
+    found = frozenset(
+        name for name in {item for line in text.splitlines() for item in line.split()} if name in known
+    )
+    if not found:
+        # ffmpeg 正常退出但一个已知编码器都没解析出来，多半是这次探测本身出了问题。
+        return found
+    _ENCODERS_CACHE = found
+    return _ENCODERS_CACHE
 
 
-@lru_cache(maxsize=None)
 def _can_use_encoder(encoder):
+    # 和上面同一个道理：只缓存"能用"。编码器不可用既可能是真的不支持，
+    # 也可能是 NVENC 会话被占满、驱动抖动这类瞬时失败，缓存下来就再也
+    # 恢复不了，上层的 normalize_output_codec 会一直返回 None。
+    cached = _ENCODER_USABLE_CACHE.get(encoder)
+    if cached:
+        return True
     try:
         result = subprocess.run(
             [
@@ -160,6 +189,7 @@ def _can_use_encoder(encoder):
     if result.returncode != 0:
         logger.info("FFmpeg encoder unavailable: %s (%s)", encoder, (result.stderr or "").strip())
         return False
+    _ENCODER_USABLE_CACHE[encoder] = True
     return True
 
 

@@ -94,7 +94,7 @@ def build_bilingual_segments(source_segments, translated_segments):
         translated_text = " ".join(str((translated_item or {}).get("text", "")).split())
         merged_item = dict(source_item or {})
         if translated_text and original_text:
-            merged_item["text"] = f"{translated_text}\\n{original_text}"
+            merged_item["text"] = f"{translated_text}\n{original_text}"
         else:
             merged_item["text"] = translated_text or original_text
         merged.append(merged_item)

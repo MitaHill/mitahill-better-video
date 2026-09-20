@@ -97,8 +97,10 @@ class Upscaler:
         try:
             img = Image.open(input_path).convert("RGB")
         except Exception as exc:
+            # 这里不能吞掉异常：跳过一帧不写出文件，后续 ffmpeg 合帧
+            # 会在缺号处静默停止，产出一个被截断的视频。
             logger.error(f"Failed to read image: {input_path} ({exc})")
-            return
+            raise RuntimeError(f"Failed to read frame: {input_path}") from exc
         img_bgr = np.array(img)[:, :, ::-1]
         output, _ = self.enhance(img_bgr, outscale=outscale)
         out_rgb = output[:, :, ::-1]
