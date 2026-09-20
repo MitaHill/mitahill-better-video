@@ -245,6 +245,8 @@ git push origin v0.1.0-beta
 - 各分支的 push 只触发一次运行，不同分支并行执行。
 - **`dev` 只推 `dev` 标签**：`dev` 分支的一次真实运行（2026-09-20）中，清空步骤被跳过，仓库里 `latest` 保持不变，新增 `dev` 标签。
 - **清空 Docker Hub 仓库并推送 `latest`**：`main` 分支的一次真实运行（2026-09-20）中，清空步骤通过 Docker Hub API 成功删除了 `latest`、`dev`、`20260115-1522` 三个标签，随后推送 `latest`，结果仓库里只剩 `latest`（约 3.49 GB）。说明当前 Token 具有 Delete 权限。
+- **`scripts/tests/` 路径下的单元测试**：`dev` 提交 `b06715b` 的真实运行（2026-09-20，运行 #2，总耗时 4 分 56 秒）中，`scripts/tests` 挂载为容器内的 `/workspace/tests`，按 `tests.test_xxx` 模块名执行，测试步骤通过，随后推送 `dev` 标签；清空仓库和 `release` 任务按预期跳过。
+- **本机开发循环端到端**（第 12 节）：同一次运行中，`scripts/loop/dev-loop.sh ship` 完成提交、推送 `dev`、等待构建、远程停止并删除旧容器、拉取 `:dev` 镜像并重建、删除旧标签镜像，`/api/health` 返回 `ok`，容器日志无 traceback 或 error。此前还用 `DEPLOY_TAG=latest` 单独验证过 `deploy` 子命令，并在远程镜像内用 `scripts/tests` 的挂载方式跑通了 3 个旧测试。
 - FFmpeg 链接失效和 `wget` 网络故障两个问题的修复。
 
 尚未在真实环境中验证（工作流语法和逻辑已在本地检查过）：
@@ -254,6 +256,12 @@ git push origin v0.1.0-beta
 - **`v*` 标签触发的 `release` 任务**：包括预览版标记、标题、说明中的 Docker 命令，以及 `--prerelease=false` 对正式版的处理。
 
 这两项都会在 GitHub 上产生公开内容（PR、发行版与镜像标签），需要在确认后用一个测试 PR 和一个测试标签来验证。
+
+本机开发循环（第 12 节）尚未走过的路径：
+
+- **构建或测试失败**：打印失败步骤日志并停止、不部署的分支，逻辑已检查，但没有用真实的失败构建验证过。
+- **`remote_key.json` 的 `key_file` 和 `password` 登录**：目前只验证了复用已建立的 SSH 连接（ControlMaster）这一种方式。
+- **`sync` 子命令**，以及“远程 `dev` 有本机没有的提交”时的拒绝逻辑。
 
 ## 12. 本机开发循环与远程运行器
 
