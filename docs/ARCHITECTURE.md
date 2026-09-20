@@ -34,10 +34,15 @@
 - Each segment follows the same lifecycle: extract frames, upscale, encode the
   segment, then release intermediate frames before moving on.
 - This avoids full-video frame extraction for multi-hour inputs.
-- Before encoding, the upscaled frame count must match the extracted frame count.
-  A frame the upscaler failed to write would make `ffmpeg -start_number 1` stop at
-  the gap and emit a silently truncated video, so a missing frame fails the task
-  instead.
+- Before encoding, every extracted frame must have a matching upscaled file. The
+  check compares file names rather than counts, because a stale file left in
+  `frames_out` can make the totals agree while a gap remains. A frame the upscaler
+  failed to write would make `ffmpeg -start_number 1` stop at the gap and emit a
+  silently truncated video, so a missing frame fails the task instead.
+- A resumed segment only trusts a continuous prefix of finished frames and restarts
+  at the first gap. Trusting the recorded resume point alone would carry an older
+  gap into the pre-encode check and fail the task at the same place on every retry,
+  with no way to recover.
 - A task process starts its own CUDA context and owns every loaded model. It exits
   after the task reaches a terminal state, so the container releases its GPU
   context regardless of success, failure, cancellation, or OOM.
