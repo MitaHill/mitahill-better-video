@@ -107,7 +107,15 @@ jobs:
 
           # 每轮取第一页并全部删除，直到仓库为空；最多 20 轮，防止删除无效时死循环
           for round in $(seq 1 20); do
-            tags=$(curl -fsS -H "Authorization: JWT $jwt" "$api?page_size=100" | jq -r '.results[].name')
+            code=$(curl -sS -o tags.json -w '%{http_code}' -H "Authorization: JWT $jwt" "$api?page_size=100")
+            if [ "$code" = "404" ]; then
+              echo "仓库不存在，无需清空（推送时会自动创建）"
+              exit 0
+            elif [ "$code" != "200" ]; then
+              echo "列出标签失败，HTTP $code" >&2
+              exit 1
+            fi
+            tags=$(jq -r '.results[].name' tags.json)
             if [ -z "$tags" ]; then
               echo "仓库已清空"
               exit 0
