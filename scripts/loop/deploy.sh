@@ -3,11 +3,13 @@
 
 deploy() {
   local tag="${DEPLOY_TAG:-dev}"
+  prog_next
   load_remote
   check_remote
-  log "远程停止旧容器、拉取 :$tag 镜像并重建"
   # 远程只保存 docker-compose.yaml、.env 和 storage/，重部署逻辑由本机通过 SSH 送过去执行
+  prog_dirty
   remote "cd $REMOTE_DIR && TAG=$tag bash -s" < "$LOOP_DIR/remote-run.sh"
+  prog_end done "已部署 :${tag}"
 
   printf '\n页面：http://%s:8501\n' "${REMOTE_HOST#*@}"
   echo "行为改动请在页面提交一个小任务，确认完成并能在管理页删除。"
