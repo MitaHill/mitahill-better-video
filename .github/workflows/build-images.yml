@@ -80,9 +80,10 @@ jobs:
         env:
           IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
         run: |
-          modules=$(ls tests/test_*.py | sed 's/\.py$//; s#/#.#')
+          # 宿主机路径是 scripts/tests，容器内仍挂载为 /workspace/tests，模块名保持 tests.test_xxx
+          modules=$(cd scripts/tests && ls test_*.py | sed 's/\.py$//; s/^/tests./')
           docker run --rm \
-            --volume "$PWD/tests:/workspace/tests:ro" \
+            --volume "$PWD/scripts/tests:/workspace/tests:ro" \
             --workdir /workspace \
             "kindmitaishere/mitahill-better-video:$IMAGE_TAG" \
             python3 -m unittest -v $modules
