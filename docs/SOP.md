@@ -71,7 +71,7 @@ GPU 探测、模型必要文件检查、`nvidia-smi`、模型加载等操作必�
 
 ## 构建与部署
 
-Gitea Actions 在 `dev`、`main` 和版本标签推送时构建镜像，并发布到 Docker Hub：
+GitHub Actions 在 `dev`、`main` 和版本标签推送时构建镜像，并发布到 Docker Hub：
 
 - `dev` 发布为 `kindmitaishere/mitahill-better-video:dev`
 - `main` 发布为 `kindmitaishere/mitahill-better-video:latest`

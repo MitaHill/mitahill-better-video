@@ -24,7 +24,7 @@ jobs:
       - name: 确定镜像标签
         id: image_tag
         env:
-          ACTION_REF: ${{ gitea.ref }}
+          ACTION_REF: ${{ github.ref }}
         run: |
           case "$ACTION_REF" in
             refs/heads/main) tag="latest" ;;
