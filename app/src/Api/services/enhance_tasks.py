@@ -3,7 +3,7 @@ from pathlib import Path
 from app.src.Database import core as db
 from app.src.Utils.http import ffprobe_info, is_filename_safe, secure_filename
 
-from .uploads import new_task_dirs
+from .uploads import new_task_dirs, save_upload_to_disk
 
 
 def create_enhance_task(
@@ -22,7 +22,7 @@ def create_enhance_task(
 
     filename = secure_filename(upload.filename)
     input_path = upload_dir / filename
-    upload.save(input_path)
+    save_upload_to_disk(upload, input_path)
 
     size_mb = input_path.stat().st_size / (1024 * 1024)
     input_type = params["input_type"]

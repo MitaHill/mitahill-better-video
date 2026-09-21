@@ -44,6 +44,21 @@ def new_task_dirs(output_root, upload_root, reserved_task_id=None):
     return task_id, run_dir, upload_dir
 
 
+def save_upload_to_disk(upload, path):
+    """把上传内容写盘。
+
+    文件 I/O 不会让出 eventlet，而主进程的 Web 服务和 GPU 采样跑在同一个事件循环
+    里，直接 save 一个大视频会让整站在拷贝期间没有响应，所以丢进原生线程池做。
+    启动自检是没打 monkey patch 的独立子进程，那里保持原来的直接写。
+    """
+    from eventlet import patcher, tpool
+
+    if patcher.is_monkey_patched("thread"):
+        tpool.execute(upload.save, str(path))
+    else:
+        upload.save(path)
+
+
 def save_uploaded_files(files, root_dir):
     saved = []
     for upload in files:
@@ -53,7 +68,7 @@ def save_uploaded_files(files, root_dir):
             return None, f"invalid filename: {upload.filename}"
         filename = secure_filename(upload.filename)
         path = root_dir / filename
-        upload.save(path)
+        save_upload_to_disk(upload, path)
         size_mb = path.stat().st_size / (1024 * 1024)
         info = ffprobe_info(path)
         saved.append(
