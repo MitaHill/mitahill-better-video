@@ -9,16 +9,22 @@ from pathlib import Path
 logger = logging.getLogger("DB")
 DB_PATH = Path(os.getenv("DB_PATH", "/workspace/storage/data/tasks.db"))
 
-def _apply_pragmas(conn):
+DEFAULT_BUSY_TIMEOUT_MS = 30000
+# 日志、GPU 采样这类“可丢”的写入用短超时：主进程跑在 eventlet 上，
+# sqlite 的等锁是 C 层阻塞，等满 30s 会把整个事件循环连同 Web 服务一起冻住。
+BEST_EFFORT_BUSY_TIMEOUT_MS = 2000
+
+def _apply_pragmas(conn, busy_timeout_ms=DEFAULT_BUSY_TIMEOUT_MS):
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute("PRAGMA temp_store=MEMORY;")
     conn.execute("PRAGMA foreign_keys=ON;")
-    conn.execute("PRAGMA busy_timeout=30000;")
+    conn.execute(f"PRAGMA busy_timeout={int(busy_timeout_ms)};")
 
-def get_connection():
-    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
-    _apply_pragmas(conn)
+def get_connection(busy_timeout_ms=DEFAULT_BUSY_TIMEOUT_MS):
+    timeout_ms = max(int(busy_timeout_ms), 0)
+    conn = sqlite3.connect(DB_PATH, timeout=timeout_ms / 1000, check_same_thread=False)
+    _apply_pragmas(conn, timeout_ms)
     return conn
 
 def init_db():
@@ -434,12 +440,14 @@ def get_next_task_atomic():
         row = c.fetchone()
         if row:
             task_id = row['task_id']
-            logger.info(f"Task {task_id} picked by worker.")
             c.execute(
                 "UPDATE task_queue SET status = 'PROCESSING', message = 'Initializing...', updated_at = ? WHERE task_id = ?",
                 (datetime.datetime.now(), task_id),
             )
             conn.commit()
+            # 日志必须在 commit 之后写：DatabaseLogHandler 会另开一条连接写同一个库，
+            # 放在 BEGIN IMMEDIATE 事务里就是跟自己的写锁互锁，要等满 busy_timeout 才继续。
+            logger.info(f"Task {task_id} picked by worker.")
             return dict(row)
         else:
             conn.rollback()
