@@ -3,7 +3,7 @@ from pathlib import Path
 from app.src.Database import core as db
 from app.src.Utils.http import ffprobe_info, is_filename_safe, secure_filename
 
-from .uploads import classify_media, new_task_dirs, save_uploaded_files
+from .uploads import classify_media, new_task_dirs, save_upload_to_disk, save_uploaded_files
 
 
 def _collect_conversion_uploads(req):
@@ -32,7 +32,7 @@ def _save_watermark_images(req, upload_dir):
             return None, "invalid watermark image filename"
         wm_name = secure_filename(image.filename)
         wm_path = upload_dir / wm_name
-        image.save(wm_path)
+        save_upload_to_disk(image, wm_path)
         out.append(str(wm_path))
     return out, None
 

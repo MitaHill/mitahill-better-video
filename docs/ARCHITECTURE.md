@@ -32,6 +32,11 @@
 - **Task process**: one child process per task, including conversion,
   enhancement, and transcription
 
+主进程跑在 eventlet 上，Web 服务和 GPU 采样共用一个事件循环，任何不让出事件
+循环的阻塞调用都会让整站短时间无响应。上传落盘因此统一走
+`Api/services/uploads.py:save_upload_to_disk`：已打 monkey patch 的主进程丢进
+`eventlet.tpool` 的原生线程池，其它进程（启动自检子进程）直接写。
+
 ## Processing Model
 - Long videos are processed in segments to keep disk, memory, and VRAM usage
   bounded.

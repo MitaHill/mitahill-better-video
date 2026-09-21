@@ -3,6 +3,8 @@ from pathlib import Path
 
 from app.src.Utils.http import ffprobe_info, is_filename_safe, secure_filename
 
+from .uploads import save_upload_to_disk
+
 
 def probe_uploaded_media(upload, upload_root):
     if not upload or not upload.filename:
@@ -15,7 +17,7 @@ def probe_uploaded_media(upload, upload_root):
     token = uuid.uuid4().hex
     filename = secure_filename(upload.filename)
     path = probe_dir / f"{token}_{filename}"
-    upload.save(path)
+    save_upload_to_disk(upload, path)
     size_mb = path.stat().st_size / (1024 * 1024)
     try:
         info = ffprobe_info(path)
