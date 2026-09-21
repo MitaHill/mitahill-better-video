@@ -2,7 +2,7 @@ import datetime
 import sqlite3
 from typing import Dict, List
 
-from .core import get_connection
+from .core import BEST_EFFORT_BUSY_TIMEOUT_MS, get_connection
 from app.src.Utils.ffmpeg import get_gpu_utilization
 
 
@@ -40,26 +40,31 @@ def insert_gpu_samples(samples: List[Dict]):
         )
     if not rows:
         return
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.executemany(
-        """INSERT INTO gpu_usage_samples
-           (collected_at, gpu_index, gpu_name, utilization_gpu, utilization_mem, memory_used_mb, memory_total_mb, temperature_c)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        rows,
-    )
-    conn.commit()
-    conn.close()
+    # 采样每秒一次，丢一两个点无所谓，不能为了写它把主进程的事件循环堵住。
+    conn = get_connection(busy_timeout_ms=BEST_EFFORT_BUSY_TIMEOUT_MS)
+    try:
+        cur = conn.cursor()
+        cur.executemany(
+            """INSERT INTO gpu_usage_samples
+               (collected_at, gpu_index, gpu_name, utilization_gpu, utilization_mem, memory_used_mb, memory_total_mb, temperature_c)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            rows,
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def prune_old_samples(retention_hours: int = 24):
     hours = max(int(retention_hours or 24), 1)
     cutoff = _now() - datetime.timedelta(hours=hours)
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM gpu_usage_samples WHERE collected_at < ?", (cutoff,))
-    conn.commit()
-    conn.close()
+    conn = get_connection(busy_timeout_ms=BEST_EFFORT_BUSY_TIMEOUT_MS)
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM gpu_usage_samples WHERE collected_at < ?", (cutoff,))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def list_gpu_usage_series(seconds: int = 60) -> Dict:

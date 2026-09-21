@@ -3,7 +3,7 @@ import json
 import sqlite3
 from typing import Dict, List
 
-from .core import get_connection
+from .core import BEST_EFFORT_BUSY_TIMEOUT_MS, get_connection
 
 _LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 _LEVEL_WEIGHT = {name: idx for idx, name in enumerate(_LEVELS)}
@@ -26,21 +26,24 @@ def _allowed_levels(min_level: str) -> List[str]:
 
 
 def insert_log(level: str, logger_name: str, message: str, extra: Dict | None = None):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute(
-        """INSERT INTO app_logs (created_at, level, logger_name, message, extra_json)
-           VALUES (?, ?, ?, ?, ?)""",
-        (
-            _now(),
-            _normalize_level(level),
-            str(logger_name or ""),
-            str(message or ""),
-            json.dumps(extra or {}, ensure_ascii=False),
-        ),
-    )
-    conn.commit()
-    conn.close()
+    # 日志入库是尽力而为：拿不到写锁就放弃，stdout 和日志文件里仍有这条记录。
+    conn = get_connection(busy_timeout_ms=BEST_EFFORT_BUSY_TIMEOUT_MS)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO app_logs (created_at, level, logger_name, message, extra_json)
+               VALUES (?, ?, ?, ?, ?)""",
+            (
+                _now(),
+                _normalize_level(level),
+                str(logger_name or ""),
+                str(message or ""),
+                json.dumps(extra or {}, ensure_ascii=False),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def purge_expired_logs():

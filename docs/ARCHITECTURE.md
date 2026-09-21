@@ -105,7 +105,13 @@ ElevenLabs API Key 保存在 SQLite 管理配置中。公开运行配置、任�
 
 ## SQLite Runtime Rules
 - SQLite runs in WAL mode with `synchronous=NORMAL`, `temp_store=MEMORY`, and a
-  30s busy timeout.
+  30s busy timeout (`Database/core.py:DEFAULT_BUSY_TIMEOUT_MS`).
+- 日志入库和 GPU 采样属于可丢弃的写入，走 `BEST_EFFORT_BUSY_TIMEOUT_MS`（2s）
+  短超时。主进程是 eventlet 单线程事件循环，sqlite 等锁是 C 层阻塞，等满 30s
+  会把 Web 服务一起冻住。丢掉的日志行在 stdout 和日志文件里仍然有。
+- 事务里不写日志。`DatabaseLogHandler` 会另开一条连接写同一个库，放在
+  `BEGIN IMMEDIATE` 事务里就是和自己的写锁互锁，只能等 busy_timeout 超时才继续，
+  曾导致任务切换时整站卡 30 秒。日志一律在 commit 之后写。
 - The intended concurrency model is one Worker writer plus API readers.
 - Avoid long API transactions, especially around progress polling or admin
   task deletion.
