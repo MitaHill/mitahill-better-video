@@ -19,8 +19,9 @@ EVENTS_SHARED_TOKEN=replace_with_random_token
 ```
 
 说明：
-- `REAL_IP_TRUSTED_PROXIES` 是默认值，启动后会写入数据库。
-- 管理页面不提供受信代理配置入口。
+- `REAL_IP_TRUSTED_PROXIES` 是默认值，仅在数据库中还没有该配置时写入；之后运行期以数据库值为准，改环境变量不会覆盖已保存的值。
+- 管理页面提供受信代理配置入口（`GET/PUT /api/admin/config/real-ip`），可直接修改受信网段，并回显当前请求解析出的 `resolved_client_ip` 用于自检。
+- 受信网段只填代理实际出口地址，不要图省事保留整段私有网段：局域网访客的真实地址会被当成代理跳过，退而采用可伪造的 `X-Forwarded-For` 左侧值。
 
 ## 2. Nginx standard reverse proxy
 
