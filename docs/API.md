@@ -32,9 +32,27 @@ Response:
 { "task_ids": ["<uuid>", "..."], "errors": [{ "filename": "...", "error": "...", "task_id": "<uuid>" }] }
 ```
 
+## POST /api/chains
+**Content-Type**: multipart/form-data
+
+把多步串成一条链，详见 [任务链设计](TASK_CHAIN.md)。
+
+Fields:
+- `file` (required)：整条链的输入文件，只取一个
+- `steps` (required)：JSON 数组，每项 `{"category": "enhance|convert|transcribe", "params": {...}}`。`params` 的键跟对应类别的单任务接口一致；输入文件字段不用填，第一步用 `file`，后续步骤由后端填上一步的产物
+
+约束：最多 5 步；`transcribe` 只能是最后一步；非最后一步的 `convert` 只允许 `convert_mode=transcode`。
+
+Response:
+```
+{ "chain_id": "<batch_id>", "task_ids": ["<task_id>", "..."] }
+```
+
+链就是一个批次，状态查 `GET /api/batches/<chain_id>`，结果打包下载 `GET /api/batches/<chain_id>/result`，整条取消 `POST /api/admin/batches/<chain_id>/cancel`。
+
 ## GET /api/tasks/<task_id>
 Response includes:
-- `status` (PENDING/PROCESSING/COMPLETED/FAILED)
+- `status` (PENDING/PROCESSING/COMPLETED/FAILED；链上还没轮到的步骤是 WAITING)
 - `progress` (0-100)
 - `message`
 - `task_params`

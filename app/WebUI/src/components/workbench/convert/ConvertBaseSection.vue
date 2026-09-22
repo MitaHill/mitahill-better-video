@@ -7,7 +7,7 @@
         <option v-for="item in convertModeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
       </select>
     </div>
-    <div class="field">
+    <div class="field" v-if="showSourcePicker">
       <label>上传视频（可多选）</label>
       <input ref="mediaInput" class="file-input-hidden" type="file" multiple accept="video/*" @change="onConvertMediaChange" />
       <div class="file-picker-row">
@@ -17,7 +17,7 @@
         <span v-if="selectedFileCount" class="selected-file-count">已选择 {{ selectedFileCount }} 个文件</span>
       </div>
     </div>
-    <div class="media-list" v-if="convertMediaInfo.length">
+    <div class="media-list" v-if="showSourcePicker && convertMediaInfo.length">
       <div class="media-row" v-for="item in convertMediaInfo" :key="item.filename + ':' + item.size_mb">
         <span>{{ item.filename }}</span>
         <span>{{ item.has_video ? '视频' : (item.has_audio ? '音频' : '未知') }}</span>
@@ -41,11 +41,16 @@ const props = defineProps({
   },
   convertMediaInfo: {
     type: Array,
-    required: true,
+    default: () => [],
+  },
+  // 链式任务的输入来自上一步，这里不需要再选文件
+  showSourcePicker: {
+    type: Boolean,
+    default: true,
   },
   onConvertMediaChange: {
     type: Function,
-    required: true,
+    default: () => {},
   },
   getFieldPolicy: {
     type: Function,

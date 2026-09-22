@@ -35,7 +35,8 @@ def _batch_status(children):
         return "PENDING"
     if all(status == "COMPLETED" for status in statuses):
         return "COMPLETED"
-    if any(status in {"PENDING", "PROCESSING"} for status in statuses):
+    # WAITING 是链上还没轮到的步骤，算整条链仍在进行
+    if any(status in {"PENDING", "PROCESSING", "WAITING"} for status in statuses):
         return "PROCESSING"
     if any(status == "FAILED" for status in statuses):
         return "FAILED"

@@ -19,6 +19,13 @@
       :remove-watermark-segment="removeWatermarkSegment"
       :get-field-policy="getFieldPolicy"
     />
+    <ChainTaskForm
+      v-else-if="activeCategory === 'chain' && chain"
+      :chain="chain"
+      :get-field-policy="getFieldPolicy"
+      :transcription-runtime-config="transcriptionRuntimeConfig"
+    />
+
     <TranscribeTaskForm
       v-else-if="activeCategory === 'transcribe'"
       :transcribe-form="transcribeForm"
@@ -41,6 +48,7 @@
 </template>
 
 <script setup>
+import ChainTaskForm from "./chain/ChainTaskForm.vue";
 import ConvertTaskForm from "./ConvertTaskForm.vue";
 import EnhanceTaskForm from "./EnhanceTaskForm.vue";
 import TranscribeTaskForm from "./TranscribeTaskForm.vue";
@@ -123,17 +131,23 @@ const props = defineProps({
     type: Function,
     required: true,
   },
+  chain: {
+    type: Object,
+    default: null,
+  },
 });
 
 const panelTitle = computed(() => {
   if (props.activeCategory === "convert") return "创建转换任务";
   if (props.activeCategory === "transcribe") return "创建转录任务";
+  if (props.activeCategory === "chain") return "创建链式任务";
   return "创建增强任务";
 });
 
 const submitText = computed(() => {
   if (props.activeCategory === "convert") return "转换任务开始";
   if (props.activeCategory === "transcribe") return "转录任务开始";
+  if (props.activeCategory === "chain") return "链式任务开始";
   return "增强任务开始";
 });
 </script>

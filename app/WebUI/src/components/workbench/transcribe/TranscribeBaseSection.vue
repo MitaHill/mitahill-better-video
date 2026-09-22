@@ -2,7 +2,7 @@
   <div class="param-section">
     <div class="param-title">转录基础</div>
 
-    <div class="field">
+    <div class="field" v-if="showSourcePicker">
       <label>上传音频或视频（可多选）</label>
       <input ref="mediaInput" class="file-input-hidden" type="file" multiple accept="video/*,audio/*" @change="onTranscribeMediaChange" />
       <div class="file-picker-row">
@@ -13,7 +13,7 @@
       </div>
     </div>
 
-    <div class="media-list" v-if="transcribeMediaInfo.length">
+    <div class="media-list" v-if="showSourcePicker && transcribeMediaInfo.length">
       <div class="media-row" v-for="item in transcribeMediaInfo" :key="item.filename + ':' + item.size_mb">
         <span>{{ item.filename }}</span>
         <span>{{ item.has_video ? "视频" : item.has_audio ? "音频" : "未知" }}</span>
@@ -109,15 +109,20 @@ const props = defineProps({
   },
   transcribeMediaInfo: {
     type: Array,
-    required: true,
+    default: () => [],
   },
   onTranscribeMediaChange: {
     type: Function,
-    required: true,
+    default: () => {},
   },
   onTranscribeLowDataToggle: {
     type: Function,
-    required: true,
+    default: () => {},
+  },
+  // 链式任务的输入来自上一步，这里不需要再选文件
+  showSourcePicker: {
+    type: Boolean,
+    default: true,
   },
   getFieldPolicy: {
     type: Function,
