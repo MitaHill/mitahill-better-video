@@ -13,6 +13,8 @@ from app.src.Database import admin as db_admin
 from app.src.Database import core as db
 from app.src.Notifications.events import send_event
 
+from .chain import advance_chain, recover_chains
+
 logger = logging.getLogger("WORKER")
 TASK_PROCESS_POLL_SECONDS = 1
 TASK_PROCESS_COMPLETION_GRACE_SECONDS = 5
@@ -152,6 +154,7 @@ def worker_loop():
     config.initialize_context()
     db.init_db()
     recover_tasks()
+    recover_chains()
     signal.signal(signal.SIGTERM, _shutdown_handler)
     signal.signal(signal.SIGINT, _shutdown_handler)
     logger.info(
@@ -168,6 +171,9 @@ def worker_loop():
         task = db.get_next_task_atomic()
         if task:
             _run_task_process(task["task_id"])
+            # 放在这里而不是 _run_task_process 的完成分支里：进程异常退出被标成
+            # FAILED 的路径也要走一次推进，否则下游会一直停在 WAITING。
+            advance_chain(task["task_id"])
         else:
             time.sleep(2)
 

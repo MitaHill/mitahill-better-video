@@ -8,6 +8,7 @@ import { useWorkbenchSubmission } from "./workbench/useWorkbenchSubmission";
 import { useWorkbenchTheme } from "./workbench/useWorkbenchTheme";
 import { useTranscribeLowDataMode } from "./workbench/useTranscribeLowDataMode";
 import { useWorkbenchUploads } from "./workbench/useWorkbenchUploads";
+import { useTaskChain } from "./workbench/useTaskChain";
 import { parseJsonSafe } from "./workbench/utils";
 
 export const useWorkbenchController = () => {
@@ -74,6 +75,8 @@ export const useWorkbenchController = () => {
     enforceCategory,
   });
 
+  const chain = useTaskChain({ transcriptionRuntimeConfig });
+
   const { enableLowData, prepareUploadFiles } = useTranscribeLowDataMode({
     transcribeForm,
     submitError,
@@ -94,6 +97,7 @@ export const useWorkbenchController = () => {
     parseJsonSafe,
     enforceCategory,
     prepareTranscribeUploadFiles: prepareUploadFiles,
+    chain,
   });
 
   const { fetchRecommendations } = useWorkbenchRecommendations({ enhanceForm });
@@ -143,6 +147,9 @@ export const useWorkbenchController = () => {
     if (!convertForm.watermarkTimeline.length) {
       addWatermarkSegment();
     }
+    if (!chain.chainSteps.length) {
+      chain.addStep("enhance");
+    }
     fetchConstraints();
     initRealtime();
   });
@@ -184,6 +191,7 @@ export const useWorkbenchController = () => {
     addWatermarkSegment,
     removeWatermarkSegment,
     transcriptionRuntimeConfig,
+    chain,
     submitTask,
     fetchStatus,
     downloadResult,

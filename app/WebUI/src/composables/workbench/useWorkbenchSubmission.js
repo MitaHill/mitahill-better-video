@@ -15,6 +15,7 @@ export const useWorkbenchSubmission = ({
   parseJsonSafe,
   enforceCategory,
   prepareTranscribeUploadFiles,
+  chain,
 }) => {
   const submissionContext = {
     enforceCategory,
@@ -28,6 +29,7 @@ export const useWorkbenchSubmission = ({
     fetchStatus,
     parseJsonSafe,
     prepareTranscribeUploadFiles,
+    chain,
   };
 
   const submitTask = async () => {

@@ -160,16 +160,27 @@ def init_db():
         import sys
         sys.exit(1)
 
-def create_task(task_id, client_ip, task_params, video_info, task_category=None):
+def create_task(
+    task_id,
+    client_ip,
+    task_params,
+    video_info,
+    task_category=None,
+    status="PENDING",
+    chain_step=None,
+    chain_next_task_id=None,
+):
     logger.info(f"Creating new task: {task_id} from {client_ip}")
     category = task_category or task_params.get("task_category") or "enhance"
+    initial_status = str(status or "PENDING").strip().upper()
+    initial_message = "Waiting for previous step" if initial_status == "WAITING" else "Waiting to start"
     conn = get_connection()
     c = conn.cursor()
     c.execute("""INSERT INTO task_queue 
-                 (task_id, created_at, updated_at, client_ip, task_category, status, task_params, video_info, progress, message, result_path) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-              (task_id, datetime.datetime.now(), datetime.datetime.now(), client_ip, category, "PENDING", 
-               json.dumps(task_params), json.dumps(video_info), 0, "Waiting to start", None))
+                 (task_id, created_at, updated_at, client_ip, task_category, status, task_params, video_info, progress, message, result_path, chain_step, chain_next_task_id) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+              (task_id, datetime.datetime.now(), datetime.datetime.now(), client_ip, category, initial_status, 
+               json.dumps(task_params), json.dumps(video_info), 0, initial_message, None, chain_step, chain_next_task_id))
     c.execute("DELETE FROM task_control WHERE task_id = ?", (task_id,))
     conn.commit()
     conn.close()
@@ -252,7 +263,7 @@ def list_batch_items(batch_id):
            FROM task_batch_items bi
            LEFT JOIN task_queue tq ON tq.task_id = bi.task_id
            WHERE bi.batch_id = ?
-           ORDER BY bi.created_at ASC, bi.task_id ASC""",
+           ORDER BY COALESCE(tq.chain_step, 999999) ASC, bi.created_at ASC, bi.task_id ASC""",
         (batch_id,),
     )
     rows = c.fetchall()
@@ -321,6 +332,19 @@ def update_task_result(task_id, result_path):
     c.execute(
         "UPDATE task_queue SET result_path = ?, updated_at = ? WHERE task_id = ?",
         (str(result_path), datetime.datetime.now(), task_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def update_task_params(task_id, task_params):
+    if task_params is None:
+        return
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        "UPDATE task_queue SET task_params = ?, updated_at = ? WHERE task_id = ?",
+        (json.dumps(task_params, ensure_ascii=False), datetime.datetime.now(), task_id),
     )
     conn.commit()
     conn.close()
@@ -567,13 +591,37 @@ def _ensure_columns(conn):
         c.execute("ALTER TABLE task_queue ADD COLUMN task_category TEXT DEFAULT 'enhance'")
     if "result_path" not in columns:
         c.execute("ALTER TABLE task_queue ADD COLUMN result_path TEXT")
+    # 任务链：chain_step 为空表示普通任务，链上的步骤按 chain_step 排序、按
+    # chain_next_task_id 单向推进。
+    if "chain_step" not in columns:
+        c.execute("ALTER TABLE task_queue ADD COLUMN chain_step INTEGER")
+    if "chain_next_task_id" not in columns:
+        c.execute("ALTER TABLE task_queue ADD COLUMN chain_next_task_id TEXT")
     conn.commit()
 
 def get_unfinished_tasks():
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT * FROM task_queue WHERE status NOT IN ('COMPLETED', 'FAILED')")
+    # WAITING 是链上还没轮到的步骤，输入文件本来就不存在，交给恢复流程只会被当成
+    # 源文件丢失删掉。它不占队列，等上游完成时自然会被推进。
+    c.execute("SELECT * FROM task_queue WHERE status NOT IN ('COMPLETED', 'FAILED', 'WAITING')")
+    rows = c.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def list_chain_tasks_to_advance():
+    """已结束但下游可能还没推进的链步骤，供 Worker 启动时补一次推进。"""
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute(
+        """SELECT * FROM task_queue
+           WHERE chain_step IS NOT NULL
+             AND chain_next_task_id IS NOT NULL
+             AND status IN ('COMPLETED', 'FAILED')"""
+    )
     rows = c.fetchall()
     conn.close()
     return [dict(row) for row in rows]

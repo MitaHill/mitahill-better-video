@@ -59,6 +59,18 @@
   It waits for the task process and starts the next task only after that process
   has exited.
 
+## Task Chain
+- 一条任务链就是一个 `batch_category = "chain"` 的批次，每一步是一条普通的
+  `task_queue` 记录，靠 `chain_step` 排序、`chain_next_task_id` 单向推进。
+- 还没轮到的步骤停在 `WAITING`。`get_next_task_atomic()` 只取 `PENDING`，所以
+  调度器不用改，也不会提前拾取。
+- 推进在 Worker：任务进程退出后 `Worker/chain.py:advance_chain()` 把上一步的
+  `result_path` 填进下一步的参数再放行，失败则把下游还在 `WAITING` 的步骤一次
+  性终止。任务进程只管自己那一步。
+- 每步仍是独立进程，显存照旧随进程退出释放；链只是把串行排得更长，不并行。
+- 产物不合法（压缩包、字幕接给视频步骤、文件不存在）时明确失败，不做兜底转换。
+- 规则和取舍见 [任务链设计](TASK_CHAIN.md)。
+
 ## WebUI Module Layout
 - `app/WebUI/src/pages/WorkbenchPage.vue`: page shell only (layout + component assembly).
 - `app/WebUI/src/components/workbench/WorkbenchHeader.vue`: theme selector + category switch entry.
@@ -68,6 +80,8 @@
 - `app/WebUI/src/components/workbench/ConvertTaskForm.vue`: conversion form module.
 - `app/WebUI/src/components/workbench/WatermarkTimelineEditor.vue`: watermark timeline editor module.
 - `app/WebUI/src/components/workbench/enhance/*`: enhance section modules.
+- `app/WebUI/src/components/workbench/chain/ChainTaskForm.vue`: task chain panel (input file + step list).
+- `app/WebUI/src/components/workbench/chain/ChainStepCard.vue`: one chain step; drag to reorder, reuses the existing section components.
 - `app/WebUI/src/components/workbench/convert/*`: conversion section modules.
 - `app/src/Worker/pipelines/transcription/translation/*`: 转录翻译提供器与分段翻译子模块（仅 OpenAI 兼容 Chat Completions 格式）。
 - `app/src/Worker/pipelines/transcription/engine.py`: 转录引擎入口，将本地与云端结果统一为字幕分段。

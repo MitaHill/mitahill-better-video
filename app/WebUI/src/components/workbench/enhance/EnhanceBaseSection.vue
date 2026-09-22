@@ -1,13 +1,13 @@
 <template>
   <div class="param-section">
     <div class="param-title">任务基础</div>
-    <div class="field">
+    <div class="field" v-if="showSourcePicker">
       <label>输入类型</label>
       <select v-model="enhanceForm.inputType" :disabled="isDisabled('inputType')">
         <option v-for="item in inputTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
       </select>
     </div>
-    <div class="field">
+    <div class="field" v-if="showSourcePicker">
       <label>上传文件（支持批量）</label>
       <input ref="fileInput" class="file-input-hidden" type="file" multiple @change="onEnhanceFileChange" />
       <div class="file-picker-row">
@@ -36,7 +36,12 @@ const props = defineProps({
   },
   onEnhanceFileChange: {
     type: Function,
-    required: true,
+    default: () => {},
+  },
+  // 链式任务的输入来自上一步，这里不需要再选文件
+  showSourcePicker: {
+    type: Boolean,
+    default: true,
   },
   getFieldPolicy: {
     type: Function,

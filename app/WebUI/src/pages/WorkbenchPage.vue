@@ -27,6 +27,7 @@
           :remove-watermark-segment="removeWatermarkSegment"
           :get-field-policy="getFieldPolicy"
           :transcription-runtime-config="transcriptionRuntimeConfig"
+          :chain="chain"
           :submit-task="submitTask"
         />
 
@@ -93,6 +94,7 @@ const {
   addWatermarkSegment,
   removeWatermarkSegment,
   transcriptionRuntimeConfig,
+  chain,
   getFieldPolicy,
   submitTask,
   fetchStatus,

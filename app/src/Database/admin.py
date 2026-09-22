@@ -351,7 +351,8 @@ def cancel_batch(batch_id: str, reason: str = "已取消（管理员操作）") 
     for item in items:
         task_id = item.get("task_id")
         status = str(item.get("status") or "").upper()
-        if task_id and status in {"PENDING", "PROCESSING"}:
+        # WAITING 是链上还没轮到的步骤，取消批次时必须一并终止，否则会一直挂着
+        if task_id and status in {"PENDING", "PROCESSING", "WAITING"}:
             cancel_task(task_id, reason=reason)
             canceled.append(task_id)
     return {"batch_id": safe_batch_id, "canceled_task_ids": canceled}

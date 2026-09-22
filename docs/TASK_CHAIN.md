@@ -1,6 +1,6 @@
 # 任务链（Task Chain）设计
 
-状态：**设计稿，尚未实现**。本文描述在现有三条处理管线之上，增加「一次提交、多步串联」能力的方案，以及实施时必须同步修改的既有代码点。
+状态：**已实现**（首版）。本文描述在现有三条处理管线之上，「一次提交、多步串联」是怎么做的，以及为什么不照搬 ComfyUI 的节点图。
 
 ## 1. 背景
 
@@ -103,8 +103,9 @@
 | --- | --- |
 | 取消整条链 | 复用 `POST /api/admin/batches/<batch_id>/cancel`。**需要改**：`Database/admin.py:354` 目前只对 `PENDING` / `PROCESSING` 的子任务取消，要把 `WAITING` 加进集合。`cancel_task` 本身（`admin.py:321`）只排除 `COMPLETED` / `FAILED`，对 `WAITING` 已经适用，不用改。 |
 | 某步失败 | 见上，后续 `WAITING` 步骤标 `FAILED`。链的聚合状态经 `_batch_status()` 变成 `FAILED`。 |
-| 容器重启 | **这是最容易出事的地方。** `get_unfinished_tasks()` 取 `status NOT IN ('COMPLETED','FAILED')`（`core.py:576`），`recover_tasks()` 会把返回的任务全部重置成 `PENDING`；而 `WAITING` 步骤的输入文件此时还不存在，会走进 `db.delete_task(task_id)` 被直接删掉（`Worker/loop.py:51`）。必须同时改这两处：恢复查询排除 `WAITING`，或在恢复分支里对 `chain_step` 非空的任务单独处理。 |
-| 中间产物清理 | 现有 TTL 按任务清理。链跑完前，上游步骤的 `result_path` 不能被清掉——清理逻辑要把「属于未完成链的任务」排除在外。 |
+| 容器重启 | **这是最容易出事的地方。** `get_unfinished_tasks()` 原本取 `status NOT IN ('COMPLETED','FAILED')`，`recover_tasks()` 会把返回的任务全部重置成 `PENDING`；而 `WAITING` 步骤的输入文件此时还不存在，会走进 `db.delete_task(task_id)` 被直接删掉（`Worker/loop.py:51`）。修法是在那条查询里排除 `WAITING`，`recover_tasks()` 本身不用改：链步骤被推进时会一并写好 `video_info.upload_path`，恢复流程据此找文件，和转换、转录任务走的是同一条路径。 |
+| 断电留下的挂死 | 上一步刚写完 `COMPLETED`、推进还没跑就断电，下游会一直停在 `WAITING`。Worker 启动时 `recover_chains()` 补一次推进；`advance_chain()` 只放行处于 `WAITING` 的下一步，重复调用是安全的。 |
+| 中间产物清理 | 无需处理：`cleanup_old_tasks()` 目前没有任何调用点，TTL 清理并没有在跑。哪天要启用它，得先把「属于未完成链的任务」排除掉。 |
 
 ## 7. API
 
@@ -131,7 +132,7 @@
 
 ### 复用
 
-- `GET /api/batches/<chain_id>`：链状态。需要小改 `batch_tasks.py`：`_batch_status()` 的「进行中」判断要把 `WAITING` 算进去；进度不再取子任务平均，改成按步加权（已完成步数 + 当前步进度）/ 总步数。
+- `GET /api/batches/<chain_id>`：链状态。只小改了一处 `batch_tasks.py`：`_batch_status()` 的「进行中」判断要把 `WAITING` 算进去。进度沿用子任务平均值——已完成的步是 100、没轮到的步是 0，平均值本身就等于按步加权，不用另写。
 - `GET /api/batches/<chain_id>/result`：结果打包。
 - Socket.IO：`join` 传 `chain_id` 即可，`events.py:37` 的批次转发已经覆盖。
 
@@ -140,46 +141,63 @@
 落点遵守既有的模块化规则（页面只做组装，逻辑进 composables，视图分区进 components）：
 
 - `constants/workbench.js`：`CATEGORY_PATH` / `CATEGORY_TABS` 增加 `chain: "/chain"`，标签「链式」。
-- `components/workbench/chain/ChainStepList.vue`：可拖拽排序的步骤条，原生 `draggable` 属性 + `dragstart` / `dragover` / `drop`，不引入依赖。
-- `components/workbench/chain/ChainStepCard.vue`：单步卡片，内部按类别复用现有的 `EnhanceTaskForm` / `ConvertTaskForm` / `TranscribeTaskForm`。**表单组件不得为链再复制一份。**
-- `composables/workbench/useTaskChain.js`：步骤增删改排序、衔接合法性校验、提交。
+- `components/workbench/chain/ChainTaskForm.vue`：链面板，顶部选输入文件，下面是步骤列表和「添加步骤」。
+- `components/workbench/chain/ChainStepCard.vue`：单步卡片，原生 `draggable` + `dragstart` / `dragover` / `drop` 排序，不引入画布库，不新增依赖。卡片内部直接复用现有的 section 组件，**没有为链复制任何一份表单**。
+- `composables/workbench/useTaskChain.js`：步骤增删改排序、衔接校验、参数收集。每一步的参数映射直接复用 `submitPayloadBuilders` 里的构建器，把产出的 FormData 去掉文件字段转成 JSON，所以链里的参数含义和单任务完全一致。
 - `composables/workbench/submission/submitChainTask.js`，在 `submission/index.js` 的 `submitterMap` 注册。
 
-状态展示复用 `TaskStatusPanel`，按 `chain_step` 排序显示每步进度。
+三个 `*BaseSection` 组件加了一个 `showSourcePicker` 开关（默认 `true`，现有页面行为不变），链里传 `false` 把文件选择区藏掉——链的输入只有最前面那一个文件。增强的「输入类型」也一起藏，它由后端按实际产物的后缀决定。
+
+首版的取舍：链里的转换步骤不渲染水印和元数据区。那一区要上传水印图片，而链面板只有一个输入文件的入口。需要水印时用单独的转换任务。
+
+状态展示复用 `TaskStatusPanel`：链就是批次，`list_batch_items` 的排序已按 `chain_step` 优先。
 
 ## 9. 需要改动的既有代码
 
+后端：
+
 | 文件 | 改动 |
 | --- | --- |
-| `Database/core.py` | `_ensure_columns()` 加两列；`get_unfinished_tasks()` 排除 `WAITING` |
-| `Database/admin.py:354` | `cancel_batch` 的状态集合加 `WAITING` |
-| `Worker/loop.py` | `worker_loop` 中调用 `advance_chain()`；`recover_tasks()` 对链步骤单独处理 |
-| `Worker/chain.py` | 新建，推进逻辑 |
-| `Api/services/chain_tasks.py` | 新建，建链 |
-| `Api/routes/chains.py` | 新建，`POST /api/chains` |
-| `Api/services/batch_tasks.py` | `_batch_status()` 认 `WAITING`；进度改按步加权 |
-| 清理逻辑 | 未完成链的中间产物不清 |
-| `docs/ARCHITECTURE.md`、`docs/API.md` | 实现时同步更新 |
+| `Database/core.py` | `_ensure_columns()` 加 `chain_step` / `chain_next_task_id`；`create_task()` 接受 `status` 和这两个字段；`get_unfinished_tasks()` 排除 `WAITING`；新增 `update_task_params()` 和 `list_chain_tasks_to_advance()`；`list_batch_items()` 按 `chain_step` 优先排序 |
+| `Database/admin.py` | `cancel_batch` 的状态集合加 `WAITING` |
+| `Worker/chain.py` | 新建：`advance_chain()` / `recover_chains()` |
+| `Worker/loop.py` | 启动时 `recover_chains()`，每个任务进程退出后 `advance_chain()` |
+| `Utils/media_items.py` | 新建：后缀分类与 `apply_media_input()`，建链和推进共用一份字段映射 |
+| `Api/services/chain_tasks.py` | 新建：步骤校验、建链 |
+| `Api/routes/chains.py` | 新建：`POST /api/chains`，在 `routes/__init__.py` 注册 |
+| `Api/services/batch_tasks.py` | `_batch_status()` 认 `WAITING` |
 
-管线代码（`Worker/pipelines/**`）和上传服务不改。
+前端：新增 `chain/ChainTaskForm.vue`、`chain/ChainStepCard.vue`、`useTaskChain.js`、`submitChainTask.js`；`constants/workbench.js`、`TaskCreatePanel.vue`、`WorkbenchPage.vue`、`useWorkbenchController.js`、`useWorkbenchSubmission.js`、`submission/index.js` 接线；三个 `*BaseSection.vue` 加 `showSourcePicker`。
 
-## 10. 验证清单
+管线代码（`Worker/pipelines/**`）、上传服务和调度器都没有改。
 
-除 `docs/SOP.md` 的常规项外，本功能必须实测：
+测试：`scripts/tests/test_task_chain.py`，14 条，覆盖推进、注入字段、zip 与字幕产物的拒绝、失败传播、幂等、非链任务不受影响，以及建链的六条校验规则。
 
-1. 三步链（转换 → 增强 → 转录）跑通，每步产物正确衔接。
+## 10. 验证状态
+
+已经跑过：
+
+- `python3 -m compileall -q app/src`（容器内）通过。
+- `python3 -m unittest tests.test_task_chain`（容器内）14 条全过，含推进、字段注入、zip 与字幕产物被拒、失败传播、幂等、非链任务零影响、建链校验。
+- `cd app/WebUI && npm run build` 通过。
+
+还没跑，需要在带 GPU 的运行环境上补：
+
+1. 三步链（转换 → 增强 → 转录）真实跑通，每步产物正确衔接。
 2. 中间步骤失败：后续步骤标 `FAILED`，链状态 `FAILED`，不留 `WAITING` 僵尸行。
 3. 链运行中取消：当前步进程被杀，`WAITING` 步骤一并终止。
 4. **链运行中重启容器**：`WAITING` 步骤没有被误删、也没有被提前拾取。
-5. 单任务（非链）提交不受影响——`chain_step` 为 `NULL` 的路径要回归一遍。
-6. 上一步产出 zip 时，下一步给出明确报错而不是静默失败。
+5. 单任务（非链）提交回归一遍——`chain_step` 为 `NULL` 的路径。
+6. `docker compose config`（开发机的 Docker CLI 没有 compose 插件，跑不了）。
 
 ## 11. 已知限制
 
-- 串行。四步链的耗时是四步之和，UI 上要说清楚。
+- 串行。四步链的耗时是四步之和，链面板上已经写明不会并行。
 - 整条链重跑，没有部分重跑。
 - 每步单输入单输出，多文件批量与链不能同时用。
 - 中间产物占磁盘，链越长占得越多。
+- 下一步直接引用上一步 `output/run_<id>/` 里的产物，没有复制。中途在管理页删掉上游任务会连带删掉那个文件，后续步骤会以「结果文件不存在」失败。
+- 链里的转换步骤没有水印和元数据配置。
 
 ## 12. 后续演进
 
