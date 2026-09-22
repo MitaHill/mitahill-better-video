@@ -7,6 +7,7 @@
 - [运行 SOP](SOP.md)：日常开发、构建、验证、Git 和版本规则。
 - [架构说明](ARCHITECTURE.md)：进程模型、模块边界、存储路径和关键约束。
 - [API 说明](API.md)：任务、管理、转录等接口。
+- [任务链设计](TASK_CHAIN.md)：多步串联的设计稿（尚未实现）。
 - [WSL2 部署提示](WSL2.md)：WSL2 下 NVIDIA / Docker 常见问题。
 - [真实 IP 部署](DEPLOY_REAL_IP.md)：Nginx、FRP、Proxy Protocol 配置。
 - [第三方代码与模型](THIRD_PARTY.md)：外部代码、模型来源和许可证。
