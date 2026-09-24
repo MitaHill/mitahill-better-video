@@ -26,14 +26,14 @@ class HATUpscaler:
     scale = 4
     window_size = 16
 
-    def __init__(self, model_path, tile=128, tile_pad=32, variant="real"):
+    def __init__(self, model_path, tile=128, tile_pad=32):
         self.model_path = Path(model_path)
         if not self.model_path.exists():
             raise FileNotFoundError(f"Model weight missing: {self.model_path}")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.tile_size = self._align_tile(tile)
         self.tile_pad = self._align_tile_pad(tile_pad)
-        self.model = self._load_model(variant)
+        self.model = self._load_model()
 
     def _align_tile(self, value):
         value = max(self.window_size, int(value or 128))
@@ -43,8 +43,8 @@ class HATUpscaler:
         value = max(self.window_size, int(value or self.window_size))
         return math.ceil(value / self.window_size) * self.window_size
 
-    def _load_model(self, variant):
-        depths = [6] * (12 if variant == "hat-l" else 6)
+    def _load_model(self):
+        depths = [6] * 6
         model = _load_official_hat_class()(
             upscale=self.scale,
             in_chans=3,

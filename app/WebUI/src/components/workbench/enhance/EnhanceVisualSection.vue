@@ -60,12 +60,10 @@ const props = defineProps({
 
 const MODEL_LABELS = Object.freeze({
   "realesrgan-x4plus": "通用高清 / realesrgan-x4plus",
-  "realesrnet-x4plus": "降噪慢速 / realesrnet-x4plus",
   "realesrgan-x4plus-anime": "二次元 / realesrgan-x4plus-anime",
   "realesr-animevideov3": "二次元视频快速 / realesr-animevideov3",
   "realesr-general-x4v3": "通用快速 / realesr-general-x4v3",
   "real-hat-gan-x4": "高质量真实图像 / real-hat-gan-x4",
-  "hat-l-srx4": "高质量大模型慢速 / hat-l-srx4",
 });
 
 const { isDisabled, allowed, numMin, numMax, numStep } = useFieldPolicy(props.getFieldPolicy, "enhance");
