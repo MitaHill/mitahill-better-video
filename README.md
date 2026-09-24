@@ -221,13 +221,13 @@ pre-run/
 
 ### 增强模型
 
-项目内置 Real-ESRGAN 与 HAT 相关加载逻辑，常用模型包括：
+项目内置 Real-ESRGAN 与 HAT 相关加载逻辑，可选模型如下：
 
-- `realesrgan-x4plus`
-- `realesrnet-x4plus`
-- `realesr-general-x4v3`
-- `real-hat-gan-x4`
-- `hat-l-srx4`
+- `realesrgan-x4plus`：通用高清，默认模型
+- `realesr-general-x4v3`：通用快速，唯一支持降噪强度调节
+- `realesr-animevideov3`：二次元视频，速度最快
+- `realesrgan-x4plus-anime`：二次元静图，质量高于 animevideov3
+- `real-hat-gan-x4`：真实图像最高画质，固定 fp32，速度最慢
 
 ### 转录模型
 

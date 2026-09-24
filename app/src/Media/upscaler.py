@@ -24,15 +24,6 @@ class Upscaler:
             )
             logger.info("HAT model loaded and ready.")
             return
-        if model_name == 'hat-l-srx4':
-            self.upsampler = HATUpscaler(
-                weights_dir / 'HAT-L_SRx4_ImageNet-pretrain.pth',
-                tile=tile,
-                tile_pad=tile_pad,
-                variant="hat-l",
-            )
-            logger.info("HAT-L model loaded and ready.")
-            return
         model_scale = 4
         dni_weight = None
         
@@ -40,9 +31,6 @@ class Upscaler:
         if model_name == 'realesrgan-x4plus':
             model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=4)
             model_path = weights_dir / 'RealESRGAN_x4plus.pth'
-        elif model_name == 'realesrnet-x4plus':
-            model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=4)
-            model_path = weights_dir / 'RealESRNet_x4plus.pth'
         elif model_name == 'realesrgan-x4plus-anime':
             model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=6, num_grow_ch=32, scale=4)
             model_path = weights_dir / 'RealESRGAN_x4plus_anime_6B.pth'

@@ -35,7 +35,7 @@ Response:
 ## POST /api/chains
 **Content-Type**: multipart/form-data
 
-把多步串成一条链，详见 [任务链设计](TASK_CHAIN.md)。
+把多步串成一条链，详见 [任务链设计](TASK_CHAIN.md)。接口可用，但前端「链式」入口暂时隐藏。
 
 Fields:
 - `file` (required)：整条链的输入文件，只取一个
