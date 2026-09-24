@@ -121,10 +121,21 @@ jobs:
               echo "仓库已清空"
               exit 0
             fi
+            # 标签列表有延迟，可能列出刚删掉的标签，删除返回 404 视为已不存在。
+            # 一轮下来一个都没删掉，说明剩下的都是过期条目，仓库已清空。
+            deleted=0
             for tag in $tags; do
-              curl -fsS -o /dev/null -X DELETE -H "Authorization: JWT $jwt" "$api/$tag/"
-              echo "已删除标签 $tag"
+              code=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: JWT $jwt" "$api/$tag/")
+              case "$code" in
+                2??) echo "已删除标签 $tag"; deleted=$((deleted + 1)) ;;
+                404) echo "标签 $tag 已不存在，跳过" ;;
+                *) echo "删除标签 $tag 失败，HTTP $code" >&2; exit 1 ;;
+              esac
             done
+            if [ "$deleted" -eq 0 ]; then
+              echo "仓库已清空（列表中剩余的是过期条目）"
+              exit 0
+            fi
           done
           echo "清空 20 轮后仓库仍有标签，请检查 Token 权限" >&2
           exit 1
