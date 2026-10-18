@@ -33,7 +33,8 @@ def emit_progress(
             "progress": progress_value,
             "message": message,
             "stage": str(stage or "").strip().lower(),
-            "gpu_util": get_gpu_utilization(),
+            # 翻译只使用远端 API；GPU 状态由主进程的采样服务提供。
+            "gpu_util": None if stage == "translate" else get_gpu_utilization(),
             "updated_at": _event_now_iso(),
             "item_index": item_index,
             "item_count": item_count,
