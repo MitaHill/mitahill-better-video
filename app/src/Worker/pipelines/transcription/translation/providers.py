@@ -276,7 +276,8 @@ class OpenAICompatibleTranslator(BaseTranslator):
                     if type(reasoning) is int and reasoning >= 0:
                         self._record(reasoning_tokens=reasoning)
                 return data
-            except (requests.ConnectionError, requests.Timeout, requests.HTTPError) as exc:
+            except (requests.ConnectionError, requests.Timeout, requests.HTTPError,
+                    requests.exceptions.ChunkedEncodingError) as exc:
                 status = response.status_code if response is not None else 0
                 transient = not isinstance(exc, requests.HTTPError) or status == 429 or status >= 500
                 if not transient or attempt == 2:

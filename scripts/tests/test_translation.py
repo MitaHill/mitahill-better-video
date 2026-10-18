@@ -243,6 +243,50 @@ class TranslatorTests(unittest.TestCase):
 
 
 class HTTPTranslationTests(unittest.TestCase):
+    def test_truncated_http_body_retries_then_falls_back_only_current_batch(self):
+        state = {"requests": 0}
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+            def do_POST(self):
+                data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                items = json.loads(data["messages"][-1]["content"])["items"]
+                state["requests"] += 1
+                if items[0]["id"] == 0:
+                    self.send_response(200)
+                    self.send_header("Content-Length", "100")
+                    self.end_headers()
+                    self.wfile.write(b"{")
+                    self.wfile.flush()
+                    self.close_connection = True
+                    return
+                body = response(json.dumps({"translations": [
+                    {"id": item["id"], "text": "译" + item["text"]} for item in items
+                ]})).content
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        translator = OpenAICompatibleTranslator(
+            base_url=f"http://127.0.0.1:{server.server_port}/v1", model="test", api_key="",
+            prompt="Translate to {{target_language}}.", batch_size=1, concurrency=1,
+        )
+        try:
+            with patch.object(translator, "_retry_delay", return_value=0):
+                result = translate_segments(segments(2), translator, "zh")
+        finally:
+            translator.on_task_end()
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+        self.assertEqual([item["text"] for item in result], ["line 0", "译line 1"])
+        self.assertEqual(state["requests"], 4)
+        self.assertEqual(translator.stats["retries"], 2)
+        self.assertEqual(translator.stats["fallbacks"], 1)
+
     def test_600_segments_bounded_concurrency_order_and_connection_reuse(self):
         lock = threading.Lock()
         state = {"active": 0, "peak": 0, "requests": 0, "ports": set(), "completion": []}

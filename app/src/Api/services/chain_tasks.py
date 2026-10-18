@@ -16,7 +16,6 @@ from ..task_parsers import (
     parse_enhance_task_params,
     parse_transcription_task_params,
 )
-from .batch_tasks import add_batch_item, create_batch
 from .uploads import new_task_dirs, save_uploaded_files
 
 CHAIN_MAX_STEPS = 5
@@ -111,27 +110,37 @@ def create_chain(upload, steps, client_ip, output_root, upload_root, logger):
             return None, None, "仅支持 H.264/H.265/MPEG2 视频编码。"
 
     task_ids = [item[0] for item in allocated]
-    chain_id = create_batch("chain")
-    for index, (category, params) in enumerate(parsed_steps):
-        task_id = task_ids[index]
-        next_task_id = task_ids[index + 1] if index + 1 < len(task_ids) else None
-        if index == 0:
-            params, video_info = first_params, first_video_info
-            status = "PENDING"
-        else:
-            video_info = {}
-            status = "WAITING"
-        db.create_task(
-            task_id,
-            client_ip,
-            params,
-            video_info,
-            task_category=category,
-            status=status,
-            chain_step=index,
-            chain_next_task_id=next_task_id,
-        )
-        add_batch_item(chain_id, task_id, category, item_label=f"{index + 1}.{category}")
+    # 首步与后继、批次关系一起提交，Worker 不能读到半条链。
+    conn = db.get_connection()
+    try:
+        with conn:
+            conn.execute("BEGIN IMMEDIATE")
+            chain_id = db.create_batch("chain", connection=conn)
+            for index, (category, params) in enumerate(parsed_steps):
+                task_id = task_ids[index]
+                next_task_id = task_ids[index + 1] if index + 1 < len(task_ids) else None
+                if index == 0:
+                    params, video_info = first_params, first_video_info
+                    status = "PENDING"
+                else:
+                    video_info = {}
+                    status = "WAITING"
+                db.create_task(
+                    task_id,
+                    client_ip,
+                    params,
+                    video_info,
+                    task_category=category,
+                    status=status,
+                    chain_step=index,
+                    chain_next_task_id=next_task_id,
+                    connection=conn,
+                )
+                db.add_batch_item(
+                    chain_id, task_id, category, item_label=f"{index + 1}.{category}", connection=conn
+                )
+    finally:
+        conn.close()
 
     logger.info("Chain %s created with steps %s", chain_id, task_ids)
     return chain_id, task_ids, None

@@ -86,9 +86,13 @@ def _fail_downstream(task, reason):
         if not next_id:
             return
         nxt = db.get_task(next_id)
-        if not nxt or str(nxt.get("status") or "").upper() != "WAITING":
+        if not nxt:
             return
-        _fail_step(nxt, reason)
+        status = str(nxt.get("status") or "").upper()
+        if status == "WAITING":
+            _fail_step(nxt, reason)
+        elif status != "FAILED":
+            return
         current = nxt
     logger.warning("Chain walk from task %s exceeded %s steps, stopping.", task["task_id"], _MAX_CHAIN_WALK)
 
@@ -101,7 +105,11 @@ def _promote_next(task):
     if not nxt:
         logger.warning("Chain step %s points at missing task %s.", task["task_id"], next_id)
         return
-    if str(nxt.get("status") or "").upper() != "WAITING":
+    status = str(nxt.get("status") or "").upper()
+    if status == "FAILED":
+        _fail_downstream(nxt, "上游步骤失败，已跳过")
+        return
+    if status != "WAITING":
         # 已经推进过（或已被取消），推进保持幂等
         return
 
