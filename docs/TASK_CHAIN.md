@@ -71,7 +71,8 @@
 `create_conversion_task` / `create_transcription_task` 都强耦合 Flask `request` 来取上传文件（`Api/services/conversion_tasks.py:40`、`transcription_tasks.py:54`），而链的后续步骤没有上传文件，只有一个本地路径。为了不被迫重构这两个 service，**建链时就把所有步骤的任务行一次性插好**：
 
 - 第 0 步：走现有上传流程（`uploads.py:save_upload_to_disk`），`status = PENDING`。
-- 第 1..n 步：用 `db.create_task()` 直接插行，params 里的输入路径字段留空，`status` 随后改为 `WAITING`。
+- 第 1..n 步：用 `db.create_task()` 直接插行，params 里的输入路径字段留空，初始状态为 `WAITING`。
+- 批次、全部步骤和批次关系在同一个 SQLite 事务中提交；事务内不写日志。提交前首步对 Worker 不可见，任何插入失败都会回滚整条链。
 - 推进时只做两件事：把上一步的 `result_path` 填进下一步 params 的输入路径字段（必要时补 `db.update_task_video_info`），然后 `PENDING`。
 
 这样推进逻辑不需要建任务，也不碰上传层。副作用是前端在链开始前就能看到完整的步骤列表和各自的 task_id。
@@ -103,9 +104,9 @@
 
 | 场景 | 处理 |
 | --- | --- |
-| 取消整条链 | 复用 `POST /api/admin/batches/<batch_id>/cancel`。**需要改**：`Database/admin.py:354` 目前只对 `PENDING` / `PROCESSING` 的子任务取消，要把 `WAITING` 加进集合。`cancel_task` 本身（`admin.py:321`）只排除 `COMPLETED` / `FAILED`，对 `WAITING` 已经适用，不用改。 |
-| 某步失败 | 见上，后续 `WAITING` 步骤标 `FAILED`。链的聚合状态经 `_batch_status()` 变成 `FAILED`。 |
-| 容器重启 | **这是最容易出事的地方。** `get_unfinished_tasks()` 原本取 `status NOT IN ('COMPLETED','FAILED')`，`recover_tasks()` 会把返回的任务全部重置成 `PENDING`；而 `WAITING` 步骤的输入文件此时还不存在，会走进 `db.delete_task(task_id)` 被直接删掉（`Worker/loop.py:51`）。修法是在那条查询里排除 `WAITING`，`recover_tasks()` 本身不用改：链步骤被推进时会一并写好 `video_info.upload_path`，恢复流程据此找文件，和转换、转录任务走的是同一条路径。 |
+| 取消整条链 | 复用 `POST /api/admin/batches/<batch_id>/cancel`，取消所有 `PENDING` / `PROCESSING` / `WAITING` 子任务。单独取消链步骤也会同步取消等待中的后继。 |
+| 某步失败 | 后续 `WAITING` 步骤标 `FAILED`；失败传播会穿过已经失败的中间步骤。单独取消尚未执行的链步骤时，管理接口同步取消其等待中的后继，不依赖 Worker 拾取被取消步骤。链的聚合状态经 `_batch_status()` 变成 `FAILED`。 |
+| 容器重启 | **这是最容易出事的地方。** `get_unfinished_tasks()` 原本取 `status NOT IN ('COMPLETED','FAILED')`，`recover_tasks()` 会把返回的任务全部重置成 `PENDING`；而 `WAITING` 步骤的输入文件此时还不存在，会走进 `db.delete_task(task_id)` 被直接删掉（`Worker/loop.py:51`）。修法是在那条查询里排除 `WAITING`，`recover_tasks()` 对链任务保留失败记录：链步骤被推进时会一并写好 `video_info.upload_path`，恢复流程据此找文件，和转换、转录任务走的是同一条路径。链步骤源文件缺失或恢复异常时保留任务及链指针，标记 `FAILED`，随后由 `recover_chains()` 终止等待中的后继；普通任务仍沿用删除规则。 |
 | 断电留下的挂死 | 上一步刚写完 `COMPLETED`、推进还没跑就断电，下游会一直停在 `WAITING`。Worker 启动时 `recover_chains()` 补一次推进；`advance_chain()` 只放行处于 `WAITING` 的下一步，重复调用是安全的。 |
 | 中间产物清理 | 无需处理：`cleanup_old_tasks()` 目前没有任何调用点，TTL 清理并没有在跑。哪天要启用它，得先把「属于未完成链的任务」排除掉。 |
 
@@ -148,7 +149,7 @@
 - `composables/workbench/useTaskChain.js`：步骤增删改排序、衔接校验、参数收集。每一步的参数映射直接复用 `submitPayloadBuilders` 里的构建器，把产出的 FormData 去掉文件字段转成 JSON，所以链里的参数含义和单任务完全一致。
 - `composables/workbench/submission/submitChainTask.js`，在 `submission/index.js` 的 `submitterMap` 注册。
 
-三个 `*BaseSection` 组件加了一个 `showSourcePicker` 开关（默认 `true`，现有页面行为不变），链里传 `false` 把文件选择区藏掉——链的输入只有最前面那一个文件。增强的「输入类型」也一起藏，它由后端按实际产物的后缀决定。
+三个 `*BaseSection` 组件加了一个 `showSourcePicker` 开关（默认 `true`，现有页面行为不变），链里传 `false` 把文件选择区藏掉——链的输入只有最前面那一个文件。增强的「输入类型」也一起藏，它由后端按实际产物的后缀决定。转录的「低数据传输」同样随文件选择区隐藏：链的后继输入已经在服务端，不经过浏览器音频提取。
 
 首版的取舍：链里的转换步骤不渲染水印和元数据区。那一区要上传水印图片，而链面板只有一个输入文件的入口。需要水印时用单独的转换任务。
 
@@ -173,7 +174,7 @@
 
 管线代码（`Worker/pipelines/**`）、上传服务和调度器都没有改。
 
-测试：`scripts/tests/test_task_chain.py`，14 条，覆盖推进、注入字段、zip 与字幕产物的拒绝、失败传播、幂等、非链任务不受影响，以及建链的六条校验规则。
+测试：`scripts/tests/test_task_chain.py` 覆盖推进、字段注入、zip 与字幕产物拒绝、失败传播、幂等、非链任务、建链校验，以及真实 SQLite 的整链提交可见性、插入失败回滚、子步骤取消和缺失源文件的重启恢复。
 
 ## 10. 验证状态
 

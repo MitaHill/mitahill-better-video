@@ -22,6 +22,7 @@
           :on-enhance-file-change="onEnhanceFileChange"
           :on-convert-media-change="onConvertMediaChange"
           :on-transcribe-media-change="onTranscribeMediaChange"
+          :on-transcribe-low-data-toggle="onTranscribeLowDataToggle"
           :on-watermark-images-change="onWatermarkImagesChange"
               :add-watermark-segment="addWatermarkSegment"
           :remove-watermark-segment="removeWatermarkSegment"
@@ -90,6 +91,7 @@ const {
   onEnhanceFileChange,
   onConvertMediaChange,
   onTranscribeMediaChange,
+  onTranscribeLowDataToggle,
   onWatermarkImagesChange,
   addWatermarkSegment,
   removeWatermarkSegment,

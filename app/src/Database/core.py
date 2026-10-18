@@ -169,12 +169,14 @@ def create_task(
     status="PENDING",
     chain_step=None,
     chain_next_task_id=None,
+    connection=None,
 ):
-    logger.info(f"Creating new task: {task_id} from {client_ip}")
+    if connection is None:
+        logger.info(f"Creating new task: {task_id} from {client_ip}")
     category = task_category or task_params.get("task_category") or "enhance"
     initial_status = str(status or "PENDING").strip().upper()
     initial_message = "Waiting for previous step" if initial_status == "WAITING" else "Waiting to start"
-    conn = get_connection()
+    conn = connection if connection is not None else get_connection()
     c = conn.cursor()
     c.execute("""INSERT INTO task_queue 
                  (task_id, created_at, updated_at, client_ip, task_category, status, task_params, video_info, progress, message, result_path, chain_step, chain_next_task_id) 
@@ -182,9 +184,10 @@ def create_task(
               (task_id, datetime.datetime.now(), datetime.datetime.now(), client_ip, category, initial_status, 
                json.dumps(task_params), json.dumps(video_info), 0, initial_message, None, chain_step, chain_next_task_id))
     c.execute("DELETE FROM task_control WHERE task_id = ?", (task_id,))
-    conn.commit()
-    conn.close()
-    logger.debug(f"Task {task_id} inserted into queue.")
+    if connection is None:
+        conn.commit()
+        conn.close()
+        logger.debug(f"Task {task_id} inserted into queue.")
 
 def get_task(task_id):
     conn = get_connection()
@@ -223,23 +226,24 @@ def new_batch_id():
     raise RuntimeError("failed to allocate a unique 4-digit batch id")
 
 
-def create_batch(batch_category):
+def create_batch(batch_category, connection=None):
     batch_id = new_batch_id()
     now = datetime.datetime.now()
-    conn = get_connection()
+    conn = connection if connection is not None else get_connection()
     c = conn.cursor()
     c.execute(
         """INSERT INTO task_batches (batch_id, batch_category, created_at, updated_at)
            VALUES (?, ?, ?, ?)""",
         (batch_id, batch_category, now, now),
     )
-    conn.commit()
-    conn.close()
+    if connection is None:
+        conn.commit()
+        conn.close()
     return batch_id
 
 
-def add_batch_item(batch_id, task_id, task_category, item_label=""):
-    conn = get_connection()
+def add_batch_item(batch_id, task_id, task_category, item_label="", connection=None):
+    conn = connection if connection is not None else get_connection()
     c = conn.cursor()
     now = datetime.datetime.now()
     c.execute(
@@ -249,8 +253,9 @@ def add_batch_item(batch_id, task_id, task_category, item_label=""):
         (batch_id, task_id, task_category, item_label, now),
     )
     c.execute("UPDATE task_batches SET updated_at = ? WHERE batch_id = ?", (now, batch_id))
-    conn.commit()
-    conn.close()
+    if connection is None:
+        conn.commit()
+        conn.close()
 
 
 def list_batch_items(batch_id):

@@ -1,10 +1,12 @@
+import logging
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from app.src.Api.services import chain_tasks
-from app.src.Worker import chain
+from app.src.Database import admin, core as db
+from app.src.Worker import chain, loop
 
 FAKE_PROBE = {
     "duration": 12.0,
@@ -159,6 +161,26 @@ class ChainAdvanceTests(unittest.TestCase):
         self.assertEqual(fake.tasks["0002"]["status"], "PROCESSING")
         self.assertEqual(fake.params_writes, {})
 
+    def test_failed_middle_step_does_not_block_failure_propagation(self):
+        fake = FakeDb({
+            "0001": make_task("0001", "convert", "FAILED", 0, "0002"),
+            "0002": make_task("0002", "enhance", "FAILED", 1, "0003"),
+            "0003": make_task("0003", "transcribe", "WAITING", 2),
+        })
+        with patch.object(chain, "db", fake):
+            chain.advance_chain("0001")
+        self.assertEqual(fake.tasks["0003"]["status"], "FAILED")
+
+    def test_completed_step_propagates_cancelled_next_step(self):
+        fake = FakeDb({
+            "0001": make_task("0001", "convert", "COMPLETED", 0, "0002"),
+            "0002": make_task("0002", "enhance", "FAILED", 1, "0003"),
+            "0003": make_task("0003", "transcribe", "WAITING", 2),
+        })
+        with patch.object(chain, "db", fake):
+            chain.advance_chain("0001")
+        self.assertEqual(fake.tasks["0003"]["status"], "FAILED")
+
     def test_plain_task_is_untouched(self):
         fake = FakeDb({"0001": make_task("0001", "enhance", "COMPLETED", None)})
         with patch.object(chain, "db", fake):
@@ -201,6 +223,91 @@ class ChainValidationTests(unittest.TestCase):
         self.assertEqual(form["watermark_timeline"], '[{"text": "hi"}]')
         self.assertEqual(form["crf"], 20)
         self.assertIs(form["fp16"], True)
+
+
+class ChainDatabaseTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        db_path = patch.object(db, "DB_PATH", self.root / "tasks.db")
+        db_path.start()
+        self.addCleanup(db_path.stop)
+        db.init_db()
+        events = patch.object(chain, "send_event")
+        events.start()
+        self.addCleanup(events.stop)
+
+    def _create_chain(self):
+        source = self.root / "source.mp4"
+        source.write_bytes(b"video")
+        saved = [{"upload_path": str(source)}]
+        with patch.object(chain_tasks, "save_uploaded_files", return_value=(saved, None)), \
+                patch("app.src.Utils.media_items.ffprobe_info", return_value=dict(FAKE_PROBE)):
+            return chain_tasks.create_chain(
+                object(), [{"category": "convert"}, {"category": "convert"}],
+                "127.0.0.1", self.root / "output", self.root / "upload", logging.getLogger("test"),
+            )
+
+    def test_worker_cannot_see_first_step_until_whole_chain_is_committed(self):
+        create_task = db.create_task
+        def insert(*args, **kwargs):
+            create_task(*args, **kwargs)
+            # 独立连接模拟 Worker；任何一步写完时都不能看到半条链。
+            self.assertIsNone(db.get_task(args[0]))
+        with patch.object(db, "create_task", side_effect=insert):
+            batch_id, ids, error = self._create_chain()
+        self.assertIsNone(error)
+        self.assertEqual([db.get_task(i)["status"] for i in ids], ["PENDING", "WAITING"])
+        self.assertEqual(len(db.list_batch_items(batch_id)), 2)
+        self.assertEqual(db.get_task(ids[0])["chain_next_task_id"], ids[1])
+
+    def test_insert_failure_rolls_back_entire_chain(self):
+        add_item = db.add_batch_item
+        def insert(*args, **kwargs):
+            add_item(*args, **kwargs)
+            if kwargs["item_label"].startswith("2."):
+                raise RuntimeError("injected insertion failure")
+        with patch.object(db, "add_batch_item", side_effect=insert):
+            with self.assertRaisesRegex(RuntimeError, "injected"):
+                self._create_chain()
+        conn = db.get_connection()
+        try:
+            for table in ("task_queue", "task_batches", "task_batch_items"):
+                self.assertEqual(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0], 0)
+        finally:
+            conn.close()
+
+    def _insert_steps(self, first_status="PENDING"):
+        for index, status in enumerate((first_status, "WAITING", "WAITING")):
+            db.create_task(
+                f"{index + 1:04d}", "127.0.0.1",
+                {"filename": "missing.mp4", "upload_path": str(self.root / "missing.mp4")}, {},
+                task_category="convert", status=status, chain_step=index,
+                chain_next_task_id=f"{index + 2:04d}" if index < 2 else None,
+            )
+
+    def test_cancel_pending_first_step_terminates_all_successors(self):
+        self._insert_steps()
+        admin.cancel_task("0001")
+        self.assertEqual([db.get_task(f"{i:04d}")["status"] for i in (1, 2, 3)], ["FAILED"] * 3)
+
+    def test_cancel_waiting_middle_step_terminates_successors_only(self):
+        self._insert_steps("PROCESSING")
+        admin.cancel_task("0002")
+        self.assertEqual([db.get_task(f"{i:04d}")["status"] for i in (1, 2, 3)],
+                         ["PROCESSING", "FAILED", "FAILED"])
+
+    def test_restart_with_missing_source_fails_chain_without_deleting_links(self):
+        self._insert_steps("PROCESSING")
+        loop.recover_tasks()
+        chain.recover_chains()
+        self.assertEqual([db.get_task(f"{i:04d}")["status"] for i in (1, 2, 3)], ["FAILED"] * 3)
+        self.assertIn("Recovery failed", db.get_task("0001")["message"])
+        # 重启恢复保持幂等，不再留下 WAITING 行。
+        loop.recover_tasks()
+        chain.recover_chains()
+        self.assertEqual(db.get_unfinished_tasks(), [])
 
 
 if __name__ == "__main__":

@@ -77,7 +77,7 @@
       </select>
     </div>
 
-    <div class="field low-data-field">
+    <div v-if="showSourcePicker" class="field low-data-field">
       <label class="check-inline">
         <input
           type="checkbox"

@@ -333,6 +333,23 @@ def cancel_task(task_id: str, reason: str = "已取消（管理员操作）") ->
 
     db_core.request_task_cancel(safe_task_id, reason=reason)
     db_core.update_task_status(safe_task_id, "FAILED", progress=task.get("progress") or 0, message=reason)
+    # 尚未入队的链步骤不会经过 Worker，取消时必须同时终止其后继。
+    current = task
+    seen = {safe_task_id}
+    while current.get("chain_next_task_id"):
+        next_id = current["chain_next_task_id"]
+        if next_id in seen:
+            break
+        seen.add(next_id)
+        current = db_core.get_task(next_id)
+        if not current:
+            break
+        next_status = str(current.get("status") or "").upper()
+        if next_status == "WAITING":
+            db_core.request_task_cancel(next_id, reason=reason)
+            db_core.update_task_status(next_id, "FAILED", message=reason)
+        elif next_status != "FAILED":
+            break
     latest = db_core.get_task(safe_task_id)
     return latest or task
 

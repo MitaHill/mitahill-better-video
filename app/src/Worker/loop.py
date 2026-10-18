@@ -49,11 +49,15 @@ def recover_tasks():
                 logger.info("Task Recovery: Task %s has source file. Resetting to PENDING.", task_id)
                 db.update_task_status(task_id, "PENDING", 0, "Recovered from system restart.")
             else:
-                logger.warning("Task Recovery: Task %s source missing at %s. Deleting task.", task_id, input_path)
-                db.delete_task(task_id)
+                logger.warning("Task Recovery: Task %s source missing at %s.", task_id, input_path)
+                raise FileNotFoundError(f"Source file missing: {input_path}")
         except Exception as exc:
             logger.error("Failed to recover task %s: %s", task_id, exc)
-            db.delete_task(task_id)
+            if task.get("chain_step") is not None:
+                # 保留链指针，让 recover_chains 将失败传给所有后继。
+                db.update_task_status(task_id, "FAILED", message=f"Recovery failed: {exc}")
+            else:
+                db.delete_task(task_id)
 
 
 def _terminate_process(process, task_id: str, reason: str):
