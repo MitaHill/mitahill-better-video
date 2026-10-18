@@ -92,6 +92,8 @@ def normalize_transcription_options(raw):
         ).strip(),
         "translator_prompt": str(translator_prompt or "").strip(),
         "translator_fallback_mode": fallback_mode,
+        "translator_batch_size": config.TRANSCRIPTION_TRANSLATOR_BATCH_SIZE,
+        "translator_concurrency": config.TRANSCRIPTION_TRANSLATOR_CONCURRENCY,
         "generate_bilingual": True,
         "export_json": False,
     }
