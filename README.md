@@ -419,20 +419,20 @@ Git 分支约定：
 - `dev`: 日常开发分支，新功能和修复从这里开始
 - `main`: 稳定分支，只合并已测试版本
 
-每个 `dev` 提交都应完成必要验证后再提交。
+测试交付统一使用 `scripts/loop/dev-loop.sh ship`，以对应提交的 CI 构建、镜像内全量测试和远程部署健康检查为依据，随后由用户手动验收。
 
 版本约定：
 
 - 带 `alpha` 或 `beta` 后缀的版本号是预览版，例如 `v0.0.2-alpha`
 - 只有纯版本号才是正式发行版，例如 `v0.1.0`
 
-推荐检查：
+标准 CI/CD 入口：
 
 ```bash
-python3 -m compileall -q app/src
-cd app/WebUI && npm run build
-cd ../../pre-run && docker compose config
+bash scripts/loop/dev-loop.sh ship "fix: 说明本次改动"
 ```
+
+本地构建或测试仅用于开发排查，不能作为测试交付依据。流程与结果记录要求见 [CI/CD 与发布说明](docs/CI_CD.md)。
 
 ---------------
 

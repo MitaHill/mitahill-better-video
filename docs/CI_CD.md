@@ -4,6 +4,16 @@
 
 工作流文件：`.github/workflows/build-images.yml`
 
+## 交付依据
+
+所有测试交付统一通过 `scripts/loop/dev-loop.sh ship "提交信息"`：提交并推送本次改动，等待对应 Git Hash 的 GitHub Actions 构建和镜像内全量测试成功，再部署到远程运行器并完成健康检查。
+
+- 本地构建、单测、编译检查或临时容器检查只用于开发排查，不能单独作为“测试通过”或“已验证交付”的依据。
+- `check` 只检查前置条件，`deploy` 只重新部署已有镜像，都不能替代 `ship` 的完整验证流程。
+- 交付报告必须注明 Git Hash、CI 运行链接、CI 测试结果和远程部署及健康检查结果。任何一步失败或尚未完成，都应如实标明。
+- 页面功能由用户在该版本上手动测试；健康检查通过不能替代人工验收。
+- 页脚显示构建时注入的版本类型与 Git Hash：`dev` 为开发版，`main` 或发布标签为稳定版。无法获取 Hash 时显示“未知提交”，不得写死旧版本号。
+
 ## 1. 远程仓库策略
 
 - 唯一远程仓库是 GitHub：`https://github.com/MitaHill/mitahill-better-video`
@@ -275,6 +285,7 @@ git push origin v0.1.0-beta
 - `docker-compose.yaml`：镜像写为 `kindmitaishere/mitahill-better-video:${TAG:-dev}`，其余与 `pre-run/docker-compose.yaml` 一致
 - `.env`：挂载到容器 `/workspace/config/.env` 的文件，内容可为空。必须是文件，挂载点不存在时 Docker 会把它建成目录
 - `storage/`：持久化数据（上传、输出、数据库、日志、模型缓存）
+- `.deploy-image.yml`：固定实际部署的镜像 digest；`.deploy-rollback-image` 记录上一镜像标签，`.deploy.lock` 防止并发部署
 
 ### 脚本目录
 
@@ -297,8 +308,9 @@ git push origin v0.1.0-beta
 
 1. 有未提交的改动时，用给定的提交信息提交（只暂存已跟踪文件）
 2. 推送 `dev`，触发工作流；用 `gh run watch` 等待构建和单元测试完成，失败时打印失败步骤日志并停止，不部署
-3. 远程停止并删除 `better_video` 容器，拉取 `:dev` 镜像并重建，成功后删除旧镜像（只删本项目的镜像），轮询 `/api/health`
-4. 输出镜像、容器状态、日志中的错误行数和最近日志，由人判断满意与否：满意则结束，不满意则继续修改并再次执行
+3. 检查没有待处理或运行中的任务，先拉取本次提交的 `sha-<Git Hash>` 镜像，固定其 digest，并保留旧镜像；下载失败不停止当前服务
+4. 重建 `better_video` 并检查 `/api/health` 中应用、数据库和 Worker 的状态；失败时尝试恢复上一镜像，本次部署仍报告失败
+5. 输出部署结果，由用户手动测试；需要修改时再次执行完整 `ship` 流程
 
 | 命令 | 作用 |
 | --- | --- |

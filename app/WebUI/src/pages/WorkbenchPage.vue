@@ -55,7 +55,7 @@
       </template>
     </section>
 
-    <div class="app-signature">由CodeX和米塔山开发</div>
+    <div class="app-signature">{{ buildInfo.channel }} <code>{{ buildInfo.gitHash }}</code></div>
   </div>
 </template>
 
@@ -65,6 +65,8 @@ import TaskStatusPanel from "../components/workbench/TaskStatusPanel.vue";
 import WorkbenchHeader from "../components/workbench/WorkbenchHeader.vue";
 import AdminPanel from "../components/admin/AdminPanel.vue";
 import { useWorkbenchController } from "../composables/useWorkbenchController";
+
+const buildInfo = __BUILD_INFO__;
 
 const {
   activeCategory,

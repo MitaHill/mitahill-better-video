@@ -69,9 +69,12 @@ jobs:
       - name: 构建应用镜像
         env:
           IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
+          BUILD_CHANNEL: ${{ steps.image_tag.outputs.release == 'true' && 'stable' || 'dev' }}
         run: |
           docker build \
             --file deploy/docker/for-app/Dockerfile \
+            --build-arg BUILD_CHANNEL="$BUILD_CHANNEL" \
+            --build-arg GIT_SHA="$GITHUB_SHA" \
             --network host \
             --tag "kindmitaishere/mitahill-better-video:$IMAGE_TAG" \
             .

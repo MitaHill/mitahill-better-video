@@ -11,7 +11,9 @@ COPY app/WebUI/index.html .
 COPY app/WebUI/public ./public
 COPY app/WebUI/src ./src
 RUN npm ci
-RUN npm run build
+ARG BUILD_CHANNEL=dev
+ARG GIT_SHA=unknown
+RUN BUILD_CHANNEL="$BUILD_CHANNEL" GIT_SHA="$GIT_SHA" npm run build
 
 FROM ghcr.io/astral-sh/uv:0.8.13 AS uv
 
