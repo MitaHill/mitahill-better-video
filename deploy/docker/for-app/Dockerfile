@@ -10,8 +10,7 @@ COPY app/WebUI/vite.config.js .
 COPY app/WebUI/index.html .
 COPY app/WebUI/public ./public
 COPY app/WebUI/src ./src
-COPY app/WebUI/tests ./tests
-RUN npm ci && npm test
+RUN npm ci
 ARG BUILD_CHANNEL=dev
 ARG GIT_SHA=unknown
 RUN BUILD_CHANNEL="$BUILD_CHANNEL" GIT_SHA="$GIT_SHA" npm run build

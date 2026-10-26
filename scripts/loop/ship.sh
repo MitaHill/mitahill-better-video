@@ -61,11 +61,11 @@ ship() {
 
   prog_dirty
   if ! gh run watch "$run_id" --interval 15 --exit-status; then
-    log "构建或测试失败，失败步骤日志（末尾 80 行）"
+    log "CI 未成功完成（build → test → push），失败步骤日志（末尾 80 行）"
     gh run view "$run_id" --log-failed | tail -80
-    die "构建失败，未部署。修改代码后重新执行 scripts/loop/dev-loop.sh ship \"提交信息\""
+    die "CI 未通过，未部署。修改代码后重新执行 scripts/loop/dev-loop.sh ship \"提交信息\""
   fi
-  prog_end done "构建与镜像内单测通过"
+  prog_end done "build、test、push 全部通过"
 
   DEPLOY_IMAGE="kindmitaishere/mitahill-better-video:sha-$sha" deploy
 }

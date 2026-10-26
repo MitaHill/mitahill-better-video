@@ -20,6 +20,9 @@ concurrency:
   group: docker-image-build-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   build:
     # PR 合并后会由目标分支的 push 事件构建，这里跳过已合并的 closed，避免同一次变更触发两次。
@@ -28,6 +31,10 @@ jobs:
       github.event.action == 'opened' ||
       github.event.pull_request.merged == false
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.image_tag.outputs.tag }}
+      release: ${{ steps.image_tag.outputs.release }}
+      image_id: ${{ steps.save_image.outputs.image_id }}
 
     steps:
       - name: 拉取源码
@@ -51,13 +58,6 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "release=$release" >> "$GITHUB_OUTPUT"
 
-      - name: 登录 Docker Hub
-        if: github.event_name != 'pull_request'
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
-
       - name: 构建基础镜像
         run: |
           docker build \
@@ -68,7 +68,6 @@ jobs:
 
       - name: 构建应用镜像
         env:
-          IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
           BUILD_CHANNEL: ${{ steps.image_tag.outputs.release == 'true' && 'stable' || 'dev' }}
         run: |
           docker build \
@@ -76,12 +75,69 @@ jobs:
             --build-arg BUILD_CHANNEL="$BUILD_CHANNEL" \
             --build-arg GIT_SHA="$GITHUB_SHA" \
             --network host \
-            --tag "kindmitaishere/mitahill-better-video:$IMAGE_TAG" \
+            --tag "kindmitaishere/mitahill-better-video:ci-$GITHUB_SHA" \
             .
+
+      - name: 保存本次构建的镜像
+        id: save_image
+        run: |
+          set -euo pipefail
+          image="kindmitaishere/mitahill-better-video:ci-$GITHUB_SHA"
+          echo "image_id=$(docker image inspect --format '{{.Id}}' "$image")" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/ci-image"
+          docker image save "$image" | gzip -1 > "$RUNNER_TEMP/ci-image/image.tar.gz"
+
+      - name: 传递构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-image-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-image/image.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+          overwrite: true
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ needs.build.outputs.tag }}
+      release: ${{ needs.build.outputs.release }}
+      image_id: ${{ needs.build.outputs.image_id }}
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v4
+
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: app-image-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-image
+
+      - name: 加载并核对镜像
+        env:
+          EXPECTED_IMAGE_ID: ${{ needs.build.outputs.image_id }}
+        run: |
+          set -euo pipefail
+          gzip -dc "$RUNNER_TEMP/ci-image/image.tar.gz" | docker image load
+          rm "$RUNNER_TEMP/ci-image/image.tar.gz"
+          actual=$(docker image inspect --format '{{.Id}}' "kindmitaishere/mitahill-better-video:ci-$GITHUB_SHA")
+          test "$actual" = "$EXPECTED_IMAGE_ID"
+
+      - name: 准备前端测试环境
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: app/WebUI/package-lock.json
+
+      - name: 运行前端回归测试
+        working-directory: app/WebUI
+        run: npm ci && npm test
 
       - name: 在镜像内运行单元测试
         env:
-          IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
+          IMAGE_REF: kindmitaishere/mitahill-better-video:ci-${{ github.sha }}
         run: |
           # 宿主机路径是 scripts/tests，容器内仍挂载为 /workspace/tests，模块名保持 tests.test_xxx
           modules=$(cd scripts/tests && ls test_*.py | sed 's/\.py$//; s/^/tests./')
@@ -89,12 +145,45 @@ jobs:
             --volume "$PWD/scripts/tests:/workspace/tests:ro" \
             --volume "$PWD/scripts/loop:/workspace/scripts/loop:ro" \
             --workdir /workspace \
-            "kindmitaishere/mitahill-better-video:$IMAGE_TAG" \
+            "$IMAGE_REF" \
             python3 -m unittest -v $modules
+
+  push:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 拉取源码
+        uses: actions/checkout@v4
+
+      - name: 下载已通过测试的构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: app-image-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-image
+
+      - name: 加载并核对已测试的镜像
+        env:
+          EXPECTED_IMAGE_ID: ${{ needs.test.outputs.image_id }}
+        run: |
+          set -euo pipefail
+          gzip -dc "$RUNNER_TEMP/ci-image/image.tar.gz" | docker image load
+          rm "$RUNNER_TEMP/ci-image/image.tar.gz"
+          image="kindmitaishere/mitahill-better-video:ci-$GITHUB_SHA"
+          actual=$(docker image inspect --format '{{.Id}}' "$image")
+          test "$actual" = "$EXPECTED_IMAGE_ID"
+
+      - name: 登录 Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
 
       # 构建和测试都通过后才清空仓库，避免构建失败时 Docker Hub 上一个镜像都不剩。
       - name: 清空 Docker Hub 仓库旧镜像
-        if: github.event_name != 'pull_request' && steps.image_tag.outputs.release == 'true'
+        if: needs.test.outputs.release == 'true'
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -147,10 +236,11 @@ jobs:
       - name: 推送应用镜像并打最新标签
         if: github.event_name != 'pull_request'
         env:
-          IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
-          RELEASE: ${{ steps.image_tag.outputs.release }}
+          IMAGE_TAG: ${{ needs.test.outputs.tag }}
+          RELEASE: ${{ needs.test.outputs.release }}
         run: |
           repo="kindmitaishere/mitahill-better-video"
+          docker tag "$repo:ci-$GITHUB_SHA" "$repo:$IMAGE_TAG"
           docker push "$repo:$IMAGE_TAG"
           docker tag "$repo:$IMAGE_TAG" "$repo:sha-$GITHUB_SHA"
           docker push "$repo:sha-$GITHUB_SHA"
@@ -159,22 +249,8 @@ jobs:
             docker push "$repo:latest"
           fi
 
-      - name: 清理构建残留
-        if: always()
-        run: docker image prune --force
-
-  release:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: 拉取源码
-        uses: actions/checkout@v4
-
       - name: 创建或更新发行版
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}

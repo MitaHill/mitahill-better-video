@@ -1,5 +1,6 @@
 import copy
 import io
+import json
 import subprocess
 import unittest
 from pathlib import Path
@@ -10,7 +11,7 @@ from werkzeug.datastructures import FileStorage, MultiDict
 
 from app.src.Utils import media_mux
 from app.src.Worker.pipelines.conversion.plan import build_plan, stream_args, encoding_args, validate_streams
-from app.src.Worker.pipelines.conversion.metadata import creation_date, same_date
+from app.src.Worker.pipelines.conversion.metadata import creation_date, read_metadata, same_date
 from app.src.Api.services.conversion_tasks import create_conversion_task
 from app.src.Api.task_parsers.conversion import parse_conversion_task_params
 
@@ -95,6 +96,13 @@ class ConversionPlanTests(unittest.TestCase):
         self.assertEqual(key, 'ASF:CreationDate')
         self.assertTrue(same_date(value, '2012-01-07T10:36:43+00:00'))
         self.assertFalse(same_date(value, '2012-01-07T10:36:43'))
+
+    def test_old_exiftool_zero_dates_are_not_treated_as_capture_dates(self):
+        metadata = {'QuickTime:CreateDate': '1904:01:01 00:00:00+00:00',
+                    'Track1:MediaCreateDate': '1904:01:01 00:00:00+00:00',
+                    'Keys:CreationDate': '1970:01:01 00:00:00+00:00'}
+        with patch('app.src.Worker.pipelines.conversion.metadata.exiftool', return_value=json.dumps([metadata])):
+            self.assertEqual(read_metadata('source.mp4'), {'Keys:CreationDate': metadata['Keys:CreationDate']})
 
     def test_api_defaults_preserve_and_accept_fractional_frame_rates(self):
         params = parse_conversion_task_params({'frame_rate': '29.97'})

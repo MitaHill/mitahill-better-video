@@ -18,6 +18,18 @@ DESCRIPTIVE_TAGS = {'Make', 'Model', 'CameraModelName', 'SerialNumber', 'LensMod
                     'Title', 'Artist', 'Author', 'Comment', 'Description', 'Copyright'}
 
 
+def unset_date(key, value):
+    if not isinstance(value, str):
+        return False
+    if value.startswith('0000:'):
+        return True
+    group, tag = key.split(':', 1)
+    # Debian 的旧版 ExifTool 没有 StrictDate，零值会显示为 1904 年。
+    binary_date = group == 'QuickTime' or re.fullmatch(r'Track\d+', group)
+    return bool(binary_date and tag in DATE_TAGS
+                and value in {'1904:01:01 00:00:00', '1904:01:01 00:00:00+00:00'})
+
+
 def exiftool(*args):
     try:
         result = subprocess.run(['exiftool', *map(str, args)], capture_output=True,
@@ -38,7 +50,7 @@ def read_metadata(path):
     return {key: value for key, value in payload[0].items()
             if ':' in key and key.split(':', 1)[0] not in {'System', 'File', 'Composite', 'ExifTool'}
             and key.split(':')[-1] in DATE_TAGS | DESCRIPTIVE_TAGS
-            and not (isinstance(value, str) and value.startswith('0000:'))}
+            and not unset_date(key, value)}
 
 
 def creation_date(metadata):

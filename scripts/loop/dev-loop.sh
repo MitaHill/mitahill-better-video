@@ -48,7 +48,7 @@ trap 'prog_fail_current' ERR INT TERM
 case "${1:-ship}" in
   ship)
     prog_init "前置检查" "提交本地改动" "推送 ${BRANCH} 触发构建" \
-              "等待 GitHub Actions 构建与测试" "远程部署与健康检查"
+              "等待 GitHub Actions build → test → push" "远程部署与健康检查"
     ship "${2:-}" ;;
   sync)
     prog_init "拉取 ${BRANCH} 最新提交"

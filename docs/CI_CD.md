@@ -53,21 +53,27 @@
 - 不同分支的构建互不排队。
 - 同一分支连续推送时，正在运行的构建不会被取消。后续运行会排队，且排队期间如果又有更新的运行进来，较早排队的会被替换。因此连续多次快速推送同一分支时，中间的提交可能不会单独构建，最终以最新一次为准。
 
-## 3. 构建流程
+## 3. build → test → push
 
-`build` 任务在 `ubuntu-latest` 上按顺序执行：
+Actions 图固定为三个串行任务，前一阶段失败时后续阶段不会执行：
 
-1. 拉取源码
-2. 根据触发引用确定镜像标签
-3. 登录 Docker Hub（PR 事件跳过）
-4. 构建基础镜像 `base_better_video:20260210-2330`（`deploy/docker/base/Dockerfile`）
-5. 构建应用镜像（`deploy/docker/for-app/Dockerfile`）
-6. 在镜像内运行单元测试：把 `scripts/tests/` 只读挂载到容器内的 `/workspace/tests`，对 `scripts/tests/test_*.py` 全部模块（模块名 `tests.test_xxx`）执行 `python3 -m unittest -v`
-7. 清空 Docker Hub 仓库旧镜像（仅 `main` 和 `v*` 标签；PR 和 `dev` 跳过，见第 4 节）
-8. 推送应用镜像；`main` 和 `v*` 标签额外打 `latest`（PR 事件跳过）
-9. 清理构建残留（始终执行）
+```mermaid
+flowchart LR
+    build[build 构建镜像] --> test[test 前后端回归]
+    test --> push[push 镜像与发行说明]
+```
 
-构建或测试失败时，第 7、8 步都不会执行，Docker Hub 上现有镜像保持不变。
+| 阶段 | 主要操作 | 交付约束 |
+| --- | --- | --- |
+| `build` | 拉取源码，确定版本类型与标签，构建基础镜像和应用镜像 | 不执行测试，不推送镜像；保存本次 SHA 对应的镜像与 Image ID |
+| `test` | 下载并核对镜像 ID；Node 20 执行前端 `npm ci && npm test`；在构建镜像内执行全部 Python 单元和 FFmpeg/ExifTool 集成测试 | 使用 `scripts/tests/` 和 `scripts/loop/` 的只读挂载，测试模块为 `tests.test_xxx`；失败阻止 `push` |
+| `push` | 下载并再次核对同一镜像 ID；登录 Docker Hub，处理发布标签并推送镜像；版本标签同时创建或更新发行说明 | 不重新构建；PR 跳过整个阶段；稳定版原有清理规则保持不变 |
+
+三个阶段使用 GitHub 托管 Runner。镜像通过工作流 artifact 传递，流式 `docker save | gzip -1` 避免同时保存完整 tar 与压缩包；artifact 不重复压缩，保留一天。测试与推送都必须与 `build` 输出的 Image ID 一致，不能用重建镜像代替已测试镜像。
+
+代价是增加镜像上传、两次下载及临时存储；收益是 Actions 清楚显示构建、测试、推送各自的结果，也支持在同一次运行里只重跑失败任务。保留期结束后需重跑完整工作流。
+
+loop-script 等待整条工作流成功，再部署本次 SHA 的镜像；任何阶段失败、取消或尚未完成，都不能作为交付依据。
 
 ### 镜像标签
 
@@ -135,7 +141,7 @@ Docker Hub 页面上的“仓库大小”统计的是仓库占用的全部存储
 
 ## 5. 发行版规则
 
-推送 `v*` 标签且 `build` 任务成功后，`release` 任务自动创建或更新对应的 GitHub 发行版。
+推送 `v*` 标签，且构建、测试和镜像推送成功后，`push` 阶段的发行说明步骤自动创建或更新对应的 GitHub 发行版。
 
 ### 预览版判定
 
@@ -161,7 +167,7 @@ Docker Hub 页面上的“仓库大小”统计的是仓库占用的全部存储
 `README.md` 中 `<!-- release-docker:start -->` 与 `<!-- release-docker:end -->` 之间的内容会被原样摘取到发行版说明中，不做任何替换，镜像标签保持 README 里写的 `latest`。
 
 - 修改 Docker 命令只需要改 README 这一处，不要改工作流。
-- 不要删除或改名这两个标记。缺少标记时 `release` 任务会报错退出，不会创建空说明的发行版。
+- 不要删除或改名这两个标记。缺少标记时 `push` 阶段的发行说明步骤会报错退出，不会创建空说明的发行版。
 - 因为第 4 节的清理策略，版本标签的镜像会在下一次 `main` 或版本标签构建后被删除，所以发行版说明里不使用版本标签。
 
 ### 如何发布一个新版本
@@ -195,7 +201,7 @@ git push origin v0.1.0-beta
 
 - 工作流文件里只有对这两个 Secret 的引用，没有任何明文凭据。不要把 Token 写进工作流、README 或提交记录。
 - Token 泄露或轮换后，在 Docker Hub 重新生成，再更新 GitHub Secret 即可，无需改代码。
-- `release` 任务使用内置 `github.token`，仅声明了 `contents: write` 权限，不需要额外配置。
+- `push` 阶段的发行说明步骤使用内置 `github.token`，仅声明了 `contents: write` 权限，不需要额外配置。
 - 未配置 Secrets 时，push 触发的运行会在“登录 Docker Hub”步骤失败；PR 事件不受影响。
 
 ## 7. Runner 与资源
@@ -237,7 +243,7 @@ git push origin v0.1.0-beta
 | 登录 Docker Hub 失败 | Secrets 未配置、名称写错，或 Token 过期或权限不足 | 检查两个 Secret，必要时重新生成 Token |
 | “清空 Docker Hub 仓库旧镜像”失败 | Token 没有 Delete 权限、Docker Hub API 变化，或登录失败 | 重新生成 Read, Write, Delete 权限的 Token；此时不会推送镜像，但失败前已删掉的标签不会恢复，仓库可能已部分或全部清空，修好后重新运行该构建 |
 | “在镜像内运行单元测试”失败 | 测试或代码有问题 | 查看日志中 `FAIL`/`ERROR` 的用例；测试失败时不会推送镜像 |
-| `release` 任务报缺少 `release-docker` 标记 | README 中标记被删除或改名 | 恢复 `<!-- release-docker:start -->` 与 `<!-- release-docker:end -->` |
+| `push` 阶段的发行说明步骤报缺少 `release-docker` 标记 | README 中标记被删除或改名 | 恢复 `<!-- release-docker:start -->` 与 `<!-- release-docker:end -->` |
 | 推送后没有触发运行 | 提交信息含 `[skip ci]`，或分支不是 `dev`/`main` | 去掉 `[skip ci]` 重新提交，或手动触发 |
 | 提交里改了 `.github/workflows` 后运行用的还是旧规则 | push 触发的运行使用该提交里的工作流版本 | 确认目标提交已包含最新工作流；两个分支都要同步 |
 | 构建中途报磁盘空间不足 | Runner 磁盘约 14 GB | 见第 7 节清理预装软件 |
@@ -258,7 +264,7 @@ git push origin v0.1.0-beta
 - 各分支的 push 只触发一次运行，不同分支并行执行。
 - **`dev` 只推 `dev` 标签**：`dev` 分支的一次真实运行（2026-09-20）中，清空步骤被跳过，仓库里 `latest` 保持不变，新增 `dev` 标签。
 - **清空 Docker Hub 仓库并推送 `latest`**：`main` 分支的一次真实运行（2026-09-20）中，清空步骤通过 Docker Hub API 成功删除了 `latest`、`dev`、`20260115-1522` 三个标签，随后推送 `latest`，结果仓库里只剩 `latest`（约 3.49 GB）。说明当前 Token 具有 Delete 权限。
-- **`scripts/tests/` 路径下的单元测试**：`dev` 提交 `b06715b` 的真实运行（2026-09-20，运行 #2，总耗时 4 分 56 秒）中，`scripts/tests` 挂载为容器内的 `/workspace/tests`，按 `tests.test_xxx` 模块名执行，测试步骤通过，随后推送 `dev` 标签；清空仓库和 `release` 任务按预期跳过。
+- **`scripts/tests/` 路径下的单元测试**：`dev` 提交 `b06715b` 的真实运行（2026-09-20，运行 #2，总耗时 4 分 56 秒）中，`scripts/tests` 挂载为容器内的 `/workspace/tests`，按 `tests.test_xxx` 模块名执行，测试步骤通过，随后推送 `dev` 标签；清空仓库和 `push` 阶段的发行说明步骤按预期跳过。
 - **本机开发循环端到端**（第 12 节）：同一次运行中，`scripts/loop/dev-loop.sh ship` 完成提交、推送 `dev`、等待构建、远程停止并删除旧容器、拉取 `:dev` 镜像并重建、删除旧标签镜像，`/api/health` 返回 `ok`，容器日志无 traceback 或 error。此前还用 `DEPLOY_TAG=latest` 单独验证过 `deploy` 子命令，并在远程镜像内用 `scripts/tests` 的挂载方式跑通了 3 个旧测试。
 - FFmpeg 链接失效和 `wget` 网络故障两个问题的修复。
 
@@ -266,7 +272,7 @@ git push origin v0.1.0-beta
 
 - **`main` 在新分流条件下的清空，以及版本标签路径（额外 `docker tag`）**：分流逻辑在本地对 `main`、`dev`、版本标签、PR、其他分支五种引用逐一模拟过输出；真实运行验证了 `dev` 路径（清空步骤被跳过、只新增 `dev` 标签、`latest` 不变），以及此前的 `main` 清空（分流条件加入之前的版本）。加入分流条件之后，`main` 还没有真实运行过。
 - **PR 开启与关闭的触发**：包括“已合并的 PR 关闭会被跳过”这一条件。
-- **`v*` 标签触发的 `release` 任务**：包括预览版标记、标题、说明中的 Docker 命令，以及 `--prerelease=false` 对正式版的处理。
+- **`v*` 标签触发的 `push` 阶段的发行说明步骤**：包括预览版标记、标题、说明中的 Docker 命令，以及 `--prerelease=false` 对正式版的处理。
 
 这两项都会在 GitHub 上产生公开内容（PR、发行版与镜像标签），需要在确认后用一个测试 PR 和一个测试标签来验证。
 
@@ -307,7 +313,7 @@ git push origin v0.1.0-beta
 `scripts/loop/dev-loop.sh` 在本机执行，通过 SSH 连接远程运行器，流程是：
 
 1. 有未提交的改动时，用给定的提交信息提交（只暂存已跟踪文件）
-2. 推送 `dev`，触发工作流；用 `gh run watch` 等待构建和单元测试完成，失败时打印失败步骤日志并停止，不部署
+2. 推送 `dev`，触发工作流；用 `gh run watch` 等待 `build → test → push` 全部完成，失败时打印失败步骤日志并停止，不部署
 3. 检查没有待处理或运行中的任务，先拉取本次提交的 `sha-<Git Hash>` 镜像，固定其 digest，并保留旧镜像；下载失败不停止当前服务
 4. 重建 `better_video` 并检查 `/api/health` 中应用、数据库和 Worker 的状态；失败时尝试恢复上一镜像，本次部署仍报告失败
 5. 输出部署结果，由用户手动测试；需要修改时再次执行完整 `ship` 流程
@@ -357,6 +363,6 @@ git push origin v0.1.0-beta
 ### 转换保留策略的验收
 
 - 应用镜像安装 ExifTool，用于读取和恢复 FFprobe 未导出的日期与描述性元数据。
-- 前端 `npm test` 在镜像构建阶段执行；后端真实 FFmpeg/ExifTool 回归在镜像内全量单测阶段执行。两者均经 loop-script 的 CI 验证，不能用本地运行替代。
+- 前端 `npm test` 和后端真实 FFmpeg/ExifTool 回归统一在 `test` 阶段执行，后端使用 `build` 产出的同一镜像。两者均经 loop-script 的 CI 验证，不能用本地运行替代。
 - 手动验收：默认项应为“保持原始”；只选 HEVC 时检查音轨、字幕、章节、日期仍在。原 WMA 与 MP4 不兼容时会明确失败，请选择 MKV；不会为了任务成功而修改未指定的音轨。
 - 使用 ZIP 下载验证解压后的文件修改日期；Finder 创建日期和照片/Immich 的显示由对应应用实际确认，健康检查不代表这些项目已通过验收。
