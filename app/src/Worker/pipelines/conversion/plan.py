@@ -92,6 +92,7 @@ def encoding_args(info, plan, options, duration, gpu=False):
 
 def validate_streams(original, output, plan):
     before, after = original['streams'], output['streams']
+    normalizations = []
     # MP4 章节可能生成额外的文本数据轨；额外轨可接受，原有轨必须逐个存在。
     if len(after) < len(before):
         raise RuntimeError('转换结果丢失媒体流，拒绝交付')
@@ -108,6 +109,19 @@ def validate_streams(original, output, plan):
                 raise RuntimeError(f"媒体流 {src['index']} 的 {key} 未保留")
         for flag in ('default', 'forced', 'attached_pic'):
             if bool(src.get('disposition', {}).get(flag)) != bool(dst.get('disposition', {}).get(flag)):
+                # MOV/MP4 会启用唯一的音频/视频轨。这不改变轨道选择，
+                # 但多轨默认选择、强制字幕和封面标记仍必须完全一致。
+                kind = src.get('codec_type')
+                if (flag == 'default' and plan.container in {'mp4', 'mov'}
+                        and kind in {'audio', 'video'}
+                        and not src.get('disposition', {}).get(flag)
+                        and dst.get('disposition', {}).get(flag)
+                        and sum(s.get('codec_type') == kind for s in before) == 1
+                        and sum(s.get('codec_type') == kind for s in after) == 1):
+                    normalizations.append({'stream_index': src['index'], 'flag': flag,
+                                           'before': 0, 'after': 1,
+                                           'reason': 'MP4/MOV 启用唯一的音频或视频轨'})
+                    continue
                 raise RuntimeError(f"媒体流 {src['index']} 的 {flag} 标记未保留")
     source_chapters = original.get('chapters', [])
     result_chapters = output.get('chapters', [])
@@ -122,3 +136,4 @@ def validate_streams(original, output, plan):
         raise RuntimeError('转换结果时长无效')
     if duration > 0 and abs(duration - result_duration) > max(.5, duration * .001):
         raise RuntimeError('转换结果时长异常，拒绝交付')
+    return normalizations

@@ -133,9 +133,10 @@ class ConversionPipelineTests(unittest.TestCase):
     def test_device_location_and_offset_date_survive(self):
         source = self.make_mp4()
         subprocess.run(['exiftool', '-overwrite_original', '-Keys:Make=Apple', '-Keys:Model=Test Camera',
-                        '-Keys:GPSCoordinates=25.0 121.5', '-Keys:CreationDate=2020:02:03 12:05:06+08:00', str(source)],
+                        '-Keys:GPSCoordinates=25.00000, 121.50000', '-Keys:CreationDate=2020:02:03 12:05:06+08:00', str(source)],
                        capture_output=True, text=True, check=True)
         original = read_metadata(source)
+        self.assertEqual(original['Keys:GPSCoordinates'], '25 121.5')
         result = self.render(source, {'video_codec': 'h265'})
         actual = read_metadata(result)
         for key in ('Keys:Make', 'Keys:Model', 'Keys:GPSCoordinates', 'Keys:CreationDate'):

@@ -68,6 +68,28 @@ class ConversionPlanTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, '探测'):
                 media_mux.probe_media('slow.mp4')
 
+    def test_mp4_single_track_enablement_is_recorded_but_other_flags_stay_strict(self):
+        info = copy.deepcopy(self.info)
+        info['streams'] = info['streams'][:1]
+        info['streams'][0]['disposition']['default'] = 0
+        result = copy.deepcopy(info)
+        result['streams'][0]['disposition']['default'] = 1
+        plan = build_plan(info, Path('source.mkv'), {'output_format': 'mp4'})
+        changes = validate_streams(info, result, plan)
+        self.assertEqual(changes[0]['flag'], 'default')
+        self.assertEqual(changes[0]['before'], 0)
+        for container in ('mkv', 'mp4'):
+            with self.subTest(container=container):
+                multiple = copy.deepcopy(info)
+                multiple['streams'].append(dict(multiple['streams'][0], index=1))
+                changed = copy.deepcopy(multiple)
+                changed['streams'][0]['disposition']['default'] = 1
+                with self.assertRaisesRegex(RuntimeError, 'default'):
+                    validate_streams(multiple, changed, build_plan(multiple, Path('source.mkv'), {'output_format': container}))
+        result['streams'][0]['disposition']['forced'] = 1
+        with self.assertRaisesRegex(RuntimeError, 'forced'):
+            validate_streams(info, result, plan)
+
     def test_container_creation_is_not_claimed_as_camera_time(self):
         key, value = creation_date({'ASF:CreationDate': '2012:01:07 10:36:43Z'})
         self.assertEqual(key, 'ASF:CreationDate')

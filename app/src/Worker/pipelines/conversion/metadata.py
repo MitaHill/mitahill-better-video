@@ -30,7 +30,9 @@ def exiftool(*args):
 
 
 def read_metadata(path):
-    payload = json.loads(exiftool('-json', '-G1', '-s', '-n', '-api', 'QuickTimeUTC=1', path))
+    # QuickTime 的零值表示未设置日期，StrictDate 防止将它解释成纪元日期。
+    payload = json.loads(exiftool('-json', '-G1', '-s', '-n', '-api', 'QuickTimeUTC=1',
+                                 '-api', 'StrictDate=1', path))
     if not payload:
         raise RuntimeError('无法读取原文件元数据')
     return {key: value for key, value in payload[0].items()
@@ -107,6 +109,8 @@ def restore_metadata(source, output, original, container, options, modified_ms=N
                 continue
             if key in result and str(result[key]) == str(value):
                 continue
+            if key.startswith('Keys:'):
+                raise RuntimeError(f'元数据 {key} 未在原位置保留，拒绝交付')
             # 跨格式写入时同一字段可能迁移到另一个标准组。
             if not any(k.split(':')[-1] == tag and (same_date(v, value) if tag in DATE_TAGS else str(v) == str(value)) for k, v in result.items()):
                 raise RuntimeError(f'元数据 {key} 未保留，拒绝交付；请尝试保持原容器')
@@ -141,6 +145,4 @@ def restore_metadata(source, output, original, container, options, modified_ms=N
         if not math.isfinite(seconds) or seconds < 0 or seconds > 4102444800:
             raise RuntimeError('原文件修改日期无效')
         os.utime(output, (seconds, seconds))
-    report_path = output.with_name(output.name + '.metadata.json')
-    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     return report

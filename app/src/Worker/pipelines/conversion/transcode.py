@@ -1,3 +1,4 @@
+import json
 import re
 import shutil
 
@@ -85,8 +86,10 @@ def render_single_video(task_id, video_path, options, run_dir, index, total):
     emit_progress(task_id, progress_end, f'转换视频 {index}/{total}: 恢复日期和元数据并核对媒体流',
                   file_index=index, file_count=total, stage='finalize')
     modified_ms = (options.get('source_file_times') or {}).get(video_path.name)
-    restore_metadata(video_path, working, metadata, plan.container, options, modified_ms, unchanged=unchanged)
-    validate_streams(original, probe_media(working), plan)
+    report = restore_metadata(video_path, working, metadata, plan.container, options, modified_ms, unchanged=unchanged)
+    report['stream_normalizations'] = validate_streams(original, probe_media(working), plan)
+    working.with_name(working.name + '.metadata.json').write_text(
+        json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     working.replace(final)
     working.with_name(working.name + '.metadata.json').replace(final.with_name(final.name + '.metadata.json'))
     return final
