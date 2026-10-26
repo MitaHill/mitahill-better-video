@@ -55,7 +55,7 @@
 
 ## 3. build → test → push
 
-一个 CI job 在同一台 GitHub 托管 Runner 上执行三个命名步骤。准备源码和 Node.js 后，按下面顺序运行；前一阶段失败时后续阶段不会执行：
+一个名为 `ci` 的 job 在同一台 GitHub 托管 Runner 上执行三个命名步骤。准备源码和 Node.js 后，按下面顺序运行；前一阶段失败时后续阶段不会执行：
 
 ```mermaid
 flowchart LR

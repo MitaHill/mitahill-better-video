@@ -25,7 +25,7 @@ permissions:
 
 jobs:
   ci:
-    name: build → test → push
+    name: ci
     # ponytail: 三个阶段共享 Runner 的本地镜像，避免传输数 GB 的中间产物。
     # PR 合并后只由目标分支的 push 构建，避免重复运行。
     if: >-
