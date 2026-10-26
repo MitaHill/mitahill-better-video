@@ -1,10 +1,7 @@
 import logging
-import shutil
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
-
-from app.src.Utils.ffmpeg import run_ffmpeg
 
 from .common import (
     VALID_WATERMARK_POSITIONS,
@@ -182,31 +179,16 @@ def _build_watermark_segments(options, run_dir, duration_seconds):
     return built
 
 
-def apply_watermark_and_metadata(source_path, final_path, options, duration_seconds, run_dir):
-    metadata_args = []
-    for key in ("title", "author", "comment"):
-        val = (options.get(f"meta_{key}") or "").strip()
-        if val:
-            tag = "artist" if key == "author" else key
-            metadata_args += ["-metadata", f"{tag}={val}"]
-
+def build_watermark_filter(options, duration_seconds, run_dir, video_index):
     segments = _build_watermark_segments(options, run_dir, duration_seconds)
-    if not segments and not metadata_args:
-        if source_path != final_path:
-            shutil.move(source_path, final_path)
-        return
-
-    if not segments and metadata_args:
-        cmd = ["ffmpeg", "-y", "-i", str(source_path), "-c", "copy", *metadata_args, str(final_path)]
-        run_ffmpeg(cmd)
-        return
-
-    cmd = ["ffmpeg", "-y", "-i", str(source_path)]
+    if not segments:
+        return [], None, None
+    inputs = []
     for seg in segments:
-        cmd += ["-i", str(seg["source_path"])]
+        inputs += ["-i", str(seg["source_path"])]
 
     filter_parts = []
-    current_label = "[0:v]"
+    current_label = f"[0:{video_index}]"
     for idx, seg in enumerate(segments, start=1):
         wm_in = f"[{idx}:v]"
         wm_label = f"[wm{idx}]"
@@ -235,9 +217,4 @@ def apply_watermark_and_metadata(source_path, final_path, options, duration_seco
         filter_parts.append(overlay)
         current_label = next_label
 
-    cmd += ["-filter_complex", ";".join(filter_parts)]
-    cmd += ["-map", current_label, "-map", "0:a?"]
-    cmd += ["-c:v", "libx264", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "copy"]
-    cmd += metadata_args
-    cmd += [str(final_path)]
-    run_ffmpeg(cmd)
+    return inputs, ";".join(filter_parts), current_label

@@ -353,3 +353,10 @@ git push origin v0.1.0-beta
 - 认证优先级：`key_file`，其次 `password`；两者都为空时复用已建立的 SSH 连接（ControlMaster）或 ssh-agent
 - 推荐使用密钥。密码是明文存放，只适合个人机器
 - 所有 SSH 调用共用一个 ControlMaster（`ControlPath=~/.ssh/cm-%C`，保持 1 小时），只认证一次
+
+### 转换保留策略的验收
+
+- 应用镜像安装 ExifTool，用于读取和恢复 FFprobe 未导出的日期与描述性元数据。
+- 前端 `npm test` 在镜像构建阶段执行；后端真实 FFmpeg/ExifTool 回归在镜像内全量单测阶段执行。两者均经 loop-script 的 CI 验证，不能用本地运行替代。
+- 手动验收：默认项应为“保持原始”；只选 HEVC 时检查音轨、字幕、章节、日期仍在。原 WMA 与 MP4 不兼容时会明确失败，请选择 MKV；不会为了任务成功而修改未指定的音轨。
+- 使用 ZIP 下载验证解压后的文件修改日期；Finder 创建日期和照片/Immich 的显示由对应应用实际确认，健康检查不代表这些项目已通过验收。

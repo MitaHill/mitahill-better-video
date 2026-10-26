@@ -32,8 +32,8 @@ export const useWorkbenchFormsState = () => {
 
   const convertForm = reactive({
     convertMode: "transcode",
-    outputFormat: "mp4",
-    videoCodec: "h264",
+    outputFormat: "preserve",
+    videoCodec: "preserve",
     frameRate: 0,
     aspectRatio: "",
     secondPassReencode: false,
@@ -42,7 +42,7 @@ export const useWorkbenchFormsState = () => {
     flipVertical: false,
     videoFadeInSec: 0,
     videoFadeOutSec: 0,
-    crf: 18,
+    crf: 0,
     videoBitrateK: 0,
     targetSizeMb: 0,
     targetWidth: 0,
@@ -59,6 +59,7 @@ export const useWorkbenchFormsState = () => {
     frameExportFps: 0,
     frameExportFpsMode: "manual",
     frameExportFormat: "jpg",
+    downloadAsZip: false,
     mediaFiles: [],
   });
 

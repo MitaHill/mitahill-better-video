@@ -1,4 +1,6 @@
 from pathlib import Path
+import json
+import math
 
 from app.src.Database import core as db
 from app.src.Utils.http import ffprobe_info, is_filename_safe, secure_filename
@@ -47,6 +49,25 @@ def create_conversion_task(
     media_files = _collect_conversion_uploads(req)
     if not media_files:
         return None, "at least one audio/video media file is required"
+    filenames = [secure_filename(f.filename) for f in media_files if f and f.filename]
+    if len(filenames) != len(set(filenames)):
+        return None, "同一批转换不能包含重名文件，请重命名后上传"
+    if len({Path(name).stem for name in filenames}) != len(filenames):
+        return None, "同一批转换不能包含同名但不同扩展名的文件，避免输出互相覆盖"
+    try:
+        dates = json.loads(req.form.get("source_file_times") or "[]")
+        if not isinstance(dates, list):
+            raise ValueError("source_file_times must be a list")
+        source_times = {}
+        for item in dates:
+            name = item["filename"]
+            value = float(item["last_modified_ms"])
+            if name not in filenames or not math.isfinite(value) or not 0 <= value <= 4102444800000:
+                raise ValueError("invalid source file date")
+            source_times[name] = value
+        params["source_file_times"] = source_times
+    except (ValueError, TypeError, KeyError):
+        return None, "原文件修改日期无效"
 
     task_id, run_dir, upload_dir = new_task_dirs(output_root, upload_root)
     media_dir = upload_dir / "media"

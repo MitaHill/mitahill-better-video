@@ -9,10 +9,11 @@ from .common import (
 def parse_conversion_task_params(form):
     parsed = {
         "task_category": "convert",
+        "download_as_zip": bool_from_form(form, "download_as_zip", False),
         "convert_mode": (form.get("convert_mode", "transcode") or "transcode").lower(),
-        "output_format": (form.get("output_format", "mp4") or "mp4").lower(),
-        "video_codec": (form.get("video_codec", "h264") or "h264").lower(),
-        "frame_rate": int_from_form(form, "frame_rate", 0),
+        "output_format": (form.get("output_format", "preserve") or "preserve").lower(),
+        "video_codec": (form.get("video_codec", "preserve") or "preserve").lower(),
+        "frame_rate": float_from_form(form, "frame_rate", 0),
         "aspect_ratio": (form.get("aspect_ratio", "") or "").strip(),
         "second_pass_reencode": bool_from_form(form, "second_pass_reencode", False),
         "deinterlace": bool_from_form(form, "deinterlace", False),
@@ -20,7 +21,7 @@ def parse_conversion_task_params(form):
         "flip_vertical": bool_from_form(form, "flip_vertical", False),
         "video_fade_in_sec": float_from_form(form, "video_fade_in_sec", 0.0),
         "video_fade_out_sec": float_from_form(form, "video_fade_out_sec", 0.0),
-        "crf": int_from_form(form, "crf", 18),
+        "crf": int_from_form(form, "crf", 0),
         "video_bitrate_k": int_from_form(form, "video_bitrate_k", 0),
         "target_size_mb": float_from_form(form, "target_size_mb", 0.0),
         "target_width": int_from_form(form, "target_width", 0),

@@ -1,12 +1,10 @@
-from app.src.Config import settings as config
-
 from .common import to_bool, to_float, to_int
 
 
 def build_video_filters(options, duration_seconds):
     vf = []
     if to_bool(options.get("deinterlace"), False):
-        vf.append("yadif_cuda=mode=send_frame:parity=auto:deint=all" if config.FFMPEG_USE_GPU else "yadif")
+        vf.append("yadif")
     if to_bool(options.get("flip_horizontal"), False):
         vf.append("hflip")
     if to_bool(options.get("flip_vertical"), False):
@@ -18,6 +16,8 @@ def build_video_filters(options, duration_seconds):
         vf.append(
             f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"
         )
+    elif width > 0 or height > 0:
+        vf.append(f"scale={width or -2}:{height or -2}")
 
     aspect_ratio = (options.get("aspect_ratio") or "").strip()
     if aspect_ratio:

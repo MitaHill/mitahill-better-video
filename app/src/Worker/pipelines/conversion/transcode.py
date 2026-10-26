@@ -1,190 +1,92 @@
-from app.src.Config import settings as config
-from app.src.Utils.ffmpeg import get_video_duration, run_ffmpeg
-from app.src.Utils.media_mux import (
-    probe_media, first_audio_stream, choose_audio_args, check_audio_encoder,
-    mux_audio, validate_media_output,
-)
+import re
+import shutil
 
-from .common import GPU_CODEC_MAP, VALID_FORMATS, to_bool, to_float, to_int
+from app.src.Config import settings as config
+from app.src.Utils.ffmpeg import run_ffmpeg
+from app.src.Utils.media_mux import probe_media
+
+from .common import to_bool
 from .filters import build_video_filters
+from .metadata import read_metadata, ffmpeg_metadata_args, restore_metadata
+from .plan import build_plan, stream_args, encoding_args, validate_streams
 from .progress import emit_progress, run_ffmpeg_with_progress
-from .watermark import apply_watermark_and_metadata
+from .watermark import build_watermark_filter
 
 
 def render_single_video(task_id, video_path, options, run_dir, index, total):
-    output_format = (options.get("output_format") or "mp4").lower()
-    if output_format not in VALID_FORMATS:
-        output_format = "mp4"
-
-    audio = first_audio_stream(probe_media(video_path))
-    audio_args = choose_audio_args(audio, output_format)
-    check_audio_encoder(audio_args)
-
-    codec_key = (options.get("video_codec") or "h264").lower()
-    gpu_codec, cpu_codec = GPU_CODEC_MAP.get(codec_key, GPU_CODEC_MAP["h264"])
-    frame_rate = to_int(options.get("frame_rate"), 0, min_value=0, max_value=120)
-    duration = max(0.01, get_video_duration(video_path))
-
-    out_dir = run_dir / "results"
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    base_stem = video_path.stem
-    tmp_video_only = run_dir / f"{base_stem}_video_only.mp4"
-    tmp_muxed = run_dir / f"{base_stem}_muxed.{output_format}"
-    final_path = out_dir / f"{base_stem}.{output_format}"
-
-    size_limit_mb = to_float(options.get("target_size_mb"), 0.0, min_value=0.0)
-    target_video_bitrate = None
-    if size_limit_mb > 0 and duration > 0:
-        total_bps = int((size_limit_mb * 8 * 1024 * 1024) / duration)
-        target_video_bitrate = max(200_000, total_bps)
-    elif to_int(options.get("video_bitrate_k"), 0, min_value=0) > 0:
-        target_video_bitrate = to_int(options.get("video_bitrate_k"), 0) * 1000
-
+    original = probe_media(video_path)
+    metadata = read_metadata(video_path)
+    duration = max(.01, float(original.get('format', {}).get('duration') or 0))
+    video = next((s for s in original['streams'] if s.get('codec_type') == 'video'
+                  and not s.get('disposition', {}).get('attached_pic')), None)
+    if video is None:
+        raise RuntimeError('原文件没有视频流')
     vf = build_video_filters(options, duration)
-    emit_progress(
-        task_id,
-        5 + int((index - 1) * (80 / max(total, 1))),
-        f"转换视频 {index}/{total}: 编码准备",
-        file_index=index,
-        file_count=total,
-        stage="prepare",
-    )
-
-    hwaccel = ["-hwaccel", "cuda"] if config.FFMPEG_USE_GPU else []
-    video_cmd = ["ffmpeg", "-y", *hwaccel, "-i", str(video_path), "-an"]
+    extra_inputs, graph, filtered_video = build_watermark_filter(options, duration, run_dir, video['index'])
     if vf:
-        video_cmd += ["-vf", vf]
-    if frame_rate > 0:
-        video_cmd += ["-r", str(frame_rate)]
-    video_cmd += ["-c:v", gpu_codec, "-preset", "p4", "-pix_fmt", "yuv420p"]
-    if target_video_bitrate:
-        video_cmd += [
-            "-b:v",
-            str(target_video_bitrate),
-            "-maxrate",
-            str(target_video_bitrate),
-            "-bufsize",
-            str(target_video_bitrate * 2),
-        ]
-    else:
-        crf = to_int(options.get("crf"), 18, min_value=10, max_value=35)
-        video_cmd += ["-rc:v", "vbr", "-cq:v", str(crf), "-b:v", "0"]
-    video_cmd += [str(tmp_video_only)]
-
-    cpu_fallback = ["ffmpeg", "-y", "-i", str(video_path), "-an"]
-    if vf:
-        cpu_vf = vf.replace("yadif_cuda=mode=send_frame:parity=auto:deint=all", "yadif")
-        cpu_fallback += ["-vf", cpu_vf]
-    if frame_rate > 0:
-        cpu_fallback += ["-r", str(frame_rate)]
-    cpu_fallback += ["-c:v", cpu_codec, "-pix_fmt", "yuv420p"]
-    if target_video_bitrate:
-        cpu_fallback += [
-            "-b:v",
-            str(target_video_bitrate),
-            "-maxrate",
-            str(target_video_bitrate),
-            "-bufsize",
-            str(target_video_bitrate * 2),
-        ]
-    else:
-        cpu_fallback += ["-crf", str(to_int(options.get("crf"), 18, min_value=10, max_value=35))]
-    cpu_fallback += [str(tmp_video_only)]
-
-    try:
-        run_ffmpeg_with_progress(
-            video_cmd,
-            task_id=task_id,
-            duration_seconds=duration,
-            progress_start=5 + int((index - 1) * (80 / max(total, 1))),
-            progress_end=55 + int((index - 1) * (80 / max(total, 1))),
-            stage_message=f"转换视频 {index}/{total}: 视频编码中",
-            file_index=index,
-            file_count=total,
-        )
-    except Exception:
-        run_ffmpeg_with_progress(
-            cpu_fallback,
-            task_id=task_id,
-            duration_seconds=duration,
-            progress_start=5 + int((index - 1) * (80 / max(total, 1))),
-            progress_end=55 + int((index - 1) * (80 / max(total, 1))),
-            stage_message=f"转换视频 {index}/{total}: CPU 编码中",
-            file_index=index,
-            file_count=total,
-        )
-
-    emit_progress(
-        task_id,
-        60 + int((index - 1) * (80 / max(total, 1))),
-        f"转换视频 {index}/{total}: 封装音轨",
-        file_index=index,
-        file_count=total,
-        stage="audio",
-    )
-
-    def notify_audio_transcode(encoder):
-        name = "MP3" if encoder == "libmp3lame" else "AAC"
-        emit_progress(
-            task_id, 60 + int((index - 1) * (80 / max(total, 1))),
-            f"转换视频 {index}/{total}: 原音频与目标格式不兼容，正在转换为 {name}",
-            file_index=index, file_count=total, stage="audio",
-        )
-
-    mux_audio(
-        tmp_video_only, video_path, tmp_muxed, audio, audio_args,
-        on_transcode=notify_audio_transcode,
-    )
-    validate_media_output(tmp_muxed, expect_audio=audio is not None)
-
-    emit_progress(
-        task_id,
-        75 + int((index - 1) * (80 / max(total, 1))),
-        f"转换视频 {index}/{total}: 水印与元数据",
-        file_index=index,
-        file_count=total,
-        stage="finalize",
-    )
-    apply_watermark_and_metadata(tmp_muxed, final_path, options, duration, run_dir)
-
-    if to_bool(options.get("second_pass_reencode"), False):
-        reencoded = out_dir / f"{base_stem}_pass2.{output_format}"
-        bitrate_args = []
-        if target_video_bitrate:
-            bitrate_args = [
-                "-b:v",
-                str(target_video_bitrate),
-                "-maxrate",
-                str(target_video_bitrate),
-                "-bufsize",
-                str(target_video_bitrate * 2),
-            ]
+        if graph:
+            graph = f"[0:{video['index']}]{vf}[basevideo];" + graph.replace(f"[0:{video['index']}]", '[basevideo]', 1)
         else:
-            bitrate_args = ["-crf", str(to_int(options.get("crf"), 18, min_value=10, max_value=35))]
-        run_ffmpeg(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(final_path),
-                "-c:v",
-                cpu_codec,
-                *bitrate_args,
-                "-c:a",
-                "copy",
-                str(reencoded),
-            ]
+            graph, filtered_video = f"[0:{video['index']}]{vf}[filtered_video]", '[filtered_video]'
+    plan = build_plan(original, video_path, options, has_filters=bool(graph))
+    if plan.reencode and any(s.get('side_data_type') in {'Mastering display metadata', 'Content light level metadata', 'DOVI configuration record'} for s in video.get('side_data_list', [])):
+        raise RuntimeError('该视频包含 HDR/Dolby Vision 专用元数据，当前无法保证重新编码后完整保留；请保持原编码')
+    out_dir = run_dir / 'results'
+    out_dir.mkdir(parents=True, exist_ok=True)
+    final = out_dir / f'{video_path.stem}.{plan.suffix}'
+    working = run_dir / f'{video_path.stem}_working.{plan.suffix}'
+    progress_start = 5 + int((index - 1) * 80 / max(total, 1))
+    progress_end = 5 + int(index * 80 / max(total, 1))
+
+    def command(gpu):
+        cmd = ['ffmpeg', '-y', '-noautorotate', '-i', str(video_path), *extra_inputs]
+        if graph:
+            cmd += ['-filter_complex', graph]
+        cmd += stream_args(original, plan, filtered_video)
+        cmd += encoding_args(original, plan, options, duration, gpu=gpu)
+        cmd += ffmpeg_metadata_args(metadata, plan.container)
+        for option, key in (('meta_title', 'title'), ('meta_author', 'artist'), ('meta_comment', 'comment')):
+            if str(options.get(option) or '').strip():
+                cmd += ['-metadata', f'{key}={options[option].strip()}']
+        return [*cmd, '-f', plan.container, str(working)]
+
+    def execute(gpu):
+        run_ffmpeg_with_progress(
+            command(gpu), task_id=task_id, duration_seconds=duration,
+            progress_start=progress_start, progress_end=progress_end,
+            stage_message=f'转换视频 {index}/{total}: 仅修改指定视频，复制其他媒体流',
+            file_index=index, file_count=total,
         )
-        reencoded.replace(final_path)
 
-    validate_media_output(final_path, expect_audio=audio is not None)
+    original_plan = build_plan(original, video_path, {})
+    unchanged = (not plan.reencode and plan.container == original_plan.container
+                 and not any(options.get(k) for k in ('meta_title', 'meta_author', 'meta_comment')))
+    use_gpu = bool(plan.reencode and config.FFMPEG_USE_GPU)
+    try:
+        if unchanged:
+            shutil.copyfile(video_path, working)
+        else:
+            execute(use_gpu)
+    except RuntimeError as exc:
+        # 仅硬件故障改用同编码的 CPU 实现；容器不兼容不改变其他流。
+        if use_gpu and re.search(r'Cannot load.*(?:cuda|nvidia)|No capable devices|OpenEncodeSessionEx failed|InitializeEncoder failed|CUDA_ERROR|Driver does not support', str(exc), re.I):
+            execute(False)
+        else:
+            raise RuntimeError(f'{exc}\n为保留原音轨、字幕及附件，本任务不会自动丢弃或转码它们；请尝试 MKV 或保持原容器。') from exc
 
-    for tmp in [tmp_video_only, tmp_muxed]:
-        if tmp.exists():
-            try:
-                tmp.unlink()
-            except Exception:
-                pass
+    if to_bool(options.get('second_pass_reencode')):
+        second = run_dir / f'{video_path.stem}_pass2.{plan.suffix}'
+        run_ffmpeg(['ffmpeg', '-y', '-noautorotate', '-i', str(working),
+                    *stream_args(original, plan),
+                    *encoding_args(original, plan, options, duration),
+                    *ffmpeg_metadata_args(metadata, plan.container), '-f', plan.container, str(second)])
+        second.replace(working)
 
-    return final_path
+    emit_progress(task_id, progress_end, f'转换视频 {index}/{total}: 恢复日期和元数据并核对媒体流',
+                  file_index=index, file_count=total, stage='finalize')
+    modified_ms = (options.get('source_file_times') or {}).get(video_path.name)
+    restore_metadata(video_path, working, metadata, plan.container, options, modified_ms, unchanged=unchanged)
+    validate_streams(original, probe_media(working), plan)
+    working.replace(final)
+    working.with_name(working.name + '.metadata.json').replace(final.with_name(final.name + '.metadata.json'))
+    return final

@@ -144,3 +144,18 @@ ElevenLabs API Key 保存在 SQLite 管理配置中。公开运行配置、任�
 - 支持会话令牌（`admin_sessions`），接口使用 `Authorization: Bearer <token>`。
 - 客户端IP解析由 `app/src/Utils/client_ip.py` 统一处理，支持 IPv4/IPv6、`Forwarded`、`X-Forwarded-For`、`X-Real-IP`。
 - 通过“管理页可编辑配置 + 环境变量默认值”组合管理受信代理 CIDR，动态处理代理链，适配 Nginx / FRP 转发场景。
+
+## Conversion preservation
+
+转换默认保持原容器与视频编码，上传探测只用于显示，不将原参数自动写入修改选项。没有内容修改时直接复制文件字节；需要修改时分为四个步骤：
+
+1. FFprobe 读取全部媒体流、章节和标签，ExifTool 补充日期、设备和位置等字段。
+2. `conversion/plan.py` 确定主视频及是否需要重新编码，逐条映射其他视频、全部音轨、字幕、附件和数据轨，保留语言和 disposition。
+3. 只修改指定视频；缩放、反交错、水印合并进同一次编码。原帧率不取整，不使用 `-shortest` 截断原内容。GPU 编码器故障只回退同编码 CPU 实现。
+4. `conversion/metadata.py` 在编码全部结束后恢复已识别的日期和描述性标签，并核对流、章节和日期。失败时不发布结果；不兼容字幕、音轨或附件不会自动删除或转码，用户需选择兼容容器。
+
+ASF 文件属性中的创建日期通过 ExifTool 读取，转换到 MP4/MOV 时映射到电影头与轨道日期。该日期表示原容器创建时间，不宣称为真实相机拍摄时间。未注明时区的日期不擅自补时区。
+
+原文件 `lastModified` 随上传单独保存，只恢复输出文件的 mtime，不充当拍摄日期。可选 ZIP 下载带 UTC mtime 扩展和 `.metadata.json` 清单；普通浏览器下载不保证 Finder 创建日期，也不保证自动恢复本地修改日期。未识别的相机私有信息不在完整保留承诺内。
+
+新回归包含多音轨、字幕、附件、章节、ASF 日期、MP4 日期、水印、二次编码、设备位置、时区与 ZIP 修改时间；前端 Node 内置测试随镜像构建执行。所有交付仍以 `scripts/loop/dev-loop.sh ship` 的 CI 和部署结果为依据，页面由用户手动验收。

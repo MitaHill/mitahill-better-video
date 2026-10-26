@@ -36,11 +36,12 @@ def process_conversion_task(task):
         total = max(1, len(video_paths))
         for idx, video_path in enumerate(video_paths, start=1):
             outputs.append(render_single_video(task_id, video_path, params, run_dir, idx, total))
-        if len(outputs) == 1:
+        if len(outputs) == 1 and not params.get("download_as_zip"):
             result_path = outputs[0]
         else:
             result_path = run_dir / "results" / f"convert_{task_id}.zip"
-            zip_paths(outputs, result_path, run_dir / "results")
+            reports = [p.with_name(p.name + ".metadata.json") for p in outputs]
+            zip_paths([*outputs, *reports], result_path, run_dir / "results")
 
     db.update_task_result(task_id, result_path)
     db.update_task_status(task_id, "COMPLETED", 100, f"Completed: {Path(result_path).name}")

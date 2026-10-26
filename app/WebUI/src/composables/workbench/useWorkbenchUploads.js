@@ -1,4 +1,4 @@
-import { validateFiles } from "./utils";
+import { validateFiles } from "./utils.js";
 
 const probeMedia = async (file, parseJsonSafe) => {
   const data = new FormData();
@@ -9,34 +9,6 @@ const probeMedia = async (file, parseJsonSafe) => {
     throw new Error(err.error || `探测失败: ${file.name}`);
   }
   return parseJsonSafe(res);
-};
-
-const applyConversionDefaultsByProbe = (convertForm, info) => {
-  if (!info) return;
-
-  const hasVideo = info.has_video === true || Number(info.width) > 0 || Number(info.height) > 0 || Number(info.fps) > 0;
-
-  if (hasVideo && info.fps && Number(info.fps) > 0) {
-    convertForm.frameRate = Math.round(Number(info.fps));
-    convertForm.frameExportFps = Math.round(Number(info.fps));
-  }
-  if (hasVideo && info.video_bitrate && Number(info.video_bitrate) > 0) {
-    convertForm.videoBitrateK = Math.max(1, Math.round(Number(info.video_bitrate) / 1000));
-  }
-  if (hasVideo && info.width && Number(info.width) > 0) {
-    convertForm.targetWidth = Number(info.width);
-  }
-  if (hasVideo && info.height && Number(info.height) > 0) {
-    convertForm.targetHeight = Number(info.height);
-  }
-  if (hasVideo) {
-    const codec = String(info.video_codec || "").toLowerCase();
-    if (codec.includes("265") || codec === "hevc") {
-      convertForm.videoCodec = "h265";
-    } else if (codec) {
-      convertForm.videoCodec = "h264";
-    }
-  }
 };
 
 export const useWorkbenchUploads = ({
@@ -84,7 +56,6 @@ export const useWorkbenchUploads = ({
       try {
         const info = await probeMedia(file, parseJsonSafe);
         convertMediaInfo.value.push(info);
-        applyConversionDefaultsByProbe(convertForm, info);
       } catch (error) {
         probeErrors.push(`${file.name}: ${error.message}`);
       }

@@ -19,6 +19,8 @@ export const buildConvertTaskFormData = (convertForm) => {
   convertForm.mediaFiles.forEach((file) => data.append("media_files", file));
   convertForm.watermarkImages.forEach((file) => data.append("watermark_images", file));
 
+  data.append("source_file_times", JSON.stringify(convertForm.mediaFiles.map((file) => ({ filename: file.name, last_modified_ms: file.lastModified }))));
+  data.append("download_as_zip", String(convertForm.downloadAsZip));
   data.append("convert_mode", convertForm.convertMode);
   data.append("output_format", convertForm.outputFormat);
   data.append("video_codec", convertForm.videoCodec);

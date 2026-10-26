@@ -10,7 +10,8 @@ COPY app/WebUI/vite.config.js .
 COPY app/WebUI/index.html .
 COPY app/WebUI/public ./public
 COPY app/WebUI/src ./src
-RUN npm ci
+COPY app/WebUI/tests ./tests
+RUN npm ci && npm test
 ARG BUILD_CHANNEL=dev
 ARG GIT_SHA=unknown
 RUN BUILD_CHANNEL="$BUILD_CHANNEL" GIT_SHA="$GIT_SHA" npm run build
@@ -35,7 +36,7 @@ COPY --from=uv /uv /uvx /usr/local/bin/
 RUN echo "Triggering Re-build (Force Update 2026-01-08-1051)"
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends fonts-noto-cjk && \
+    apt-get install -y --no-install-recommends fonts-noto-cjk libimage-exiftool-perl && \
     rm -rf /var/lib/apt/lists/*
 
 # 1. Copy Source Code (app-only)

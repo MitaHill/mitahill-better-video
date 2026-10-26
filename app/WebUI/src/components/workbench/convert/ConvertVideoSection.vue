@@ -1,6 +1,9 @@
 <template>
   <div class="param-section" v-if="convertForm.convertMode === 'transcode'">
     <div class="param-title">视频参数</div>
+    <p class="hint">默认复制全部媒体流，仅修改指定项。容器不兼容时会报错，不会静默删除字幕或音轨。</p>
+    <label class="check-inline"><input type="checkbox" v-model="convertForm.downloadAsZip" />打包 ZIP（保留解压后的文件修改日期，附元数据清单）</label>
+    <p class="hint">内嵌日期默认保留；浏览器下载无法保证 Finder 的文件创建日期。</p>
     <div class="inline-grid three">
       <div class="field compact">
         <label>格式</label>
@@ -21,14 +24,14 @@
           type="number"
           :min="numMin('frameRate', 0)"
           :max="numMax('frameRate', 120)"
-          :step="numStep('frameRate', 1)"
+          :step="numStep('frameRate', 0.001)"
           :disabled="isDisabled('frameRate')"
           placeholder="0=保持"
         />
       </div>
     </div>
     <div class="inline-grid three">
-      <div class="field compact"><label>CRF</label><input v-model.number="convertForm.crf" type="number" :min="numMin('crf', 10)" :max="numMax('crf', 35)" :step="numStep('crf', 1)" :disabled="isDisabled('crf')" /></div>
+      <div class="field compact"><label>CRF（0=不指定）</label><input v-model.number="convertForm.crf" type="number" :min="numMin('crf', 0)" :max="numMax('crf', 35)" :step="numStep('crf', 1)" :disabled="isDisabled('crf')" /></div>
       <div class="field compact"><label>码率(kbps)</label><input v-model.number="convertForm.videoBitrateK" type="number" :min="numMin('videoBitrateK', 0)" :max="numMax('videoBitrateK', 200000)" :step="numStep('videoBitrateK', 1)" :disabled="isDisabled('videoBitrateK')" placeholder="0=自动" /></div>
       <div class="field compact"><label>大小限制(MB)</label><input v-model.number="convertForm.targetSizeMb" type="number" :min="numMin('targetSizeMb', 0)" :max="numMax('targetSizeMb', 102400)" :step="numStep('targetSizeMb', 0.1)" :disabled="isDisabled('targetSizeMb')" /></div>
     </div>
@@ -73,16 +76,16 @@ const props = defineProps({
 const { isDisabled, allowed, numMin, numMax, numStep } = useFieldPolicy(props.getFieldPolicy, "convert");
 
 const outputFormatOptions = computed(() =>
-  allowed("outputFormat", ["mp4", "mkv", "mov", "avi"]).map((value) => ({
+  allowed("outputFormat", ["preserve", "mp4", "mkv", "mov", "avi"]).map((value) => ({
     value,
-    label: String(value || "").toUpperCase(),
+    label: value === "preserve" ? "保持原始" : String(value || "").toUpperCase(),
   }))
 );
 
 const videoCodecOptions = computed(() =>
-  allowed("videoCodec", ["h264", "h265"]).map((value) => ({
+  allowed("videoCodec", ["preserve", "h264", "h265"]).map((value) => ({
     value,
-    label: String(value || "").toUpperCase(),
+    label: value === "preserve" ? "保持原始" : String(value || "").toUpperCase(),
   }))
 );
 
