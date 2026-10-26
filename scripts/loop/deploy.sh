@@ -3,13 +3,18 @@
 
 deploy() {
   local tag="${DEPLOY_TAG:-dev}"
+  local image="${DEPLOY_IMAGE:-kindmitaishere/mitahill-better-video:$tag}"
+  [[ "$image" =~ ^kindmitaishere/mitahill-better-video:([a-zA-Z0-9_.-]+)$ ]] \
+    || die "无效的部署镜像引用"
   prog_next
   load_remote
   check_remote
   # 远程只保存 docker-compose.yaml、.env 和 storage/，重部署逻辑由本机通过 SSH 送过去执行
   prog_dirty
-  remote "cd $REMOTE_DIR && TAG=$tag bash -s" < "$LOOP_DIR/remote-run.sh"
-  prog_end done "已部署 :${tag}"
+  local quoted_dir
+  printf -v quoted_dir '%q' "$REMOTE_DIR"
+  remote "cd $quoted_dir && IMAGE_REF=$image bash -s" < "$LOOP_DIR/remote-run.sh"
+  prog_end done "已部署 ${image}（上一镜像已保留）"
 
   printf '\n页面：http://%s:8501\n' "${REMOTE_HOST#*@}"
   echo "行为改动请在页面提交一个小任务，确认完成并能在管理页删除。"

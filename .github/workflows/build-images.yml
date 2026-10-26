@@ -84,6 +84,7 @@ jobs:
           modules=$(cd scripts/tests && ls test_*.py | sed 's/\.py$//; s/^/tests./')
           docker run --rm \
             --volume "$PWD/scripts/tests:/workspace/tests:ro" \
+            --volume "$PWD/scripts/loop:/workspace/scripts/loop:ro" \
             --workdir /workspace \
             "kindmitaishere/mitahill-better-video:$IMAGE_TAG" \
             python3 -m unittest -v $modules
@@ -148,6 +149,8 @@ jobs:
         run: |
           repo="kindmitaishere/mitahill-better-video"
           docker push "$repo:$IMAGE_TAG"
+          docker tag "$repo:$IMAGE_TAG" "$repo:sha-$GITHUB_SHA"
+          docker push "$repo:sha-$GITHUB_SHA"
           if [ "$RELEASE" = "true" ] && [ "$IMAGE_TAG" != "latest" ]; then
             docker tag "$repo:$IMAGE_TAG" "$repo:latest"
             docker push "$repo:latest"

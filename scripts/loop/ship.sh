@@ -67,5 +67,5 @@ ship() {
   fi
   prog_end done "构建与镜像内单测通过"
 
-  deploy
+  DEPLOY_IMAGE="kindmitaishere/mitahill-better-video:sha-$sha" deploy
 }
