@@ -1,5 +1,9 @@
 from app.src.Config import settings as config
 from app.src.Utils.ffmpeg import get_video_duration, run_ffmpeg
+from app.src.Utils.media_mux import (
+    probe_media, first_audio_stream, choose_audio_args, check_audio_encoder,
+    mux_audio, validate_media_output,
+)
 
 from .common import GPU_CODEC_MAP, VALID_FORMATS, to_bool, to_float, to_int
 from .filters import build_video_filters
@@ -11,6 +15,10 @@ def render_single_video(task_id, video_path, options, run_dir, index, total):
     output_format = (options.get("output_format") or "mp4").lower()
     if output_format not in VALID_FORMATS:
         output_format = "mp4"
+
+    audio = first_audio_stream(probe_media(video_path))
+    audio_args = choose_audio_args(audio, output_format)
+    check_audio_encoder(audio_args)
 
     codec_key = (options.get("video_codec") or "h264").lower()
     gpu_codec, cpu_codec = GPU_CODEC_MAP.get(codec_key, GPU_CODEC_MAP["h264"])
@@ -116,26 +124,19 @@ def render_single_video(task_id, video_path, options, run_dir, index, total):
         stage="audio",
     )
 
-    run_ffmpeg(
-        [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(tmp_video_only),
-            "-i",
-            str(video_path),
-            "-map",
-            "0:v:0",
-            "-map",
-            "1:a:0?",
-            "-c:v",
-            "copy",
-            "-c:a",
-            "copy",
-            "-shortest",
-            str(tmp_muxed),
-        ]
+    def notify_audio_transcode(encoder):
+        name = "MP3" if encoder == "libmp3lame" else "AAC"
+        emit_progress(
+            task_id, 60 + int((index - 1) * (80 / max(total, 1))),
+            f"转换视频 {index}/{total}: 原音频与目标格式不兼容，正在转换为 {name}",
+            file_index=index, file_count=total, stage="audio",
+        )
+
+    mux_audio(
+        tmp_video_only, video_path, tmp_muxed, audio, audio_args,
+        on_transcode=notify_audio_transcode,
     )
+    validate_media_output(tmp_muxed, expect_audio=audio is not None)
 
     emit_progress(
         task_id,
@@ -176,6 +177,8 @@ def render_single_video(task_id, video_path, options, run_dir, index, total):
             ]
         )
         reencoded.replace(final_path)
+
+    validate_media_output(final_path, expect_audio=audio is not None)
 
     for tmp in [tmp_video_only, tmp_muxed]:
         if tmp.exists():

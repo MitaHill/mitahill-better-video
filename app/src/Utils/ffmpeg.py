@@ -3,15 +3,25 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 logger = logging.getLogger("FFMPEG")
+
+
+class FFmpegError(RuntimeError):
+    def __init__(self, returncode, stderr, log_path):
+        self.returncode = returncode
+        self.stderr = stderr
+        self.log_path = log_path
+        tail = "\n".join((stderr or "").strip().splitlines()[-20:])
+        super().__init__(f"ffmpeg failed: {tail}")
 
 
 def _write_ffmpeg_stderr(stderr_text):
     logs_dir = Path("/workspace/storage/logs/ffmpeg_stderr")
     logs_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    log_path = logs_dir / f"{stamp}.log"
+    log_path = logs_dir / f"{stamp}-{uuid4().hex[:8]}.log"
     log_path.write_text(stderr_text or "", encoding="utf-8")
     return log_path
 
@@ -31,7 +41,7 @@ def run_ffmpeg(args, fallback_args=None):
         tail_text = "\n".join(tail_lines)
         logger.error("ffmpeg failed (last 20 lines):\n%s", tail_text)
         logger.error("Full ffmpeg stderr archived at %s", log_path)
-        raise RuntimeError(f"ffmpeg failed: {tail_text}")
+        raise FFmpegError(proc.returncode, stderr_text, log_path)
 
 def get_video_codec(file_path):
     cmd = ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "default=noprint_wrappers=1:nokey=1", str(file_path)]
