@@ -1,9 +1,7 @@
 <template>
   <div class="param-section" v-if="convertForm.convertMode === 'transcode'">
     <div class="param-title">视频参数</div>
-    <p class="hint">默认复制全部媒体流，仅修改指定项。容器不兼容时会报错，不会静默删除字幕或音轨。</p>
-    <label class="check-inline"><input type="checkbox" v-model="convertForm.downloadAsZip" />打包 ZIP（保留解压后的文件修改日期，附元数据清单）</label>
-    <p class="hint">内嵌日期默认保留；浏览器下载无法保证 Finder 的文件创建日期。</p>
+    <label class="check-inline"><input type="checkbox" v-model="convertForm.downloadAsZip" />打包 ZIP</label>
     <div class="inline-grid three">
       <div class="field compact">
         <label>格式</label>
