@@ -55,23 +55,21 @@
 
 ## 3. build → test → push
 
-Actions 图固定为三个串行任务，前一阶段失败时后续阶段不会执行：
+一个 CI job 在同一台 GitHub 托管 Runner 上执行三个命名步骤。准备源码和 Node.js 后，按下面顺序运行；前一阶段失败时后续阶段不会执行：
 
 ```mermaid
 flowchart LR
-    build[build 构建镜像] --> test[test 前后端回归]
-    test --> push[push 镜像与发行说明]
+    build[build 本机构建镜像] --> test[test 直接测试本机镜像]
+    test --> push[push 发布已测镜像]
 ```
 
 | 阶段 | 主要操作 | 交付约束 |
 | --- | --- | --- |
-| `build` | 拉取源码，确定版本类型与标签，构建基础镜像和应用镜像 | 不执行测试，不推送镜像；保存本次 SHA 对应的镜像与 Image ID |
-| `test` | 下载并核对镜像 ID；Node 20 执行前端 `npm ci && npm test`；在构建镜像内执行全部 Python 单元和 FFmpeg/ExifTool 集成测试 | 使用 `scripts/tests/` 和 `scripts/loop/` 的只读挂载，测试模块为 `tests.test_xxx`；失败阻止 `push` |
-| `push` | 下载并再次核对同一镜像 ID；登录 Docker Hub，处理发布标签并推送镜像；版本标签同时创建或更新发行说明 | 不重新构建；PR 跳过整个阶段；稳定版原有清理规则保持不变 |
+| `build` | 确定版本类型与标签，构建基础镜像和应用镜像 | 不执行测试、不上传中间镜像；输出本机不可变 Image ID |
+| `test` | Node 20 执行前端 `npm ci && npm test`；直接以 Image ID 启动刚构建的镜像，执行全部 Python 单元和 FFmpeg/ExifTool 集成测试 | `scripts/tests/` 和 `scripts/loop/` 只读挂载；测试模块为 `tests.test_xxx`；失败阻止 `push` |
+| `push` | 将同一 Image ID 标记为发布标签并推送 Docker Hub；版本标签同时创建或更新发行说明 | 不重新构建；PR 跳过；稳定版原有清理规则保持不变 |
 
-三个阶段使用 GitHub 托管 Runner。镜像通过工作流 artifact 传递，流式 `docker save | gzip -1` 避免同时保存完整 tar 与压缩包；artifact 不重复压缩，保留一天。测试与推送都必须与 `build` 输出的 Image ID 一致，不能用重建镜像代替已测试镜像。
-
-代价是增加镜像上传、两次下载及临时存储；收益是 Actions 清楚显示构建、测试、推送各自的结果，也支持在同一次运行里只重跑失败任务。保留期结束后需重跑完整工作流。
+镜像始终留在该 Runner 的 Docker daemon 中，测试成功后才上传 Docker Hub；没有 artifact 保存、跨任务上传或下载。Actions 展示一个 job，内部有明确的 `build`、`test`、`push` 三个步骤。重跑需要执行整个 job，以保证镜像与测试来自同一轮运行。
 
 loop-script 等待整条工作流成功，再部署本次 SHA 的镜像；任何阶段失败、取消或尚未完成，都不能作为交付依据。
 
@@ -363,6 +361,6 @@ git push origin v0.1.0-beta
 ### 转换保留策略的验收
 
 - 应用镜像安装 ExifTool，用于读取和恢复 FFprobe 未导出的日期与描述性元数据。
-- 前端 `npm test` 和后端真实 FFmpeg/ExifTool 回归统一在 `test` 阶段执行，后端使用 `build` 产出的同一镜像。两者均经 loop-script 的 CI 验证，不能用本地运行替代。
+- 前端 `npm test` 和后端真实 FFmpeg/ExifTool 回归统一在 `test` 步骤执行，后端直接使用 `build` 在同一 Runner 产出的镜像。两者均经 loop-script 的 CI 验证，不能用本地运行替代。
 - 手动验收：默认项应为“保持原始”；只选 HEVC 时检查音轨、字幕、章节、日期仍在。原 WMA 与 MP4 不兼容时会明确失败，请选择 MKV；不会为了任务成功而修改未指定的音轨。
 - 使用 ZIP 下载验证解压后的文件修改日期；Finder 创建日期和照片/Immich 的显示由对应应用实际确认，健康检查不代表这些项目已通过验收。

@@ -24,29 +24,34 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    # PR 合并后会由目标分支的 push 事件构建，这里跳过已合并的 closed，避免同一次变更触发两次。
+  ci:
+    name: build → test → push
+    # ponytail: 三个阶段共享 Runner 的本地镜像，避免传输数 GB 的中间产物。
+    # PR 合并后只由目标分支的 push 构建，避免重复运行。
     if: >-
       github.event_name != 'pull_request' ||
       github.event.action == 'opened' ||
       github.event.pull_request.merged == false
     runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.image_tag.outputs.tag }}
-      release: ${{ steps.image_tag.outputs.release }}
-      image_id: ${{ steps.save_image.outputs.image_id }}
-
+    permissions:
+      contents: write # 版本标签的发行说明需要写权限；令牌仅在 push 步骤提供。
     steps:
-      - name: 拉取源码
+      - name: 准备源码
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - name: 确定镜像标签
-        id: image_tag
+      - name: 准备 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: build
+        id: build
         env:
           ACTION_REF: ${{ github.ref }}
         run: |
-          # release=true 表示稳定发布（main 和版本标签）：清空仓库旧镜像并打 latest 标签。
-          # dev 只推送 dev 标签，不清空仓库，也不覆盖 latest。
+          set -euo pipefail
           release=false
           case "$ACTION_REF" in
             refs/heads/main) tag="latest"; release=true ;;
@@ -55,239 +60,146 @@ jobs:
             refs/pull/*) tag="pr-test" ;;
             *) tag="manual" ;;
           esac
+          channel=dev
+          [ "$release" = "false" ] || channel=stable
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "release=$release" >> "$GITHUB_OUTPUT"
 
-      - name: 构建基础镜像
-        run: |
           docker build \
             --file deploy/docker/base/Dockerfile \
             --network host \
-            --tag base_better_video:20260210-2330 \
-            .
-
-      - name: 构建应用镜像
-        env:
-          BUILD_CHANNEL: ${{ steps.image_tag.outputs.release == 'true' && 'stable' || 'dev' }}
-        run: |
+            --tag base_better_video:20260210-2330 .
+          image="kindmitaishere/mitahill-better-video:ci-$GITHUB_SHA"
           docker build \
             --file deploy/docker/for-app/Dockerfile \
-            --build-arg BUILD_CHANNEL="$BUILD_CHANNEL" \
+            --build-arg BUILD_CHANNEL="$channel" \
             --build-arg GIT_SHA="$GITHUB_SHA" \
-            --network host \
-            --tag "kindmitaishere/mitahill-better-video:ci-$GITHUB_SHA" \
-            .
-
-      - name: 保存本次构建的镜像
-        id: save_image
-        run: |
-          set -euo pipefail
-          image="kindmitaishere/mitahill-better-video:ci-$GITHUB_SHA"
+            --network host --tag "$image" .
           echo "image_id=$(docker image inspect --format '{{.Id}}' "$image")" >> "$GITHUB_OUTPUT"
-          mkdir -p "$RUNNER_TEMP/ci-image"
-          docker image save "$image" | gzip -1 > "$RUNNER_TEMP/ci-image/image.tar.gz"
 
-      - name: 传递构建产物
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-image-${{ github.sha }}
-          path: ${{ runner.temp }}/ci-image/image.tar.gz
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 1
-          overwrite: true
-
-  test:
-    needs: build
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ needs.build.outputs.tag }}
-      release: ${{ needs.build.outputs.release }}
-      image_id: ${{ needs.build.outputs.image_id }}
-    steps:
-      - name: 拉取源码
-        uses: actions/checkout@v4
-
-      - name: 下载构建产物
-        uses: actions/download-artifact@v4
-        with:
-          name: app-image-${{ github.sha }}
-          path: ${{ runner.temp }}/ci-image
-
-      - name: 加载并核对镜像
+      - name: test
         env:
-          EXPECTED_IMAGE_ID: ${{ needs.build.outputs.image_id }}
+          IMAGE_ID: ${{ steps.build.outputs.image_id }}
         run: |
           set -euo pipefail
-          gzip -dc "$RUNNER_TEMP/ci-image/image.tar.gz" | docker image load
-          rm "$RUNNER_TEMP/ci-image/image.tar.gz"
-          actual=$(docker image inspect --format '{{.Id}}' "kindmitaishere/mitahill-better-video:ci-$GITHUB_SHA")
-          test "$actual" = "$EXPECTED_IMAGE_ID"
-
-      - name: 准备前端测试环境
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: app/WebUI/package-lock.json
-
-      - name: 运行前端回归测试
-        working-directory: app/WebUI
-        run: npm ci && npm test
-
-      - name: 在镜像内运行单元测试
-        env:
-          IMAGE_REF: kindmitaishere/mitahill-better-video:ci-${{ github.sha }}
-        run: |
-          # 宿主机路径是 scripts/tests，容器内仍挂载为 /workspace/tests，模块名保持 tests.test_xxx
+          npm ci --prefix app/WebUI
+          npm test --prefix app/WebUI
           modules=$(cd scripts/tests && ls test_*.py | sed 's/\.py$//; s/^/tests./')
           docker run --rm \
             --volume "$PWD/scripts/tests:/workspace/tests:ro" \
             --volume "$PWD/scripts/loop:/workspace/scripts/loop:ro" \
-            --workdir /workspace \
-            "$IMAGE_REF" \
+            --workdir /workspace "$IMAGE_ID" \
             python3 -m unittest -v $modules
 
-  push:
-    needs: test
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: 拉取源码
-        uses: actions/checkout@v4
-
-      - name: 下载已通过测试的构建产物
-        uses: actions/download-artifact@v4
-        with:
-          name: app-image-${{ github.sha }}
-          path: ${{ runner.temp }}/ci-image
-
-      - name: 加载并核对已测试的镜像
-        env:
-          EXPECTED_IMAGE_ID: ${{ needs.test.outputs.image_id }}
-        run: |
-          set -euo pipefail
-          gzip -dc "$RUNNER_TEMP/ci-image/image.tar.gz" | docker image load
-          rm "$RUNNER_TEMP/ci-image/image.tar.gz"
-          image="kindmitaishere/mitahill-better-video:ci-$GITHUB_SHA"
-          actual=$(docker image inspect --format '{{.Id}}' "$image")
-          test "$actual" = "$EXPECTED_IMAGE_ID"
-
-      - name: 登录 Docker Hub
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
-
-      # 构建和测试都通过后才清空仓库，避免构建失败时 Docker Hub 上一个镜像都不剩。
-      - name: 清空 Docker Hub 仓库旧镜像
-        if: needs.test.outputs.release == 'true'
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          api="https://hub.docker.com/v2/repositories/kindmitaishere/mitahill-better-video/tags"
-
-          jwt=$(jq -n --arg u "$DOCKERHUB_USERNAME" --arg p "$DOCKERHUB_TOKEN" '{username: $u, password: $p}' \
-            | curl -fsS -H "Content-Type: application/json" -d @- https://hub.docker.com/v2/users/login \
-            | jq -r '.token')
-          if [ -z "$jwt" ] || [ "$jwt" = "null" ]; then
-            echo "Docker Hub API 登录失败" >&2
-            exit 1
-          fi
-
-          # 每轮取第一页并全部删除，直到仓库为空；最多 20 轮，防止删除无效时死循环
-          for round in $(seq 1 20); do
-            code=$(curl -sS -o tags.json -w '%{http_code}' -H "Authorization: JWT $jwt" "$api?page_size=100")
-            if [ "$code" = "404" ]; then
-              echo "仓库不存在，无需清空（推送时会自动创建）"
-              exit 0
-            elif [ "$code" != "200" ]; then
-              echo "列出标签失败，HTTP $code" >&2
-              exit 1
-            fi
-            tags=$(jq -r '.results[].name' tags.json)
-            if [ -z "$tags" ]; then
-              echo "仓库已清空"
-              exit 0
-            fi
-            # 标签列表有延迟，可能列出刚删掉的标签，删除返回 404 视为已不存在。
-            # 一轮下来一个都没删掉，说明剩下的都是过期条目，仓库已清空。
-            deleted=0
-            for tag in $tags; do
-              code=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: JWT $jwt" "$api/$tag/")
-              case "$code" in
-                2??) echo "已删除标签 $tag"; deleted=$((deleted + 1)) ;;
-                404) echo "标签 $tag 已不存在，跳过" ;;
-                *) echo "删除标签 $tag 失败，HTTP $code" >&2; exit 1 ;;
-              esac
-            done
-            if [ "$deleted" -eq 0 ]; then
-              echo "仓库已清空（列表中剩余的是过期条目）"
-              exit 0
-            fi
-          done
-          echo "清空 20 轮后仓库仍有标签，请检查 Token 权限" >&2
-          exit 1
-
-      - name: 推送应用镜像并打最新标签
+      - name: push
         if: github.event_name != 'pull_request'
         env:
-          IMAGE_TAG: ${{ needs.test.outputs.tag }}
-          RELEASE: ${{ needs.test.outputs.release }}
+          IMAGE_ID: ${{ steps.build.outputs.image_id }}
+          IMAGE_TAG: ${{ steps.build.outputs.tag }}
+          RELEASE: ${{ steps.build.outputs.release }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          ACTION_REF: ${{ github.ref }}
         run: |
+          set -euo pipefail
+          echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+          if [ "$RELEASE" = "true" ]; then
+            clear_old_tags() {
+              set -euo pipefail
+              api="https://hub.docker.com/v2/repositories/kindmitaishere/mitahill-better-video/tags"
+
+              jwt=$(jq -n --arg u "$DOCKERHUB_USERNAME" --arg p "$DOCKERHUB_TOKEN" '{username: $u, password: $p}' \
+                | curl -fsS -H "Content-Type: application/json" -d @- https://hub.docker.com/v2/users/login \
+                | jq -r '.token')
+              if [ -z "$jwt" ] || [ "$jwt" = "null" ]; then
+                echo "Docker Hub API 登录失败" >&2
+                exit 1
+              fi
+
+              # 每轮取第一页并全部删除，直到仓库为空；最多 20 轮，防止删除无效时死循环
+              for round in $(seq 1 20); do
+                code=$(curl -sS -o tags.json -w '%{http_code}' -H "Authorization: JWT $jwt" "$api?page_size=100")
+                if [ "$code" = "404" ]; then
+                  echo "仓库不存在，无需清空（推送时会自动创建）"
+                  return 0
+                elif [ "$code" != "200" ]; then
+                  echo "列出标签失败，HTTP $code" >&2
+                  exit 1
+                fi
+                tags=$(jq -r '.results[].name' tags.json)
+                if [ -z "$tags" ]; then
+                  echo "仓库已清空"
+                  return 0
+                fi
+                # 标签列表有延迟，可能列出刚删掉的标签，删除返回 404 视为已不存在。
+                # 一轮下来一个都没删掉，说明剩下的都是过期条目，仓库已清空。
+                deleted=0
+                for tag in $tags; do
+                  code=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: JWT $jwt" "$api/$tag/")
+                  case "$code" in
+                    2??) echo "已删除标签 $tag"; deleted=$((deleted + 1)) ;;
+                    404) echo "标签 $tag 已不存在，跳过" ;;
+                    *) echo "删除标签 $tag 失败，HTTP $code" >&2; exit 1 ;;
+                  esac
+                done
+                if [ "$deleted" -eq 0 ]; then
+                  echo "仓库已清空（列表中剩余的是过期条目）"
+                  return 0
+                fi
+              done
+              echo "清空 20 轮后仓库仍有标签，请检查 Token 权限" >&2
+              exit 1
+            }
+            clear_old_tags
+          fi
+
           repo="kindmitaishere/mitahill-better-video"
-          docker tag "$repo:ci-$GITHUB_SHA" "$repo:$IMAGE_TAG"
+          docker tag "$IMAGE_ID" "$repo:$IMAGE_TAG"
           docker push "$repo:$IMAGE_TAG"
-          docker tag "$repo:$IMAGE_TAG" "$repo:sha-$GITHUB_SHA"
+          docker tag "$IMAGE_ID" "$repo:sha-$GITHUB_SHA"
           docker push "$repo:sha-$GITHUB_SHA"
           if [ "$RELEASE" = "true" ] && [ "$IMAGE_TAG" != "latest" ]; then
-            docker tag "$repo:$IMAGE_TAG" "$repo:latest"
+            docker tag "$IMAGE_ID" "$repo:latest"
             docker push "$repo:latest"
           fi
 
-      - name: 创建或更新发行版
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          # 以 alpha、beta 结尾的版本一律标为预览版（预发行版）
-          case "$TAG" in
-            *alpha|*beta)
-              title="$TAG 预览版"
-              prerelease_flag="--prerelease"
-              summary="预览版：功能与接口可能变动，不建议用于生产环境。"
-              ;;
-            *)
-              title="$TAG"
-              prerelease_flag="--prerelease=false"
-              summary="正式版。"
-              ;;
-          esac
+          if [[ "$ACTION_REF" == refs/tags/v* ]]; then
+            # 以 alpha、beta 结尾的版本一律标为预览版（预发行版）
+            case "$TAG" in
+              *alpha|*beta)
+                title="$TAG 预览版"
+                prerelease_flag="--prerelease"
+                summary="预览版：功能与接口可能变动，不建议用于生产环境。"
+                ;;
+              *)
+                title="$TAG"
+                prerelease_flag="--prerelease=false"
+                summary="正式版。"
+                ;;
+            esac
 
-          # Docker 拉取与运行命令取自 README.md 中 release-docker 标记之间的内容
-          docker_section=$(sed -n '/<!-- release-docker:start -->/,/<!-- release-docker:end -->/p' README.md | sed '1d;$d')
-          if [ -z "$docker_section" ]; then
-            echo "README.md 中缺少 release-docker 标记段落" >&2
-            exit 1
-          fi
+            # Docker 拉取与运行命令取自 README.md 中 release-docker 标记之间的内容
+            docker_section=$(sed -n '/<!-- release-docker:start -->/,/<!-- release-docker:end -->/p' README.md | sed '1d;$d')
+            if [ -z "$docker_section" ]; then
+              echo "README.md 中缺少 release-docker 标记段落" >&2
+              exit 1
+            fi
 
-          {
-            echo "$summary"
-            echo
-            echo "## Docker 镜像"
-            echo
-            echo "Docker Hub 仓库只保留最近一次构建的镜像，因此这里统一使用 \`latest\` 标签。"
-            echo
-            echo "$docker_section"
-          } > release-notes.md
+            {
+              echo "$summary"
+              echo
+              echo "## Docker 镜像"
+              echo
+              echo "Docker Hub 仓库只保留最近一次构建的镜像，因此这里统一使用 \`latest\` 标签。"
+              echo
+              echo "$docker_section"
+            } > release-notes.md
 
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$title" --notes-file release-notes.md $prerelease_flag
-          else
-            gh release create "$TAG" --verify-tag --title "$title" --notes-file release-notes.md $prerelease_flag
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              gh release edit "$TAG" --title "$title" --notes-file release-notes.md $prerelease_flag
+            else
+              gh release create "$TAG" --verify-tag --title "$title" --notes-file release-notes.md $prerelease_flag
+            fi
           fi
