@@ -69,7 +69,7 @@ def find_result_file(task, output_root):
     result_path = task.get("result_path")
     if result_path:
         path = Path(result_path)
-        if path.exists():
+        if path.is_file():
             return path
 
     import json
@@ -78,8 +78,8 @@ def find_result_file(task, output_root):
     filename = params.get("filename")
     if not filename:
         run_results = output_root / f"run_{task['task_id']}" / "results"
-        zipped = sorted(run_results.glob("*.zip")) if run_results.exists() else []
+        zipped = sorted(path for path in run_results.glob("*.zip") if path.is_file())
         return zipped[0] if zipped else None
     stem = Path(filename).stem
-    results = list(output_root.glob(f"sr_{stem}.*"))
+    results = [path for path in output_root.glob(f"sr_{stem}.*") if path.is_file()]
     return results[0] if results else None

@@ -1,3 +1,5 @@
+from flask import url_for
+
 from app.src.Database import core as db
 
 from ...constants import OUTPUT_ROOT, UPLOAD_ROOT
@@ -37,6 +39,8 @@ def submit_transcription_request(req, client_ip):
             return {"error": errors[0].get("error") or "提交转录任务失败", "errors": errors}, 400
 
     payload = {"task_id": task_ids[0], "task_ids": task_ids}
+    if len(task_ids) == 1 and not batch_id:
+        payload["status_url"] = url_for("api_tasks.get_task", task_id=task_ids[0])
     if batch_id:
         payload["batch_id"] = batch_id
     if errors:

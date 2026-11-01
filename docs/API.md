@@ -1,80 +1,129 @@
 # API Contract
 
+任务接口使用普通 HTTP 上传、查询和下载，可接入 n8n。当前不要求 API Key；管理接口仍需管理员登录。新增 URL 字段均为相对路径，调用方需与服务地址拼接。
+
+任务 ID 是字符串（当前为四位数字，如 `"0123"`），不是 UUID；请保留前导零，并将其作为不透明标识使用。
+
 ## POST /api/tasks
-**Content-Type**: multipart/form-data
 
-Fields:
-- `file` (required)
-- `input_type` (Video | Image)
-- `model_name`
-- `upscale` (2/3/4)
-- `tile`
-- `denoise_strength`
-- `crf`
-- `output_codec` (available values come from `/api/config/recommendations`)
-- `tile_pad`
-- `fp16`
+创建一个增强任务。**Content-Type**：`multipart/form-data`。
 
-Response:
+| 字段 | 默认值 / 说明 |
+| --- | --- |
+| `file` | 必填，单个视频或图片 |
+| `input_type` | `Video`，也可为 `Image` |
+| `model_name` | `realesrgan-x4plus` |
+| `upscale` | 启动时根据显存确定，可从 `/api/config/recommendations` 查询 |
+| `tile` | 启动时根据显存确定，可从 `/api/config/recommendations` 查询 |
+| `denoise_strength` | `0.5` |
+| `crf` | `18` |
+| `output_codec` | `h264`；可用值见 `/api/config/recommendations` 的 `enhance_output_codecs` |
+| `tile_pad` | 服务端 `DEFAULT_TILE_PADDING`，未配置时为 `10` |
+| `fp16` | 服务端 `DEFAULT_FP16`，未配置时为 `true` |
+
+成功返回 **201**：
+
+```json
+{ "task_id": "0123", "status_url": "/api/tasks/0123" }
 ```
-{ "task_id": "<uuid>" }
-```
+
+缺少文件、文件名不合法或媒体被拒绝时返回 **400** 和 `error`。部分拒绝发生在创建记录之后，此时还会返回 `task_id`，对应任务为 `FAILED`。
 
 ## POST /api/tasks/batch
-**Content-Type**: multipart/form-data
 
-Fields:
-- `files` (required, multiple)
-- 其余字段同 `/api/tasks`，批量任务共享同一组参数
+**Content-Type**：`multipart/form-data`。`files` 为多个上传文件（也兼容 `file`），其余增强参数与单任务相同。
 
-Response:
+成功返回 **201**，可能包含部分失败：
+
+```json
+{
+  "batch_id": "9500",
+  "task_ids": ["0123", "0124"],
+  "errors": [{ "filename": "bad.mp4", "error": "...", "task_id": "0124" }]
+}
 ```
-{ "task_ids": ["<uuid>", "..."], "errors": [{ "filename": "...", "error": "...", "task_id": "<uuid>" }] }
-```
+
+批次状态和结果分别使用 `GET /api/batches/<batch_id>`、`GET /api/batches/<batch_id>/result`。
 
 ## POST /api/chains
-**Content-Type**: multipart/form-data
 
-把多步串成一条链，详见 [任务链设计](TASK_CHAIN.md)。接口可用，但前端「链式」入口暂时隐藏。
+**Content-Type**：`multipart/form-data`。已有任务链接口保留，前端入口暂时隐藏，详见 [任务链设计](TASK_CHAIN.md)。外部工作流首版使用单任务接口，不依赖任务链。
 
-Fields:
-- `file` (required)：整条链的输入文件，只取一个
-- `steps` (required)：JSON 数组，每项 `{"category": "enhance|convert|transcribe", "params": {...}}`。`params` 的键跟对应类别的单任务接口一致；输入文件字段不用填，第一步用 `file`，后续步骤由后端填上一步的产物
+- `file`：必填，整条链的一个输入文件。
+- `steps`：必填，JSON 数组，每项为 `{"category": "enhance|convert|transcribe", "params": {...}}`；后续输入由后端使用上一步结果填充。
+- 最多五步；`transcribe` 只能是最后一步；非最后一步的 `convert` 只允许 `convert_mode=transcode`。`convert` 是保留的内部链步骤，独立转换提交接口已移除。
 
-约束：最多 5 步；`transcribe` 只能是最后一步；非最后一步的 `convert` 只允许 `convert_mode=transcode`。
+成功返回 **201**：
 
-Response:
-```
-{ "chain_id": "<batch_id>", "task_ids": ["<task_id>", "..."] }
+```json
+{ "chain_id": "9500", "task_ids": ["0123", "0124"] }
 ```
 
-链就是一个批次，状态查 `GET /api/batches/<chain_id>`，结果打包下载 `GET /api/batches/<chain_id>/result`，整条取消 `POST /api/admin/batches/<chain_id>/cancel`。
+通过批次接口查询和下载，整条取消使用 `POST /api/admin/batches/<chain_id>/cancel`。
 
 ## GET /api/tasks/<task_id>
-Response includes:
-- `status` (PENDING/PROCESSING/COMPLETED/FAILED；链上还没轮到的步骤是 WAITING)
-- `progress` (0-100)
-- `message`
-- `task_params`
-- `video_info`
-- `task_params.task_category` (`enhance` | `convert` | `transcribe`)
+
+成功返回 **200**，保留原有任务字段，包括：
+
+- `task_id`、`task_category`、`status`、`progress`（0–100）、`message`。
+- `task_params`、`video_info`、`task_progress`、`segment_progress`、`gpu_live`。
+- `created_at`、`updated_at` 为带 UTC 时区的时间字符串。
+- `result_available`：仅 `COMPLETED` 且能找到结果文件时为 `true`。
+- `result_url`：结果可用时为相对下载路径，否则为 `null`。不要使用返回中的服务端文件路径下载文件。
+
+任务参数中的 `translator_api_key` 会被遮盖。
+
+```json
+{
+  "task_id": "0123",
+  "status": "COMPLETED",
+  "progress": 100,
+  "result_available": true,
+  "result_url": "/api/tasks/0123/result"
+}
+```
+
+以上为响应节选。状态含义：
+
+| 状态 | 客户端行为 |
+| --- | --- |
+| `PENDING` / `PROCESSING` / `WAITING` | 继续等待；`WAITING` 用于尚未轮到的内部链步骤 |
+| `FAILED` | 停止，读取 `message`；管理员取消也使用此状态 |
+| `COMPLETED` | 检查 `result_available`，为真时下载；为假时作为文件缺失处理 |
+
+任务不存在返回 **404**，`error_code=task_not_found`。轮询不要通过重复提交任务来实现。
 
 ## GET /api/tasks/<task_id>/preview/original
-Returns JPEG preview if available.
+
+原始预览，存在时返回 JPEG。
 
 ## GET /api/tasks/<task_id>/preview/upscaled
-Returns JPEG preview if available.
+
+增强预览，存在时返回 JPEG。
 
 ## GET /api/tasks/<task_id>/result
-Returns output file if task is completed.
+
+成功返回 **200** 和结果文件，`Content-Disposition: attachment` 携带文件名。增强视频通常为视频文件，转录 `subtitle_zip` 为 ZIP；客户端应保存实际二进制响应。
+
+失败均返回 **404** 和 JSON：
+
+| `error_code` | 含义 |
+| --- | --- |
+| `task_not_found` | 无对应任务 |
+| `result_not_ready` | 任务不是 `COMPLETED`；响应同时包含当前 `status`，包括失败状态 |
+| `result_missing` | 任务已完成，但结果文件缺失 |
+
+示例：`{"error":"result not available","error_code":"result_not_ready","status":"PROCESSING"}`。
+
+查询时可用的文件仍可能在下载前被管理员删除；下载请求失败应进入错误分支。
 
 ## GET /api/health
-Returns `{"status":"ok"}` when backend is alive.
+
+示例：`{"status":"ok","db":"ok","worker":"running"}`。部署验收需同时确认应用、数据库和 Worker 状态。
 
 ## GET /api/config/recommendations
-Returns runtime recommendations. Enhancement output codecs are detected from
-the FFmpeg encoders available inside the container and verified against the
-current GPU:
+
+返回运行建议。增强编码器来自 FFmpeg 编码器清单及当前 GPU 的实际探测：
 
 ```json
 {
@@ -86,65 +135,104 @@ current GPU:
 }
 ```
 
-## Conversion APIs
+## POST /api/transcriptions
 
-### POST /api/conversions
-**Content-Type**: multipart/form-data
+创建转录任务。**Content-Type**：`multipart/form-data`。
 
-Fields:
-- `media_files` (required, multiple video files)
-- `convert_mode` (`transcode` | `export_frames` | `demux_streams`)
-- `output_format` (`mp4` | `mkv` | `mov` | `avi`)
-- `video_codec` (`h264` | `h265`)
-- `frame_rate`
-- `aspect_ratio`
-- `second_pass_reencode`
-- `deinterlace`
-- `flip_horizontal`
-- `flip_vertical`
-- `video_fade_in_sec`
-- `video_fade_out_sec`
-- `crf`
-- `video_bitrate_k`
-- `target_size_mb`
-- `target_width`
-- `target_height`
-- watermark and metadata fields
-- frame export fields
+| 字段 | 默认值 / 说明 |
+| --- | --- |
+| `media_files` | 必填，可多个；也兼容 `files` / `file`，最小工作流每次用 `file` 上传一个文件 |
+| `transcription_backend` | `whisper`，也可为 `elevenlabs`（需服务端已配置密钥） |
+| `transcribe_mode` | `subtitle_zip`；也可为 `subtitled_video` / `subtitle_and_video_zip` |
+| `subtitle_format` | `srt`，也可为 `vtt` |
+| `whisper_model` | 管理员配置的活动模型，未配置时为 `large-v3`；必须已安装 |
+| `language` | `auto` |
+| `translate_to` | 空，即不翻译；填写目标语言时使用服务端翻译配置 |
+| `translator_fallback_mode` | 服务端配置，未配置时为 `model_full_text`；也可为 `source_text` |
+| `max_line_chars` | `42` |
+| `temperature` / `beam_size` / `best_of` | 分别为 `0.0` / `5` / `5` |
 
-Audio-only uploads are rejected. Transcode outputs copy the first source audio
-stream when present and do not expose audio processing parameters.
+翻译提供器、地址、模型、密钥和提示词由管理员在服务端配置。上传请求中的 `translator_provider`、`translator_base_url`、`translator_model`、`translator_api_key` 不用于覆盖这些配置。启用翻译但配置不完整时返回 **400**。
 
-Response:
+单文件成功返回 **201**：
+
 ```json
-{ "task_id": "<uuid>" }
+{ "task_id": "0124", "task_ids": ["0124"], "status_url": "/api/tasks/0124" }
 ```
 
-## Transcription APIs
+多文件为每个文件创建一个任务，响应保留 `task_id`（首个任务）、`task_ids`、`batch_id` 及可能的 `errors`，不增加单任务 `status_url`；用批次接口查询，注意部分失败。参数校验失败、模型未安装或全部上传失败时返回 **400** 和 `error`。
 
-Transcription backend APIs are exposed through the workbench transcription
-entry and admin transcription tools.
+### GET /api/transcriptions/runtime-config
 
-### POST /api/transcriptions
-**Content-Type**: multipart/form-data
+公开转录配置，包含 `transcription.active_model`、`installed_models`、`elevenlabs_configured` 和翻译可用性，不返回密钥。可先查询已安装模型，再提交任务。
 
-Fields:
-- `media_files` (required, multiple; also compatible with `files` / `file`)
-- `transcription_backend` (`whisper` | `elevenlabs`)
-- `transcribe_mode` (`subtitle_zip` | `subtitled_video` | `subtitle_and_video_zip`)
-- `subtitle_format` (`srt` | `vtt`)
-- `whisper_model`
-- `language`
-- `translate_to`
-- `translator_provider` (`none` | `openai_compatible`)
-- `translator_base_url`
-- `translator_model`
-- `translator_api_key`
+## 外部工作流：curl 与 n8n
 
-Response:
-```json
-{ "task_id": "<uuid>" }
+最小闭环为：增强 → 等待 → 下载视频 → 上传转录 → 等待 → 下载字幕 ZIP。普通视频传输经过调用方；第一版不接受上游任务引用或本地路径。
+
+### curl 示例
+
+以下使用 Bash、curl 和 jq；将服务地址和文件路径替换为实际值。增强示例显式使用二倍放大和 H.264；转录模型使用运行配置中的活动模型（需要已安装）。
+
+```bash
+set -euo pipefail
+BASE_URL='http://192.168.9.4:8501'
+
+# 提交只执行一次；不要配置自动重试，以免响应丢失后重复创建任务。
+enhance=$(curl --fail-with-body -sS "$BASE_URL/api/tasks" \
+  -F 'file=@input.mp4' -F 'input_type=Video' -F 'upscale=2' -F 'output_codec=h264')
+enhance_id=$(jq -er '.task_id' <<< "$enhance")
+enhance_status=$(jq -er '.status_url' <<< "$enhance")
+
+wait_result() {
+  local status_path="$1" deadline=$((SECONDS + 86400)) state status
+  while (( SECONDS < deadline )); do
+    sleep 10
+    state=$(curl --fail-with-body -sS --max-time 30 "$BASE_URL$status_path") || return 1
+    status=$(jq -er '.status' <<< "$state") || return 1
+    case "$status" in
+      PENDING|PROCESSING|WAITING) ;;
+      FAILED) jq -r '.message' <<< "$state" >&2; return 1 ;;
+      COMPLETED)
+        if jq -e '.result_available == true' <<< "$state" >/dev/null; then
+          jq -er '.result_url' <<< "$state"
+          return
+        fi
+        echo "任务已完成但结果文件缺失：$status_path" >&2; return 1 ;;
+      *) echo "未知状态：$status" >&2; return 1 ;;
+    esac
+  done
+  echo "等待超过 24 小时，保留任务供后续查询：$status_path" >&2
+  return 1
+}
+
+enhance_result=$(wait_result "$enhance_status") || exit 1
+curl --fail-with-body -sS "$BASE_URL$enhance_result" -o enhanced.mp4 || exit 1
+
+model=$(curl --fail-with-body -sS "$BASE_URL/api/transcriptions/runtime-config" | jq -er '.transcription.active_model')
+transcribe=$(curl --fail-with-body -sS "$BASE_URL/api/transcriptions" \
+  -F 'file=@enhanced.mp4' -F "whisper_model=$model" \
+  -F 'transcribe_mode=subtitle_zip' -F 'subtitle_format=srt')
+transcribe_id=$(jq -er '.task_id' <<< "$transcribe")
+transcribe_status=$(jq -er '.status_url' <<< "$transcribe")
+transcribe_result=$(wait_result "$transcribe_status") || exit 1
+curl --fail-with-body -sS "$BASE_URL$transcribe_result" -o subtitles.zip
 ```
+
+脚本中 `enhance_id`、`transcribe_id` 可用于超时后的查询或管理。24 小时是每个任务的客户端等待上限，不会取消服务端任务。下载失败时停止，不继续提交下一步。
+
+### n8n 节点配置
+
+1. 准备服务地址和输入二进制文件，例如字段名 `data`。HTTP Request 使用 `POST /api/tasks`，Body Content Type 选择 **Form-Data**，添加 **n8n Binary File** 参数：Name 为 `file`，Input Data Field Name 为 `data`；另加 `input_type=Video`、`upscale=2`、`output_codec=h264` 的 Form Data 参数。关闭 **Retry On Fail**。
+2. 用 Edit Fields 保存 `task_id`、`status_url`、服务地址以及本次任务的 `deadline = Date.now() + 86400000`。将轮询所需字段与响应分开保留，避免 HTTP 响应覆盖任务 ID 或在每次循环时重置 deadline。
+3. Wait 配置 **After Time Interval / 10 Seconds**。等待后先比较当前时间与 deadline，超时进入错误分支并保留任务 ID；否则 HTTP Request 对服务地址加 `status_url` 发起 GET，返回 JSON。
+4. Switch 根据 `status` 分支：`PENDING` / `PROCESSING` / `WAITING` 回到 Wait；`FAILED` 用 `message` 终止；`COMPLETED` 检查 `result_available`，为假时按结果缺失终止；未知状态或非 2xx 响应也进入错误分支。
+5. 结果可用时对服务地址加 `result_url` 发起 GET，Response Format 选 **File**，输出二进制字段设为 `data`。与下一步上传之间不要丢弃该二进制字段。
+6. 另一个 HTTP Request 向 `/api/transcriptions` 上传 `file=data`，并设置 `transcribe_mode=subtitle_zip`、`subtitle_format=srt`；模型可使用已安装的活动模型。保存新的任务 ID、状态 URL 和 deadline，复用上述轮询逻辑，最终以 File 格式下载并保存 ZIP。
+
+GET 查询、下载请求均设置合理的单次请求超时（示例为 30 秒的状态查询）；提交请求的超时应能覆盖实际文件上传。失败和超时分支停止执行，不自动重新提交或取消任务。无需 Socket.IO、Webhook 或专用节点。
+
+大视频会经过 n8n 的二进制存储；按 n8n 部署模式配置文件存储，避免默认内存模式承载大文件。官方说明：[HTTP Request](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.httprequest/)、[Wait](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.wait/)、[二进制数据存储](https://docs.n8n.io/hosting/scaling/binary-data/)。
 
 ## Admin APIs (Password Auth)
 

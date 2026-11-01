@@ -2,7 +2,7 @@ import io
 import json
 from pathlib import Path
 
-from flask import Blueprint, current_app, jsonify, request, send_file
+from flask import Blueprint, current_app, jsonify, request, send_file, url_for
 from app.src.Database import core as db
 from app.src.Database import gpu_metrics as db_gpu
 from app.src.Utils.preview_cache import get_preview as get_cached_preview
@@ -58,7 +58,7 @@ def create_task():
     )
     if err:
         return jsonify({"error": err, "task_id": task_id}), 400
-    return jsonify({"task_id": task_id}), 201
+    return jsonify({"task_id": task_id, "status_url": url_for("api_tasks.get_task", task_id=task_id)}), 201
 
 
 @bp.post("/api/tasks/batch")
@@ -110,6 +110,9 @@ def get_task(task_id):
         ), 404
     task["created_at"] = _normalize_utc_timestamp(task.get("created_at"))
     task["updated_at"] = _normalize_utc_timestamp(task.get("updated_at"))
+    result = find_result_file(task, OUTPUT_ROOT) if task.get("status") == "COMPLETED" else None
+    task["result_available"] = result is not None
+    task["result_url"] = url_for("api_tasks.download_result", task_id=task_id) if result else None
     task["task_params"] = _sanitize_task_params(json.loads(task.get("task_params", "{}")))
     task["video_info"] = json.loads(task.get("video_info", "{}"))
     task["task_progress"] = db.get_task_progress(task_id)
@@ -142,9 +145,15 @@ def get_preview(task_id, kind):
 @bp.get("/api/tasks/<task_id>/result")
 def download_result(task_id):
     task = db.get_task(task_id)
-    if not task or task.get("status") != "COMPLETED":
-        return jsonify({"error": "result not available"}), 404
+    if not task:
+        return jsonify({"error": "task not found", "error_code": "task_not_found"}), 404
+    if task.get("status") != "COMPLETED":
+        return jsonify({
+            "error": "result not available",
+            "error_code": "result_not_ready",
+            "status": task.get("status"),
+        }), 404
     path = find_result_file(task, OUTPUT_ROOT)
     if not path:
-        return jsonify({"error": "output missing"}), 404
+        return jsonify({"error": "output missing", "error_code": "result_missing"}), 404
     return send_file(path, as_attachment=True, download_name=Path(path).name)
